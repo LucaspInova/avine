@@ -254,7 +254,51 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
+function AvineLogo({ className = '' }) {
+  return <img className={className} src={avineLogo} alt="Avine" />
+}
+
+function LoginScreen({ busy, error, onSubmit }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    onSubmit({ email: email.trim().toLowerCase(), password })
+  }
+
+  return (
+    <main className="login-shell">
+      <form className="login-panel" onSubmit={handleSubmit}>
+        <AvineLogo className="login-mark" />
+        <h1>Painel Gerencial</h1>
+        <label className="login-field">
+          <span>Email</span>
+          <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required />
+        </label>
+        <label className="login-field">
+          <span>Senha</span>
+          <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="login-submit" type="submit" disabled={busy}>
+          {busy ? 'Entrando...' : 'Entrar'}
+        </button>
+      </form>
+    </main>
+  )
+}
+
+function PlaceholderScreen({ title }) {
+  return (
+    <section className="content-card placeholder-card">
+      <h2>{title}</h2>
+      <p className="table-message">Modulo em preparacao.</p>
+    </section>
+  )
+}
+
+function Sidebar({ expanded, selectedItem, currentUser, onToggle, onSelect, onLogout }) {
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
@@ -294,8 +338,11 @@ function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
       </nav>
 
       <div className="sidebar-user">
-        <span className="user-orb">A</span>
-        <span className="sidebar-label">ARLISSON</span>
+        <span className="user-orb">{currentUser?.nome?.charAt(0) ?? 'A'}</span>
+        <span className="sidebar-label">{currentUser?.nome ?? 'Usuario'}</span>
+        <button className="icon-button" type="button" onClick={onLogout} aria-label="Sair" title="Sair">
+          <Icon name="logout" />
+        </button>
       </div>
     </aside>
   )
@@ -1094,6 +1141,135 @@ function LojasScreen({
   )
 }
 
+function GerenciaisScreen({
+  usuarios,
+  form,
+  editId,
+  editForm,
+  busy,
+  error,
+  onFormChange,
+  onEditFormChange,
+  onCreate,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}) {
+  const gerenciais = usuarios.filter((usuario) => usuario.perfil === 'Gerencial')
+
+  return (
+    <section className="content-card gerenciais-card">
+      <div className="section-heading">
+        <div>
+          <span className="section-kicker">Administracao</span>
+          <h2>Usuarios gerenciais</h2>
+        </div>
+      </div>
+
+      <form className="gerencial-create" onSubmit={onCreate}>
+        <label className="login-field">
+          <span>Nome</span>
+          <input value={form.nome} onChange={(event) => onFormChange({ nome: event.target.value })} />
+        </label>
+        <label className="login-field">
+          <span>Email</span>
+          <input
+            value={form.email}
+            onChange={(event) => onFormChange({ email: event.target.value })}
+            type="email"
+          />
+        </label>
+        <label className="login-field">
+          <span>Senha</span>
+          <input
+            value={form.senha}
+            onChange={(event) => onFormChange({ senha: event.target.value })}
+            type="password"
+          />
+        </label>
+        <button className="create-button" type="submit" disabled={busy}>
+          Criar gerencial
+        </button>
+      </form>
+
+      {error && <p className="form-error">{error}</p>}
+
+      <div className="users-table gerenciais-table" role="table" aria-label="Usuarios gerenciais">
+        <div className="table-row table-head" role="row">
+          <span role="columnheader">NOME</span>
+          <span role="columnheader">EMAIL</span>
+          <span role="columnheader">STATUS</span>
+          <span role="columnheader">ACOES</span>
+        </div>
+
+        {gerenciais.map((usuario) => {
+          const isEditing = editId === usuario.id
+
+          return (
+            <div className="table-row gerencial-row" role="row" key={usuario.id}>
+              <span role="cell">
+                {isEditing ? (
+                  <input
+                    value={editForm.nome}
+                    onChange={(event) => onEditFormChange({ nome: event.target.value })}
+                  />
+                ) : (
+                  usuario.nome
+                )}
+              </span>
+              <span role="cell">
+                {isEditing ? (
+                  <input
+                    value={editForm.email}
+                    onChange={(event) => onEditFormChange({ email: event.target.value })}
+                    type="email"
+                  />
+                ) : (
+                  usuario.email
+                )}
+              </span>
+              <span className="status-cell" role="cell">
+                {isEditing ? (
+                  <label className="status-toggle">
+                    <input
+                      checked={editForm.ativo}
+                      onChange={(event) => onEditFormChange({ ativo: event.target.checked })}
+                      type="checkbox"
+                    />
+                    Ativo
+                  </label>
+                ) : (
+                  <span className={`status-pill ${usuario.ativo ? 'is-active' : 'is-inactive'}`}>
+                    {usuario.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                )}
+              </span>
+              <span className="actions-cell" role="cell">
+                {isEditing ? (
+                  <>
+                    <button className="secondary-button" type="button" onClick={onCancelEdit} disabled={busy}>
+                      Cancelar
+                    </button>
+                    <button className="create-button" type="button" onClick={onSaveEdit} disabled={busy}>
+                      Salvar
+                    </button>
+                  </>
+                ) : (
+                  <button className="secondary-button" type="button" onClick={() => onStartEdit(usuario)}>
+                    Editar
+                  </button>
+                )}
+              </span>
+            </div>
+          )
+        })}
+
+        {gerenciais.length === 0 && <p className="table-message">Nenhum usuario gerencial encontrado.</p>}
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [selectedItem, setSelectedItem] = useState('usuarios')
@@ -1114,6 +1290,11 @@ function App() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingUser, setDeletingUser] = useState(false)
   const [isEditOpen, setEditOpen] = useState(false)
+  const [session, setSession] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
+  const [loginBusy, setLoginBusy] = useState(false)
 
   const [lojas, setLojas] = useState([])
   const [promotores, setPromotores] = useState([])
@@ -1282,8 +1463,11 @@ function App() {
   const isLojas = selectedItem === 'lojas'
   const isFotos = selectedItem === 'fotos'
   const isPerfil = selectedItem === 'perfil'
+  const isConfiguracoes = selectedItem === 'configuracoes'
   const pageTitle = isPerfil
     ? 'Perfil'
+    : isConfiguracoes
+      ? 'Configuracoes'
     : isLojas
       ? 'Lojas'
       : isFotos
@@ -1292,6 +1476,8 @@ function App() {
   const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
   const pageSubtitle = isPerfil
     ? 'Dados do usuario logado.'
+    : isConfiguracoes
+      ? 'Gerencie usuarios administrativos.'
     : isLojas
       ? 'Roteirizacao dos Promotores.'
     : isFotos
@@ -1744,9 +1930,9 @@ function App() {
       <Sidebar
         expanded={sidebarExpanded}
         selectedItem={selectedItem}
+        currentUser={currentUser}
         onSelect={handleSelectItem}
-        onOpenProfile={() => handleSelectItem('perfil')}
-        onLogout={() => {}}
+        onLogout={handleLogout}
         onToggle={() => setSidebarExpanded((open) => !open)}
       />
 
@@ -1887,6 +2073,21 @@ function App() {
               </div>
             )}
           </section>
+        ) : isConfiguracoes ? (
+          <GerenciaisScreen
+            usuarios={usuarios}
+            form={gerencialForm}
+            editId={gerencialEditId}
+            editForm={gerencialEditForm}
+            busy={gerencialBusy}
+            error={gerencialError}
+            onFormChange={(patch) => setGerencialForm((current) => ({ ...current, ...patch }))}
+            onEditFormChange={(patch) => setGerencialEditForm((current) => ({ ...current, ...patch }))}
+            onCreate={handleCreateGerencial}
+            onStartEdit={startEditGerencial}
+            onCancelEdit={cancelEditGerencial}
+            onSaveEdit={handleSaveGerencial}
+          />
         ) : (
           <PlaceholderScreen title={pageTitle} />
         )}
