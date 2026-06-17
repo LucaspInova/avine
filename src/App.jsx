@@ -7,12 +7,13 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
-  { id: 'relatorio', label: 'Relatorio', icon: 'chart' },
-  { id: 'notas', label: 'Notas', icon: 'notes' },
+  { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
   { id: 'usuarios', label: 'Usuarios', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
+  { id: 'relatorios', label: 'Relatorios', icon: 'notes' },
   { id: 'fotos', label: 'Fotos', icon: 'camera' },
   { id: 'logs', label: 'Logs de Erro', icon: 'logs', separated: true },
+  { id: 'configuracoes', label: 'Configuracoes', icon: 'gear' },
 ]
 
 const initialUserForm = {
@@ -28,6 +29,12 @@ const initialLojaForm = {
   nome: '',
   uf: '',
   cidade: '',
+}
+
+const initialGerencialForm = {
+  nome: '',
+  email: '',
+  senha: '',
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -221,10 +228,30 @@ function Icon({ name, className = '' }) {
     )
   }
 
+  if (name === 'logout') {
+    return (
+      <svg {...props}>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="M16 17l5-5-5-5" />
+        <path d="M21 12H9" />
+      </svg>
+    )
+  }
+
   return null
 }
 
-function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
+function Sidebar({ expanded, selectedItem, currentUser, onLogout, onToggle, onSelect }) {
+  const initials = currentUser?.nome
+    ? currentUser.nome
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join('')
+        .toUpperCase()
+    : 'AV'
+
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
@@ -264,8 +291,11 @@ function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
       </nav>
 
       <div className="sidebar-user">
-        <span className="user-orb">A</span>
-        <span className="sidebar-label">ARLISSON</span>
+        <span className="user-orb">{initials}</span>
+        <span className="sidebar-label">{currentUser?.nome ?? 'Avine'}</span>
+        <button className="sidebar-logout" type="button" onClick={onLogout} title="Sair" aria-label="Sair">
+          <Icon name="logout" />
+        </button>
       </div>
     </aside>
   )
@@ -1028,9 +1058,242 @@ function LojasScreen({
   )
 }
 
+function LoginScreen({ error, busy, onSubmit }) {
+  const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const canSubmit = emailPattern.test(email.trim()) && senha.length > 0 && !busy
+
+  return (
+    <main className="login-shell">
+      <form
+        className="login-panel"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSubmit({ email: email.trim().toLowerCase(), password: senha })
+        }}
+      >
+        <div className="login-mark">av</div>
+        <h1>Painel Gerencial</h1>
+
+        <label className="login-field">
+          <span>Email</span>
+          <input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            type="email"
+            autoComplete="email"
+            required
+          />
+        </label>
+
+        <label className="login-field">
+          <span>Senha</span>
+          <input
+            value={senha}
+            onChange={(event) => setSenha(event.target.value)}
+            type="password"
+            autoComplete="current-password"
+            required
+          />
+        </label>
+
+        {error && <p className="form-error">{error}</p>}
+
+        <button className="login-submit" type="submit" disabled={!canSubmit}>
+          {busy ? 'Entrando...' : 'Entrar'}
+        </button>
+      </form>
+    </main>
+  )
+}
+
+function GerenciaisScreen({
+  currentUser,
+  usuarios,
+  loading,
+  error,
+  busy,
+  form,
+  editId,
+  editForm,
+  search,
+  onSearch,
+  onFormChange,
+  onEditChange,
+  onCreate,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}) {
+  const gerenciais = usuarios.filter((usuario) => usuario.perfil === 'Gerencial')
+  const activeCount = gerenciais.filter((usuario) => usuario.ativo).length
+  const query = search.trim().toLowerCase()
+  const filtered = gerenciais.filter((usuario) =>
+    `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query),
+  )
+  const canCreate =
+    emailPattern.test(form.email.trim()) && form.nome.trim().length >= 4 && form.senha.length >= 8 && !busy
+
+  return (
+    <section className="users-card gerenciais-card">
+      <div className="card-toolbar">
+        <h2>Usuarios Gerenciais</h2>
+
+        <label className="search-field">
+          <Icon name="search" />
+          <input
+            value={search}
+            onChange={(event) => onSearch(event.target.value)}
+            placeholder="Nome ou email"
+            type="search"
+          />
+        </label>
+      </div>
+
+      <form className="gerencial-create" onSubmit={onCreate}>
+        <label className="form-row">
+          <span>Nome</span>
+          <input
+            value={form.nome}
+            onChange={(event) => onFormChange({ nome: event.target.value })}
+            type="text"
+            minLength={4}
+            required
+          />
+        </label>
+        <label className="form-row">
+          <span>Email</span>
+          <input
+            value={form.email}
+            onChange={(event) => onFormChange({ email: event.target.value })}
+            type="email"
+            required
+          />
+        </label>
+        <label className="form-row">
+          <span>Senha inicial</span>
+          <input
+            value={form.senha}
+            onChange={(event) => onFormChange({ senha: event.target.value })}
+            type="password"
+            minLength={8}
+            required
+          />
+        </label>
+        <button className="create-button" type="submit" disabled={!canCreate}>
+          <Icon name="plus" />
+          <span>{busy ? 'Criando...' : 'Criar Gerencial'}</span>
+        </button>
+      </form>
+
+      {error && <p className="table-message is-error">{error}</p>}
+      {loading && <p className="table-message">Carregando Gerenciais...</p>}
+
+      {!loading && (
+        <div className="users-table gerenciais-table" role="table" aria-label="Usuarios Gerenciais">
+          <div className="table-row table-head" role="row">
+            <span role="columnheader">NOME</span>
+            <span role="columnheader">EMAIL</span>
+            <span role="columnheader">STATUS</span>
+            <span role="columnheader">ACOES</span>
+          </div>
+
+          {filtered.map((usuario) => {
+            const isEditing = editId === usuario.id
+            const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
+            const cannotDeactivate = isSelf || (usuario.ativo && activeCount <= 1)
+
+            return (
+              <div className="table-row gerencial-row" role="row" key={usuario.id}>
+                <div className="name-cell" role="cell">
+                  <span className="avatar-mini">
+                    <Icon name="gear" />
+                  </span>
+                  {isEditing ? (
+                    <input
+                      value={editForm.nome}
+                      onChange={(event) => onEditChange({ nome: event.target.value })}
+                      type="text"
+                    />
+                  ) : (
+                    <strong>{usuario.nome}</strong>
+                  )}
+                </div>
+
+                <span className="email-cell" role="cell">
+                  {isEditing ? (
+                    <input
+                      value={editForm.email}
+                      onChange={(event) => onEditChange({ email: event.target.value })}
+                      type="email"
+                    />
+                  ) : (
+                    usuario.email
+                  )}
+                </span>
+
+                <span className="status-cell" role="cell">
+                  {isEditing ? (
+                    <label className="status-toggle">
+                      <input
+                        checked={editForm.ativo}
+                        disabled={cannotDeactivate}
+                        onChange={(event) => onEditChange({ ativo: event.target.checked })}
+                        type="checkbox"
+                      />
+                      <span>{editForm.ativo ? 'Ativo' : 'Inativo'}</span>
+                    </label>
+                  ) : (
+                    <span className={`status-pill ${usuario.ativo ? 'is-active' : 'is-inactive'}`}>
+                      {usuario.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  )}
+                </span>
+
+                <span className="actions-cell" role="cell">
+                  {isEditing ? (
+                    <>
+                      <button className="secondary-button" type="button" onClick={onCancelEdit}>
+                        Cancelar
+                      </button>
+                      <button className="primary-button" type="button" disabled={busy} onClick={onSaveEdit}>
+                        Salvar
+                      </button>
+                    </>
+                  ) : (
+                    <button className="secondary-button" type="button" onClick={() => onStartEdit(usuario)}>
+                      Editar
+                    </button>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+
+          {filtered.length === 0 && <p className="table-message">Nenhum Gerencial encontrado.</p>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PlaceholderScreen({ title }) {
+  return (
+    <section className="users-card placeholder-card">
+      <h2>{title}</h2>
+      <p className="table-message">Modulo protegido para Gerenciais ativos.</p>
+    </section>
+  )
+}
+
 function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
-  const [selectedItem, setSelectedItem] = useState('usuarios')
+  const [selectedItem, setSelectedItem] = useState('dashboard')
+  const [session, setSession] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [loginBusy, setLoginBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1060,6 +1323,50 @@ function App() {
   const [savingLoja, setSavingLoja] = useState(false)
   const [storeSelectedUfs, setStoreSelectedUfs] = useState([])
   const [storeSelectedCidades, setStoreSelectedCidades] = useState([])
+  const [gerencialForm, setGerencialForm] = useState(initialGerencialForm)
+  const [gerencialEditId, setGerencialEditId] = useState('')
+  const [gerencialEditForm, setGerencialEditForm] = useState({
+    nome: '',
+    email: '',
+    ativo: true,
+  })
+  const [gerencialBusy, setGerencialBusy] = useState(false)
+  const [gerencialError, setGerencialError] = useState('')
+
+  async function validateSession(activeSession, options = {}) {
+    const user = activeSession?.user
+
+    if (!user) {
+      setSession(null)
+      setCurrentUser(null)
+      setAuthLoading(false)
+      return null
+    }
+
+    const { data, error: profileError } = await supabase
+      .from('usuarios')
+      .select('id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, created_at')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+
+    if (profileError || !data || data.perfil !== 'Gerencial' || data.ativo !== true) {
+      await supabase.auth.signOut()
+      setSession(null)
+      setCurrentUser(null)
+      setAuthError(
+        options.permissionMessage ??
+          'Acesso permitido somente para usuarios Gerenciais ativos.',
+      )
+      setAuthLoading(false)
+      return null
+    }
+
+    setSession(activeSession)
+    setCurrentUser(data)
+    setAuthError('')
+    setAuthLoading(false)
+    return data
+  }
 
   async function loadUsuarios() {
     setLoading(true)
@@ -1067,7 +1374,7 @@ function App() {
 
     const { data, error: requestError } = await supabase
       .from('usuarios')
-      .select('id, email, nome, perfil, estado, fotos_habilitadas, created_at')
+      .select('id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, created_at')
       .order('nome', { ascending: true })
 
     if (requestError) {
@@ -1117,10 +1424,34 @@ function App() {
   }
 
   useEffect(() => {
-    // Bootstrap client-side data from Supabase when the app opens.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUsuarios()
-    loadLojas()
+    let isMounted = true
+
+    async function bootstrapAuth() {
+      const { data } = await supabase.auth.getSession()
+      if (!isMounted) return
+      const usuario = await validateSession(data.session)
+      if (usuario && isMounted) {
+        await Promise.all([loadUsuarios(), loadLojas()])
+      }
+    }
+
+    bootstrapAuth()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!isMounted) return
+      if (!nextSession) {
+        setSession(null)
+        setCurrentUser(null)
+        setAuthLoading(false)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const filteredUsers = useMemo(() => {
@@ -1146,14 +1477,49 @@ function App() {
   const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
   const isLojas = selectedItem === 'lojas'
   const isFotos = selectedItem === 'fotos'
-  const pageTitle = isLojas ? 'Lojas' : isFotos ? 'Fotos' : 'Cadastro de Usuario'
+  const isUsuarios = selectedItem === 'usuarios'
+  const isConfiguracoes = selectedItem === 'configuracoes'
+  const isDashboard = selectedItem === 'dashboard'
+  const isRelatorios = selectedItem === 'relatorios'
+  const isLogs = selectedItem === 'logs'
+  const pageTitle = isLojas
+    ? 'Lojas'
+    : isFotos
+      ? 'Fotos'
+      : isConfiguracoes
+        ? 'Configuracoes'
+        : isDashboard
+          ? 'Dashboard'
+          : isRelatorios
+            ? 'Relatorios'
+            : isLogs
+              ? 'Logs'
+              : 'Cadastro de Usuario'
   const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
   const pageSubtitle = isLojas
     ? 'Roteirizacao dos Promotores.'
     : isFotos
       ? 'Seletor visual das fotos cadastradas por usuario.'
-      : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
-  const heroIcon = isLojas ? 'pin' : isFotos ? 'camera' : 'users'
+      : isConfiguracoes
+        ? 'Usuarios com acesso ao painel gerencial.'
+        : isDashboard
+          ? 'Visao geral do painel Avine.'
+          : isRelatorios
+            ? 'Analises e acompanhamentos gerenciais.'
+            : isLogs
+              ? 'Auditoria e eventos do sistema.'
+              : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
+  const heroIcon = isLojas
+    ? 'pin'
+    : isFotos
+      ? 'camera'
+      : isConfiguracoes
+        ? 'gear'
+        : isRelatorios || isDashboard
+          ? 'chart'
+          : isLogs
+            ? 'logs'
+            : 'users'
 
   async function handleCreateUsuario(event) {
     event.preventDefault()
@@ -1429,6 +1795,127 @@ function App() {
     await loadLojas()
   }
 
+  async function handleLogin({ email, password }) {
+    setLoginBusy(true)
+    setAuthError('')
+
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (loginError) {
+      setAuthError('Email ou senha invalidos.')
+      setLoginBusy(false)
+      return
+    }
+
+    const usuario = await validateSession(data.session, {
+      permissionMessage: 'Voce nao tem permissao para acessar o painel gerencial.',
+    })
+
+    if (usuario) {
+      await Promise.all([loadUsuarios(), loadLojas()])
+    }
+
+    setLoginBusy(false)
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setSession(null)
+    setCurrentUser(null)
+    setSelectedItem('dashboard')
+    setUsuarios([])
+    setLojas([])
+    setPromotores([])
+    setLojaPromotores([])
+    setAuthError('')
+  }
+
+  async function handleCreateGerencial(event) {
+    event.preventDefault()
+
+    const payload = {
+      p_nome: normalizaTexto(gerencialForm.nome),
+      p_email: gerencialForm.email.trim().toLowerCase(),
+      p_password: gerencialForm.senha,
+    }
+
+    if (
+      payload.p_nome.length < 4 ||
+      !emailPattern.test(payload.p_email) ||
+      payload.p_password.length < 8
+    ) {
+      setGerencialError('Revise nome, email e senha antes de criar.')
+      return
+    }
+
+    setGerencialBusy(true)
+    setGerencialError('')
+
+    const { error: rpcError } = await supabase.rpc('create_gerencial_user', payload)
+
+    if (rpcError) {
+      setGerencialError(rpcError.message)
+      setGerencialBusy(false)
+      return
+    }
+
+    setGerencialForm(initialGerencialForm)
+    setGerencialBusy(false)
+    await loadUsuarios()
+  }
+
+  function startEditGerencial(usuario) {
+    setGerencialEditId(usuario.id)
+    setGerencialEditForm({
+      nome: usuario.nome,
+      email: usuario.email,
+      ativo: usuario.ativo,
+    })
+    setGerencialError('')
+  }
+
+  function cancelEditGerencial() {
+    setGerencialEditId('')
+    setGerencialEditForm({ nome: '', email: '', ativo: true })
+    setGerencialError('')
+  }
+
+  async function handleSaveGerencial() {
+    const payload = {
+      p_usuario_id: gerencialEditId,
+      p_nome: normalizaTexto(gerencialEditForm.nome),
+      p_email: gerencialEditForm.email.trim().toLowerCase(),
+      p_ativo: gerencialEditForm.ativo,
+    }
+
+    if (!payload.p_usuario_id || payload.p_nome.length < 4 || !emailPattern.test(payload.p_email)) {
+      setGerencialError('Revise nome e email antes de salvar.')
+      return
+    }
+
+    setGerencialBusy(true)
+    setGerencialError('')
+
+    const { data, error: rpcError } = await supabase.rpc('update_gerencial_user', payload)
+
+    if (rpcError) {
+      setGerencialError(rpcError.message)
+      setGerencialBusy(false)
+      return
+    }
+
+    if (data?.auth_user_id === currentUser?.auth_user_id) {
+      setCurrentUser(data)
+    }
+
+    cancelEditGerencial()
+    setGerencialBusy(false)
+    await loadUsuarios()
+  }
+
   function toggleEstado(estado) {
     setSelectedEstados((current) =>
       current.includes(estado) ? current.filter((item) => item !== estado) : [...current, estado],
@@ -1451,6 +1938,9 @@ function App() {
     setSelectedItem(item)
     setSearch('')
     setFilterOpen(false)
+    setCadastroOpen(false)
+    setGerencialError('')
+    setGerencialEditId('')
   }
 
   function closeCadastro() {
@@ -1459,11 +1949,25 @@ function App() {
     setLojaFormError('')
   }
 
+  if (authLoading) {
+    return (
+      <main className="login-shell">
+        <p className="auth-loading">Validando sessao...</p>
+      </main>
+    )
+  }
+
+  if (!session || !currentUser) {
+    return <LoginScreen busy={loginBusy} error={authError} onSubmit={handleLogin} />
+  }
+
   return (
     <div className="admin-shell">
       <Sidebar
         expanded={sidebarExpanded}
         selectedItem={selectedItem}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onSelect={handleSelectItem}
         onToggle={() => setSidebarExpanded((open) => !open)}
       />
@@ -1481,7 +1985,26 @@ function App() {
           </div>
         </header>
 
-        {isLojas ? (
+        {isConfiguracoes ? (
+          <GerenciaisScreen
+            currentUser={currentUser}
+            usuarios={usuarios}
+            loading={loading}
+            error={gerencialError}
+            busy={gerencialBusy}
+            form={gerencialForm}
+            editId={gerencialEditId}
+            editForm={gerencialEditForm}
+            search={search}
+            onSearch={setSearch}
+            onFormChange={(patch) => setGerencialForm((current) => ({ ...current, ...patch }))}
+            onEditChange={(patch) => setGerencialEditForm((current) => ({ ...current, ...patch }))}
+            onCreate={handleCreateGerencial}
+            onStartEdit={startEditGerencial}
+            onCancelEdit={cancelEditGerencial}
+            onSaveEdit={handleSaveGerencial}
+          />
+        ) : isLojas ? (
           <LojasScreen
             search={search}
             lojas={lojas}
@@ -1505,7 +2028,7 @@ function App() {
             onOpenCadastro={() => setCadastroOpen(true)}
             onChangePromotor={handlePromotorChange}
           />
-        ) : (
+        ) : isUsuarios || isFotos ? (
           <section className="users-card">
             <div className="card-toolbar">
               <h2>{tableTitle}</h2>
@@ -1605,10 +2128,12 @@ function App() {
               </div>
             )}
           </section>
+        ) : (
+          <PlaceholderScreen title={pageTitle} />
         )}
       </main>
 
-      {isCadastroOpen && !isLojas && (
+      {isCadastroOpen && (isUsuarios || isFotos) && (
         <CadastroModal
           form={form}
           usuarios={usuarios}

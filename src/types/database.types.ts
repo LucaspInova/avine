@@ -136,29 +136,35 @@ export type Database = {
       usuarios: {
         Row: {
           id: string
+          auth_user_id: string | null
           email: string
           nome: string
-          perfil: 'Promotor' | 'Entregador'
+          perfil: 'Promotor' | 'Entregador' | 'Gerencial'
           estado: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas: boolean
+          ativo: boolean
           created_at: string
         }
         Insert: {
           id?: string
+          auth_user_id?: string | null
           email: string
           nome: string
-          perfil: 'Promotor' | 'Entregador'
+          perfil: 'Promotor' | 'Entregador' | 'Gerencial'
           estado: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas?: boolean
+          ativo?: boolean
           created_at?: string
         }
         Update: {
           id?: string
+          auth_user_id?: string | null
           email?: string
           nome?: string
-          perfil?: 'Promotor' | 'Entregador'
+          perfil?: 'Promotor' | 'Entregador' | 'Gerencial'
           estado?: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas?: boolean
+          ativo?: boolean
           created_at?: string
         }
         Relationships: []
