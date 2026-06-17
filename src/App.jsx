@@ -8,14 +8,13 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
-  { id: 'perfil', label: 'Perfil', icon: 'users' },
   { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
-  { id: 'usuarios', label: 'Usuarios', icon: 'users' },
+  { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
-  { id: 'relatorios', label: 'Relatorios', icon: 'notes' },
+  { id: 'relatorios', label: 'Relatórios', icon: 'notes' },
   { id: 'fotos', label: 'Fotos', icon: 'camera' },
   { id: 'logs', label: 'Logs de Erro', icon: 'logs', separated: true },
-  { id: 'configuracoes', label: 'Configuracoes', icon: 'gear' },
+  { id: 'configuracoes', label: 'Configurações', icon: 'gear' },
 ]
 
 const initialUserForm = {
