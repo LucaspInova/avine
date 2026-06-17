@@ -1278,9 +1278,17 @@ function App() {
   }, [lojaPromotores])
 
   const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
+  const isUsuarios = selectedItem === 'usuarios'
   const isLojas = selectedItem === 'lojas'
   const isFotos = selectedItem === 'fotos'
-  const pageTitle = isLojas ? 'Lojas' : isFotos ? 'Fotos' : 'Cadastro de Usuario'
+  const isPerfil = selectedItem === 'perfil'
+  const pageTitle = isPerfil
+    ? 'Perfil'
+    : isLojas
+      ? 'Lojas'
+      : isFotos
+        ? 'Fotos'
+        : 'Cadastro de Usuario'
   const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
   const pageSubtitle = isPerfil
     ? 'Dados do usuario logado.'
