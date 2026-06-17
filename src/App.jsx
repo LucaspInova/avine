@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import './App.css'
 
+const avineLogo = '/avine-logo.svg'
+const storesPerPage = 24
+
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
@@ -212,6 +215,16 @@ function Icon({ name, className = '' }) {
     )
   }
 
+  if (name === 'image') {
+    return (
+      <svg {...props}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="10" r="1.5" />
+        <path d="m21 15-4.5-4.5L7 20" />
+      </svg>
+    )
+  }
+
   if (name === 'x') {
     return (
       <svg {...props}>
@@ -224,12 +237,28 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
+function AvineLogo({ className = '' }) {
+  return <img className={`avine-logo ${className}`.trim()} src={avineLogo} alt="Avine" />
+}
+
+function getFirstName(name) {
+  return name.trim().split(/\s+/)[0] || 'Usuario'
+}
+
+function ProfileAvatar({ profile, className = '' }) {
+  return profile.photo ? (
+    <img className={`profile-avatar-image ${className}`.trim()} src={profile.photo} alt="Foto do perfil" />
+  ) : (
+    <span className={`user-orb ${className}`.trim()}>{getFirstName(profile.name).charAt(0).toUpperCase()}</span>
+  )
+}
+
+function Sidebar({ expanded, selectedItem, profile, onToggle, onSelect, onOpenProfile, onLogout }) {
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
         <button className="brand-button" type="button" aria-label="Avine Gerencial">
-          <span className="brand-mark">av</span>
+          <AvineLogo className="brand-mark" />
         </button>
 
         <button
@@ -263,9 +292,16 @@ function Sidebar({ expanded, selectedItem, onToggle, onSelect }) {
         ))}
       </nav>
 
-      <div className="sidebar-user">
-        <span className="user-orb">A</span>
-        <span className="sidebar-label">ARLISSON</span>
+      <div className="sidebar-user-wrap">
+        <button className="sidebar-user" type="button" aria-haspopup="menu">
+          <ProfileAvatar profile={profile} />
+          <span className="sidebar-user-name">{getFirstName(profile.name)}</span>
+        </button>
+
+        <div className="profile-menu" role="menu">
+          <button type="button" role="menuitem" onClick={onOpenProfile}>Ver perfil</button>
+          <button type="button" role="menuitem" onClick={onLogout}>Sair</button>
+        </div>
       </div>
     </aside>
   )
@@ -942,8 +978,12 @@ function LojasScreen({
     })
   }, [lojas, search, selectedCidades, selectedUfs])
 
+  const [currentPage, setCurrentPage] = useState(1)
   const activeFilterCount = selectedUfs.length + selectedCidades.length
   const activeFilterLabel = activeFilterCount ? `${activeFilterCount} filtros` : 'Filtrar'
+  const totalPages = Math.max(1, Math.ceil(filteredLojas.length / storesPerPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedLojas = filteredLojas.slice((safePage - 1) * storesPerPage, safePage * storesPerPage)
 
   return (
     <section className="stores-page">
@@ -953,7 +993,15 @@ function LojasScreen({
         <div className="toolbar-actions">
           <label className="search-field">
             <Icon name="search" />
-            <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Procurar" type="search" />
+            <input
+              value={search}
+              onChange={(event) => {
+                setCurrentPage(1)
+                onSearch(event.target.value)
+              }}
+              placeholder="Procurar"
+              type="search"
+            />
           </label>
 
           <div className="filter-wrap">
@@ -972,9 +1020,18 @@ function LojasScreen({
                 cidades={cidades}
                 selectedUfs={selectedUfs}
                 selectedCidades={selectedCidades}
-                onToggleUf={onToggleUf}
-                onToggleCidade={onToggleCidade}
-                onClear={onClearFilters}
+                onToggleUf={(uf) => {
+                  setCurrentPage(1)
+                  onToggleUf(uf)
+                }}
+                onToggleCidade={(cidade) => {
+                  setCurrentPage(1)
+                  onToggleCidade(cidade)
+                }}
+                onClear={() => {
+                  setCurrentPage(1)
+                  onClearFilters()
+                }}
                 onClose={onCloseFilters}
               />
             )}
@@ -992,7 +1049,7 @@ function LojasScreen({
 
       {!loading && (
         <div className="store-cards-grid" aria-label="Lojas">
-          {filteredLojas.map((loja) => {
+          {paginatedLojas.map((loja) => {
             const lojaVinculos = vinculos[loja.id] ?? {}
 
             return (
@@ -1024,12 +1081,89 @@ function LojasScreen({
           )}
         </div>
       )}
+
+      {!loading && totalPages > 1 && (
+        <div className="stores-pagination" aria-label="Paginacao de lojas">
+          <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={safePage === 1} aria-label="Pagina anterior">‹</button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1)
+            .filter((page) => page <= 5 || page === totalPages || Math.abs(page - safePage) <= 1)
+            .map((page, index, pages) => (
+              <span key={page} className="pagination-item-wrap">
+                {index > 0 && page - pages[index - 1] > 1 && <span className="pagination-ellipsis">...</span>}
+                <button type="button" className={page === safePage ? 'is-active' : ''} onClick={() => setCurrentPage(page)}>{page}</button>
+              </span>
+            ))}
+          <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={safePage === totalPages} aria-label="Proxima pagina">›</button>
+        </div>
+      )}
     </section>
+  )
+}
+
+function PerfilScreen({ profile, onEdit }) {
+  return (
+    <section className="profile-page">
+      <div className="profile-cover" />
+      <div className="profile-card-body">
+        <div>
+          <h2>{profile.name}</h2>
+          <p>{profile.email}</p>
+        </div>
+        <button className="create-button" type="button" onClick={onEdit}>
+          <Icon name="gear" />
+          <span>Editar Perfil</span>
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function EditarPerfilPanel({ form, onChange, onClose, onSubmit }) {
+  return (
+    <div className="profile-panel-backdrop" role="presentation">
+      <form className="profile-panel" onSubmit={onSubmit}>
+        <div className="modal-titlebar edit-titlebar">
+          <h3>Edit</h3>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar edicao">
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="profile-panel-body">
+          <strong className="profile-panel-email">{form.email}</strong>
+          <label className="edit-field">
+            <span>Name</span>
+            <input value={form.name} onChange={(event) => onChange({ name: event.target.value })} required />
+          </label>
+          <label className="edit-field file-field">
+            <span>Foto</span>
+            <span className="file-input-label"><Icon name="image" />{form.photoName || 'Escolha uma imagem...'}</span>
+            <input
+              accept="image/*"
+              type="file"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = () => onChange({ photo: reader.result, photoName: file.name })
+                reader.readAsDataURL(file)
+              }}
+            />
+          </label>
+        </div>
+        <div className="edit-actions">
+          <button className="primary-button edit-submit" type="submit">Enviar</button>
+          <button className="secondary-button edit-cancel" type="button" onClick={onClose}>Cancelar</button>
+        </div>
+      </form>
+    </div>
   )
 }
 
 function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
+  const [profile, setProfile] = useState({ name: 'ARLISSON', email: 'arlissonjp07@gmail.com', photo: '', photoName: '' })
+  const [profileForm, setProfileForm] = useState({ name: 'ARLISSON', email: 'arlissonjp07@gmail.com', photo: '', photoName: '' })
+  const [isProfileEditOpen, setProfileEditOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState('usuarios')
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
@@ -1146,14 +1280,17 @@ function App() {
   const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
   const isLojas = selectedItem === 'lojas'
   const isFotos = selectedItem === 'fotos'
-  const pageTitle = isLojas ? 'Lojas' : isFotos ? 'Fotos' : 'Cadastro de Usuario'
+  const isPerfil = selectedItem === 'perfil'
+  const pageTitle = isPerfil ? 'Perfil' : isLojas ? 'Lojas' : isFotos ? 'Fotos' : 'Cadastro de Usuario'
   const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
-  const pageSubtitle = isLojas
-    ? 'Roteirizacao dos Promotores.'
+  const pageSubtitle = isPerfil
+    ? 'Dados do usuario logado.'
+    : isLojas
+      ? 'Roteirizacao dos Promotores.'
     : isFotos
       ? 'Seletor visual das fotos cadastradas por usuario.'
       : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
-  const heroIcon = isLojas ? 'pin' : isFotos ? 'camera' : 'users'
+  const heroIcon = isPerfil ? 'users' : isLojas ? 'pin' : isFotos ? 'camera' : 'users'
 
   async function handleCreateUsuario(event) {
     event.preventDefault()
@@ -1464,7 +1601,10 @@ function App() {
       <Sidebar
         expanded={sidebarExpanded}
         selectedItem={selectedItem}
+        profile={profile}
         onSelect={handleSelectItem}
+        onOpenProfile={() => handleSelectItem('perfil')}
+        onLogout={() => {}}
         onToggle={() => setSidebarExpanded((open) => !open)}
       />
 
@@ -1481,7 +1621,15 @@ function App() {
           </div>
         </header>
 
-        {isLojas ? (
+        {isPerfil ? (
+          <PerfilScreen
+            profile={profile}
+            onEdit={() => {
+              setProfileForm(profile)
+              setProfileEditOpen(true)
+            }}
+          />
+        ) : isLojas ? (
           <LojasScreen
             search={search}
             lojas={lojas}
@@ -1608,7 +1756,20 @@ function App() {
         )}
       </main>
 
-      {isCadastroOpen && !isLojas && (
+      {isProfileEditOpen && (
+        <EditarPerfilPanel
+          form={profileForm}
+          onChange={(patch) => setProfileForm((current) => ({ ...current, ...patch }))}
+          onClose={() => setProfileEditOpen(false)}
+          onSubmit={(event) => {
+            event.preventDefault()
+            setProfile((current) => ({ ...current, ...profileForm, name: normalizaNome(profileForm.name) }))
+            setProfileEditOpen(false)
+          }}
+        />
+      )}
+
+      {isCadastroOpen && !isLojas && !isPerfil && (
         <CadastroModal
           form={form}
           usuarios={usuarios}
