@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
+import avineLogo from './assets/avine-logo.svg'
 import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -7,6 +8,7 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
+  { id: 'perfil', label: 'Perfil', icon: 'users' },
   { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
   { id: 'usuarios', label: 'Usuarios', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
@@ -241,7 +243,8 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-function Sidebar({ expanded, selectedItem, currentUser, onLogout, onToggle, onSelect }) {
+function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
+  const firstName = currentUser?.nome?.split(/\s+/).filter(Boolean)[0] ?? 'Avine'
   const initials = currentUser?.nome
     ? currentUser.nome
         .split(/\s+/)
@@ -256,7 +259,7 @@ function Sidebar({ expanded, selectedItem, currentUser, onLogout, onToggle, onSe
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
         <button className="brand-button" type="button" aria-label="Avine Gerencial">
-          <span className="brand-mark">av</span>
+          <img className="brand-logo" src={avineLogo} alt="Avine" />
         </button>
 
         <button
@@ -291,11 +294,16 @@ function Sidebar({ expanded, selectedItem, currentUser, onLogout, onToggle, onSe
       </nav>
 
       <div className="sidebar-user">
-        <span className="user-orb">{initials}</span>
-        <span className="sidebar-label">{currentUser?.nome ?? 'Avine'}</span>
-        <button className="sidebar-logout" type="button" onClick={onLogout} title="Sair" aria-label="Sair">
-          <Icon name="logout" />
+        <button className="profile-trigger" type="button" aria-haspopup="menu">
+          <span className="user-orb">
+            {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+          </span>
+          <span className="profile-first-name">{firstName}</span>
         </button>
+        <div className="profile-menu" role="menu">
+          <button type="button" role="menuitem" onClick={() => onSelect('perfil')}>Ver perfil</button>
+          <button type="button" role="menuitem" onClick={onLogout}>Sair</button>
+        </div>
       </div>
     </aside>
   )
@@ -972,6 +980,13 @@ function LojasScreen({
     })
   }, [lojas, search, selectedCidades, selectedUfs])
 
+  const [currentPage, setCurrentPage] = useState(1)
+  const storesPerPage = 24
+  const totalPages = Math.max(1, Math.ceil(filteredLojas.length / storesPerPage))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedLojas = filteredLojas.slice((safePage - 1) * storesPerPage, safePage * storesPerPage)
+
+
   const activeFilterCount = selectedUfs.length + selectedCidades.length
   const activeFilterLabel = activeFilterCount ? `${activeFilterCount} filtros` : 'Filtrar'
 
@@ -1022,7 +1037,7 @@ function LojasScreen({
 
       {!loading && (
         <div className="store-cards-grid" aria-label="Lojas">
-          {filteredLojas.map((loja) => {
+          {paginatedLojas.map((loja) => {
             const lojaVinculos = vinculos[loja.id] ?? {}
 
             return (
@@ -1054,6 +1069,114 @@ function LojasScreen({
           )}
         </div>
       )}
+
+      {!loading && filteredLojas.length > storesPerPage && (
+        <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setCurrentPage} />
+      )}
+    </section>
+  )
+}
+
+function Pagination({ currentPage, totalPages, onPageChange }) {
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+  const visiblePages = pages.filter((page) => page <= 5 || page === totalPages || Math.abs(page - currentPage) <= 1)
+  const items = visiblePages.reduce((acc, page) => {
+    const last = acc[acc.length - 1]
+    if (last && page - last > 1) acc.push('ellipsis')
+    acc.push(page)
+    return acc
+  }, [])
+
+  return (
+    <nav className="pagination" aria-label="Paginacao de lojas">
+      <button type="button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>‹</button>
+      {items.map((item, index) =>
+        item === 'ellipsis' ? (
+          <span key={`ellipsis-${index}`}>...</span>
+        ) : (
+          <button
+            key={item}
+            className={item === currentPage ? 'is-active' : ''}
+            type="button"
+            onClick={() => onPageChange(item)}
+          >
+            {item}
+          </button>
+        ),
+      )}
+      <button type="button" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>›</button>
+    </nav>
+  )
+}
+
+function PerfilScreen({ user, profilePhoto, onPhotoChange, onSave }) {
+  const [isOpen, setOpen] = useState(false)
+  const [name, setName] = useState(user?.nome ?? '')
+  const [photoPreview, setPhotoPreview] = useState(profilePhoto)
+
+
+  function handleFile(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setPhotoPreview(reader.result)
+      onPhotoChange(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    onSave(name)
+    setOpen(false)
+  }
+
+  return (
+    <section className="profile-page">
+      <div className="profile-card">
+        <div className="profile-cover" />
+        <div className="profile-details">
+          <div className="profile-photo">{profilePhoto ? <img src={profilePhoto} alt="Foto de perfil" /> : (user?.nome?.[0] ?? 'A')}</div>
+          <div>
+            <h2>{user?.nome}</h2>
+            <p>{user?.email}</p>
+          </div>
+          <button className="create-button profile-edit-button" type="button" onClick={() => { setName(user?.nome ?? ''); setPhotoPreview(profilePhoto); setOpen(true) }}>
+            <Icon name="gear" />
+            <span>Editar Perfil</span>
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="profile-drawer-backdrop">
+          <form className="profile-drawer" onSubmit={handleSubmit}>
+            <div className="modal-titlebar">
+              <h3>Edit</h3>
+              <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Fechar">
+                <Icon name="x" />
+              </button>
+            </div>
+            <div className="profile-edit-box">
+              <strong>{user?.email}</strong>
+              <label className="edit-field">
+                <span>Name</span>
+                <input value={name} onChange={(event) => setName(event.target.value)} type="text" minLength={4} required />
+              </label>
+              <label className="edit-field">
+                <span>Foto</span>
+                <input onChange={handleFile} type="file" accept="image/*" />
+              </label>
+              {photoPreview && <img className="profile-preview" src={photoPreview} alt="Previa" />}
+            </div>
+            <div className="edit-actions">
+              <button className="primary-button edit-submit" type="submit">Enviar</button>
+              <button className="secondary-button edit-cancel" type="button" onClick={() => setOpen(false)}>Cancelar</button>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   )
 }
@@ -1072,7 +1195,7 @@ function LoginScreen({ error, busy, onSubmit }) {
           onSubmit({ email: email.trim().toLowerCase(), password: senha })
         }}
       >
-        <div className="login-mark">av</div>
+        <img className="login-logo" src={avineLogo} alt="Avine" />
         <h1>Painel Gerencial</h1>
 
         <label className="login-field">
@@ -1332,6 +1455,7 @@ function App() {
   })
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
+  const [profilePhoto, setProfilePhoto] = useState('')
 
   async function validateSession(activeSession, options = {}) {
     const user = activeSession?.user
@@ -1475,6 +1599,7 @@ function App() {
   }, [lojaPromotores])
 
   const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
+  const isPerfil = selectedItem === 'perfil'
   const isLojas = selectedItem === 'lojas'
   const isFotos = selectedItem === 'fotos'
   const isUsuarios = selectedItem === 'usuarios'
@@ -1482,7 +1607,9 @@ function App() {
   const isDashboard = selectedItem === 'dashboard'
   const isRelatorios = selectedItem === 'relatorios'
   const isLogs = selectedItem === 'logs'
-  const pageTitle = isLojas
+  const pageTitle = isPerfil
+    ? 'Perfil'
+    : isLojas
     ? 'Lojas'
     : isFotos
       ? 'Fotos'
@@ -1496,7 +1623,9 @@ function App() {
               ? 'Logs'
               : 'Cadastro de Usuario'
   const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
-  const pageSubtitle = isLojas
+  const pageSubtitle = isPerfil
+    ? 'Dados da conta gerencial.'
+    : isLojas
     ? 'Roteirizacao dos Promotores.'
     : isFotos
       ? 'Seletor visual das fotos cadastradas por usuario.'
@@ -1509,7 +1638,9 @@ function App() {
             : isLogs
               ? 'Auditoria e eventos do sistema.'
               : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
-  const heroIcon = isLojas
+  const heroIcon = isPerfil
+    ? 'users'
+    : isLojas
     ? 'pin'
     : isFotos
       ? 'camera'
@@ -1934,6 +2065,21 @@ function App() {
     )
   }
 
+  async function handleProfileSave(nome) {
+    const normalizedName = normalizaTexto(nome).toUpperCase()
+    if (normalizedName.length < 4) return
+
+    const { error: updateError } = await supabase
+      .from('usuarios')
+      .update({ nome: normalizedName })
+      .eq('id', currentUser.id)
+
+    if (!updateError) {
+      setCurrentUser((current) => ({ ...current, nome: normalizedName }))
+      await loadUsuarios()
+    }
+  }
+
   function handleSelectItem(item) {
     setSelectedItem(item)
     setSearch('')
@@ -1967,6 +2113,7 @@ function App() {
         expanded={sidebarExpanded}
         selectedItem={selectedItem}
         currentUser={currentUser}
+        profilePhoto={profilePhoto}
         onLogout={handleLogout}
         onSelect={handleSelectItem}
         onToggle={() => setSidebarExpanded((open) => !open)}
@@ -1985,7 +2132,14 @@ function App() {
           </div>
         </header>
 
-        {isConfiguracoes ? (
+        {isPerfil ? (
+          <PerfilScreen
+            user={currentUser}
+            profilePhoto={profilePhoto}
+            onPhotoChange={setProfilePhoto}
+            onSave={handleProfileSave}
+          />
+        ) : isConfiguracoes ? (
           <GerenciaisScreen
             currentUser={currentUser}
             usuarios={usuarios}
