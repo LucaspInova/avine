@@ -15,8 +15,11 @@ const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
+  { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
+  { id: 'motivos', label: 'Motivos', icon: 'filter' },
+  { id: 'recolhimento', label: 'Recolhimento', icon: 'logs' },
   { id: 'relatorios', label: 'Relatórios', icon: 'notes' },
   { id: 'fotos', label: 'Fotos', icon: 'camera' },
   { id: 'logs', label: 'Logs de Erro', icon: 'logs', separated: true },
@@ -1214,7 +1217,7 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
   )
 }
 
-function LoginScreen({ error, busy, onSubmit }) {
+function LoginScreen({ error, busy, title = 'Painel Gerencial', onSubmit }) {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const canSubmit = emailPattern.test(email.trim()) && senha.length > 0 && !busy
@@ -1229,7 +1232,7 @@ function LoginScreen({ error, busy, onSubmit }) {
         }}
       >
         <img className="login-logo" src={avineLogo} alt="Avine" />
-        <h1>Painel Gerencial</h1>
+        <h1>{title}</h1>
 
         <label className="login-field">
           <span>Email</span>
@@ -1433,6 +1436,293 @@ function GerenciaisScreen({
   )
 }
 
+function PromotorScreen({
+  user,
+  lojas,
+  nfds,
+  motivos,
+  loading,
+  error,
+  onLogout,
+  onRefresh,
+}) {
+  const [search, setSearch] = useState('')
+  const [selectedLojaId, setSelectedLojaId] = useState('')
+  const [activeStatus, setActiveStatus] = useState('atrasada')
+  const [form, setForm] = useState({
+    nfdId: '',
+    motivoId: '',
+    gal: '',
+    cod: '',
+    siu: '',
+    fotos: '',
+    observacao: '',
+  })
+  const [submitError, setSubmitError] = useState('')
+  const [submitSuccess, setSubmitSuccess] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const filteredLojas = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return lojas.filter((loja) =>
+      `${loja.codigo} ${loja.nome} ${loja.cidade} ${loja.uf}`.toLowerCase().includes(query),
+    )
+  }, [lojas, search])
+
+  const selectedLoja = useMemo(() => {
+    return lojas.find((loja) => loja.id === selectedLojaId) ?? filteredLojas[0] ?? null
+  }, [filteredLojas, lojas, selectedLojaId])
+
+  const lojaNfds = useMemo(() => {
+    if (!selectedLoja) return []
+    return nfds.filter((nfd) => nfd.loja_id === selectedLoja.id)
+  }, [nfds, selectedLoja])
+
+  const statusTabs = [
+    { id: 'atrasada', label: 'Atrasadas' },
+    { id: 'finalizada', label: 'Finalizadas' },
+    { id: 'avulsa', label: 'Avulsas' },
+    { id: 'outros', label: 'Outros' },
+  ]
+
+  const nfdsByStatus = statusTabs.reduce((acc, tab) => {
+    acc[tab.id] = lojaNfds.filter((nfd) => nfd.status_nfd === tab.id)
+    return acc
+  }, {})
+
+  const visibleNfds = nfdsByStatus[activeStatus] ?? []
+  const pendingCount = lojaNfds.filter((nfd) => nfd.status_nfd === 'atrasada' || nfd.status_nfd === 'outros').length
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    if (!selectedLoja || !form.motivoId) {
+      setSubmitError('Selecione loja e motivo antes de solicitar.')
+      return
+    }
+
+    setSubmitting(true)
+    setSubmitError('')
+    setSubmitSuccess('')
+
+    const fotoPaths = form.fotos
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    const { error: rpcError } = await supabase.rpc('solicitar_fstd', {
+      p_loja_id: selectedLoja.id,
+      p_motivo_id: form.motivoId,
+      p_nfd_id: form.nfdId || null,
+      p_quantidade_gal: Number(form.gal || 0),
+      p_quantidade_cod: Number(form.cod || 0),
+      p_quantidade_siu: Number(form.siu || 0),
+      p_fotos: fotoPaths,
+      p_observacao: form.observacao || null,
+    })
+
+    if (rpcError) {
+      setSubmitError(rpcError.message)
+      setSubmitting(false)
+      return
+    }
+
+    setSubmitSuccess('Retorno Solicitado!')
+    setForm({
+      nfdId: '',
+      motivoId: '',
+      gal: '',
+      cod: '',
+      siu: '',
+      fotos: '',
+      observacao: '',
+    })
+    setSubmitting(false)
+    await onRefresh()
+  }
+
+  return (
+    <main className="mobile-shell">
+      <header className="mobile-topbar">
+        <div>
+          <span>FSTD Promotor</span>
+          <h1>{user?.nome ?? 'Promotor'}</h1>
+        </div>
+        <button className="secondary-button" type="button" onClick={onLogout}>
+          Sair
+        </button>
+      </header>
+
+      <section className="mobile-section">
+        <label className="mobile-search">
+          <Icon name="search" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar loja"
+            type="search"
+          />
+        </label>
+
+        {error && <p className="table-message is-error">{error}</p>}
+        {loading && <p className="table-message">Carregando lojas...</p>}
+
+        <div className="mobile-store-list">
+          {filteredLojas.map((loja) => {
+            const lojaPendentes = nfds.filter(
+              (nfd) =>
+                nfd.loja_id === loja.id &&
+                (nfd.status_nfd === 'atrasada' || nfd.status_nfd === 'outros'),
+            ).length
+
+            return (
+              <button
+                key={loja.id}
+                className={`mobile-store-button ${selectedLoja?.id === loja.id ? 'is-active' : ''}`}
+                type="button"
+                onClick={() => {
+                  setSelectedLojaId(loja.id)
+                  setForm((current) => ({ ...current, nfdId: '' }))
+                }}
+              >
+                <strong>{loja.nome}</strong>
+                <span>{loja.codigo} - {loja.cidade}/{loja.uf}</span>
+                <small>{lojaPendentes} notas pendentes</small>
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      {selectedLoja && (
+        <section className="mobile-section">
+          <div className="mobile-store-title">
+            <div>
+              <span>{selectedLoja.codigo}</span>
+              <h2>{selectedLoja.nome}</h2>
+            </div>
+            <strong>{pendingCount}</strong>
+          </div>
+
+          <div className="mobile-tabs" role="tablist" aria-label="Status de NFD">
+            {statusTabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={activeStatus === tab.id ? 'is-active' : ''}
+                type="button"
+                onClick={() => setActiveStatus(tab.id)}
+              >
+                {tab.label}
+                <span>{nfdsByStatus[tab.id]?.length ?? 0}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mobile-nfd-list">
+            {visibleNfds.map((nfd) => (
+              <button
+                key={nfd.id}
+                className="mobile-nfd"
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, nfdId: nfd.id }))}
+              >
+                <strong>NFD {nfd.numero}</strong>
+                <span>Emissao {nfd.data_emissao ?? '-'}</span>
+                <small>{nfd.quantidade_total ?? 0} un. - R$ {Number(nfd.valor_total ?? 0).toFixed(2)}</small>
+              </button>
+            ))}
+
+            {visibleNfds.length === 0 && (
+              <p className="table-message">0 Notas Pendentes!</p>
+            )}
+          </div>
+
+          <form className="mobile-fstd-form" onSubmit={handleSubmit}>
+            <h3>Solicitar FSTD</h3>
+
+            <label className="form-row">
+              <span>NFD</span>
+              <select
+                value={form.nfdId}
+                onChange={(event) => setForm((current) => ({ ...current, nfdId: event.target.value }))}
+              >
+                <option value="">FSTD Avulsa</option>
+                {lojaNfds
+                  .filter((nfd) => nfd.status_nfd !== 'finalizada')
+                  .map((nfd) => (
+                    <option key={nfd.id} value={nfd.id}>
+                      {nfd.numero}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <label className="form-row">
+              <span>Motivo</span>
+              <select
+                value={form.motivoId}
+                onChange={(event) => setForm((current) => ({ ...current, motivoId: event.target.value }))}
+                required
+              >
+                <option value="">Selecione</option>
+                {motivos.map((motivo) => (
+                  <option key={motivo.id} value={motivo.id}>
+                    {motivo.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mobile-quantities">
+              {[
+                ['gal', 'GAL'],
+                ['cod', 'COD'],
+                ['siu', 'SIU'],
+              ].map(([key, label]) => (
+                <label className="form-row" key={key}>
+                  <span>{label}</span>
+                  <input
+                    value={form[key]}
+                    min="0"
+                    onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
+                    type="number"
+                  />
+                </label>
+              ))}
+            </div>
+
+            <label className="form-row">
+              <span>Fotos</span>
+              <textarea
+                value={form.fotos}
+                onChange={(event) => setForm((current) => ({ ...current, fotos: event.target.value }))}
+                placeholder="Um storage_path por linha"
+                rows="3"
+              />
+            </label>
+
+            <label className="form-row">
+              <span>Observacao</span>
+              <textarea
+                value={form.observacao}
+                onChange={(event) => setForm((current) => ({ ...current, observacao: event.target.value }))}
+                rows="3"
+              />
+            </label>
+
+            {submitError && <p className="form-error">{submitError}</p>}
+            {submitSuccess && <p className="table-message">{submitSuccess}</p>}
+
+            <button className="login-submit" type="submit" disabled={submitting}>
+              {submitting ? 'Solicitando...' : 'Solicitar retorno'}
+            </button>
+          </form>
+        </section>
+      )}
+    </main>
+  )
+}
+
 function PlaceholderScreen({ title }) {
   return (
     <section className="users-card placeholder-card">
@@ -1443,6 +1733,7 @@ function PlaceholderScreen({ title }) {
 }
 
 function App() {
+  const routeMode = window.location.pathname.startsWith('/promotor') ? 'promotor' : 'gerencial'
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [selectedItem, setSelectedItem] = useState('dashboard')
   const [session, setSession] = useState(null)
@@ -1489,6 +1780,9 @@ function App() {
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
   const [profilePhoto, setProfilePhoto] = useState('')
+  const [nfds, setNfds] = useState([])
+  const [nfdsError, setNfdsError] = useState('')
+  const [motivos, setMotivos] = useState([])
 
   async function validateSession(activeSession, options = {}) {
     const user = activeSession?.user
@@ -1507,13 +1801,15 @@ function App() {
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
-    if (profileError || !data || data.perfil !== 'Gerencial' || data.ativo !== true) {
+    const requiredPerfil = options.requiredPerfil ?? (routeMode === 'promotor' ? 'Promotor' : 'Gerencial')
+
+    if (profileError || !data || data.perfil !== requiredPerfil || data.ativo !== true) {
       await supabase.auth.signOut()
       setSession(null)
       setCurrentUser(null)
       setAuthError(
         options.permissionMessage ??
-          'Acesso permitido somente para usuarios Gerenciais ativos.',
+          `Acesso permitido somente para usuarios ${requiredPerfil} ativos.`,
       )
       setAuthLoading(false)
       return null
@@ -1590,6 +1886,42 @@ function App() {
     setLojasLoading(false)
   }
 
+  async function loadNfds() {
+    setNfdsError('')
+
+    const { data, error: requestError } = await supabase
+      .from('nfds_com_status')
+      .select('*')
+      .order('data_emissao', { ascending: false })
+
+    if (requestError) {
+      setNfdsError(requestError.message)
+      setNfds([])
+    } else {
+      setNfds(data ?? [])
+    }
+  }
+
+  async function loadMotivos() {
+    const { data, error: requestError } = await supabase
+      .from('motivos_devolucao')
+      .select('id, nome, ativo, ordem, created_at')
+      .eq('ativo', true)
+      .order('ordem', { ascending: true })
+
+    if (requestError) {
+      setMotivos([])
+    } else {
+      setMotivos(data ?? [])
+    }
+  }
+
+  async function loadOperationalData() {
+    const tasks = [loadLojas(), loadNfds(), loadMotivos()]
+    if (routeMode === 'gerencial') tasks.push(loadUsuarios())
+    await Promise.all(tasks)
+  }
+
   useEffect(() => {
     let isMounted = true
 
@@ -1598,7 +1930,7 @@ function App() {
       if (!isMounted) return
       const usuario = await validateSession(data.session)
       if (usuario && isMounted) {
-        await Promise.all([loadUsuarios(), loadLojas()])
+        await loadOperationalData()
       }
     }
 
@@ -1620,6 +1952,8 @@ function App() {
       isMounted = false
       subscription.unsubscribe()
     }
+    // Auth bootstrap runs once per route load; auth state changes are handled by the subscription above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const filteredUsers = useMemo(() => {
@@ -1649,6 +1983,9 @@ function App() {
   const isUsuarios = selectedItem === 'usuarios'
   const isConfiguracoes = selectedItem === 'configuracoes'
   const isDashboard = selectedItem === 'dashboard'
+  const isNotas = selectedItem === 'notas'
+  const isMotivos = selectedItem === 'motivos'
+  const isRecolhimento = selectedItem === 'recolhimento'
   const isRelatorios = selectedItem === 'relatorios'
   const isLogs = selectedItem === 'logs'
   const pageTitle = isPerfil
@@ -1661,6 +1998,12 @@ function App() {
         ? 'Configuracoes'
         : isDashboard
           ? 'Dashboard'
+          : isNotas
+            ? 'Notas'
+            : isMotivos
+              ? 'Motivos'
+              : isRecolhimento
+                ? 'Recolhimento'
           : isRelatorios
             ? 'Relatorios'
             : isLogs
@@ -1677,6 +2020,12 @@ function App() {
         ? 'Usuarios com acesso ao painel gerencial.'
         : isDashboard
           ? 'Visao geral do painel Avine.'
+          : isNotas
+            ? 'NFDs importadas e status FSTD.'
+            : isMotivos
+              ? 'Cadastro de motivos de devolucao.'
+              : isRecolhimento
+                ? 'Fila logistica de recolhimentos.'
           : isRelatorios
             ? 'Analises e acompanhamentos gerenciais.'
             : isLogs
@@ -1690,6 +2039,10 @@ function App() {
       ? 'camera'
       : isConfiguracoes
         ? 'gear'
+        : isNotas || isMotivos
+          ? 'notes'
+          : isRecolhimento
+            ? 'logs'
         : isRelatorios || isDashboard
           ? 'chart'
           : isLogs
@@ -1990,7 +2343,7 @@ function App() {
     })
 
     if (usuario) {
-      await Promise.all([loadUsuarios(), loadLojas()])
+      await loadOperationalData()
     }
 
     setLoginBusy(false)
@@ -2006,6 +2359,9 @@ function App() {
     setLojas([])
     setPromotores([])
     setLojaPromotores([])
+    setNfds([])
+    setMotivos([])
+    setNfdsError('')
     setAuthError('')
   }
 
@@ -2178,7 +2534,29 @@ function App() {
   }
 
   if (!session || !currentUser) {
-    return <LoginScreen busy={loginBusy} error={authError} onSubmit={handleLogin} />
+    return (
+      <LoginScreen
+        busy={loginBusy}
+        error={authError}
+        title={routeMode === 'promotor' ? 'FSTD Promotor' : 'Painel Gerencial'}
+        onSubmit={handleLogin}
+      />
+    )
+  }
+
+  if (routeMode === 'promotor') {
+    return (
+      <PromotorScreen
+        user={currentUser}
+        lojas={lojas}
+        nfds={nfds}
+        motivos={motivos}
+        loading={lojasLoading}
+        error={lojasError || nfdsError}
+        onLogout={handleLogout}
+        onRefresh={loadOperationalData}
+      />
+    )
   }
 
   return (
