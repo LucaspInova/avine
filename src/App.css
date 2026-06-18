@@ -920,6 +920,13 @@ fieldset legend {
   font-weight: 500;
 }
 
+.form-row small {
+  color: #6d756d;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
 .field-error {
   margin-top: -4px;
   color: #f36d72;

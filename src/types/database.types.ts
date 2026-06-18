@@ -142,6 +142,7 @@ export type Database = {
           perfil: 'Promotor' | 'Entregador' | 'Gerencial'
           estado: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas: boolean
+          foto_url: string | null
           ativo: boolean
           created_at: string
         }
@@ -153,6 +154,7 @@ export type Database = {
           perfil: 'Promotor' | 'Entregador' | 'Gerencial'
           estado: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas?: boolean
+          foto_url?: string | null
           ativo?: boolean
           created_at?: string
         }
@@ -164,6 +166,7 @@ export type Database = {
           perfil?: 'Promotor' | 'Entregador' | 'Gerencial'
           estado?: 'CE' | 'MA' | 'BA' | 'PA' | 'PB' | 'PI' | 'PE' | 'AP' | 'SE' | 'RN' | 'AL'
           fotos_habilitadas?: boolean
+          foto_url?: string | null
           ativo?: boolean
           created_at?: string
         }
@@ -174,9 +177,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_gerencial_user: {
+        Args: {
+          p_auth_user_id: string
+          p_nome: string
+          p_email: string
+        }
+        Returns: Database['public']['Tables']['usuarios']['Row']
+      }
       current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: UserRole | null
+      }
+      update_gerencial_user: {
+        Args: {
+          p_usuario_id: string
+          p_nome: string
+          p_email: string
+          p_ativo: boolean
+        }
+        Returns: Database['public']['Tables']['usuarios']['Row']
       }
     }
     Enums: {

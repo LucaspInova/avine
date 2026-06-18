@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
+import { createGerencialUser } from './lib/gerencialUsers'
+import {
+  getProfilePhotoSignedUrl,
+  uploadProfilePhoto,
+  validateProfilePhoto,
+} from './lib/profilePhoto'
 import avineLogo from './assets/avine-logo.svg'
 import './App.css'
 
@@ -39,6 +45,7 @@ const initialGerencialForm = {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const usuarioSelect = 'id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo, created_at'
 
 function normalizaNome(nome) {
   return nome.trim().replace(/\s+/g, ' ').toUpperCase()
@@ -1108,27 +1115,51 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
   )
 }
 
-function PerfilScreen({ user, profilePhoto, onPhotoChange, onSave }) {
+function PerfilScreen({ user, profilePhoto, onSave }) {
   const [isOpen, setOpen] = useState(false)
   const [name, setName] = useState(user?.nome ?? '')
   const [photoPreview, setPhotoPreview] = useState(profilePhoto)
-
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   function handleFile(event) {
     const file = event.target.files?.[0]
     if (!file) return
+
+    const validationError = validateProfilePhoto(file)
+    if (validationError) {
+      setSaveError(validationError)
+      event.target.value = ''
+      return
+    }
+
+    setSaveError('')
+    setSelectedPhoto(file)
+
     const reader = new FileReader()
     reader.onload = () => {
-      setPhotoPreview(reader.result)
-      onPhotoChange(reader.result)
+      if (typeof reader.result === 'string') {
+        setPhotoPreview(reader.result)
+      }
     }
     reader.readAsDataURL(file)
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    onSave(name)
-    setOpen(false)
+    setSaving(true)
+    setSaveError('')
+
+    try {
+      await onSave(name, selectedPhoto)
+      setOpen(false)
+      setSelectedPhoto(null)
+    } catch (saveProfileError) {
+      setSaveError(saveProfileError instanceof Error ? saveProfileError.message : 'Não foi possível salvar o perfil.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -1141,7 +1172,7 @@ function PerfilScreen({ user, profilePhoto, onPhotoChange, onSave }) {
             <h2>{user?.nome}</h2>
             <p>{user?.email}</p>
           </div>
-          <button className="create-button profile-edit-button" type="button" onClick={() => { setName(user?.nome ?? ''); setPhotoPreview(profilePhoto); setOpen(true) }}>
+          <button className="create-button profile-edit-button" type="button" onClick={() => { setName(user?.nome ?? ''); setPhotoPreview(profilePhoto); setSelectedPhoto(null); setSaveError(''); setOpen(true) }}>
             <Icon name="gear" />
             <span>Editar Perfil</span>
           </button>
@@ -1165,13 +1196,16 @@ function PerfilScreen({ user, profilePhoto, onPhotoChange, onSave }) {
               </label>
               <label className="edit-field">
                 <span>Foto</span>
-                <input onChange={handleFile} type="file" accept="image/*" />
+                <input onChange={handleFile} type="file" accept="image/jpeg,image/png,image/webp" />
               </label>
               {photoPreview && <img className="profile-preview" src={photoPreview} alt="Previa" />}
             </div>
+            {saveError && <p className="form-error">{saveError}</p>}
             <div className="edit-actions">
-              <button className="primary-button edit-submit" type="submit">Enviar</button>
-              <button className="secondary-button edit-cancel" type="button" onClick={() => setOpen(false)}>Cancelar</button>
+              <button className="primary-button edit-submit" type="submit" disabled={saving}>
+                {saving ? 'Enviando...' : 'Enviar'}
+              </button>
+              <button className="secondary-button edit-cancel" type="button" onClick={() => setOpen(false)} disabled={saving}>Cancelar</button>
             </div>
           </form>
         </div>
@@ -1253,8 +1287,6 @@ function GerenciaisScreen({
   const filtered = gerenciais.filter((usuario) =>
     `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query),
   )
-  const canCreate =
-    emailPattern.test(form.email.trim()) && form.nome.trim().length >= 4 && form.senha.length >= 8 && !busy
 
   return (
     <section className="users-card gerenciais-card">
@@ -1272,7 +1304,7 @@ function GerenciaisScreen({
         </label>
       </div>
 
-      <form className="gerencial-create" onSubmit={onCreate}>
+      <form className="gerencial-create" onSubmit={onCreate} noValidate>
         <label className="form-row">
           <span>Nome</span>
           <input
@@ -1300,9 +1332,11 @@ function GerenciaisScreen({
             type="password"
             minLength={8}
             required
+            aria-describedby="gerencial-password-hint"
           />
+          <small id="gerencial-password-hint">Minimo 8 caracteres.</small>
         </label>
-        <button className="create-button" type="submit" disabled={!canCreate}>
+        <button className="create-button" type="submit" disabled={busy}>
           <Icon name="plus" />
           <span>{busy ? 'Criando...' : 'Criar Gerencial'}</span>
         </button>
@@ -1462,13 +1496,14 @@ function App() {
     if (!user) {
       setSession(null)
       setCurrentUser(null)
+      setProfilePhoto('')
       setAuthLoading(false)
       return null
     }
 
     const { data, error: profileError } = await supabase
       .from('usuarios')
-      .select('id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, created_at')
+      .select(usuarioSelect)
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
@@ -1486,6 +1521,15 @@ function App() {
 
     setSession(activeSession)
     setCurrentUser(data)
+    if (data.foto_url) {
+      try {
+        setProfilePhoto(await getProfilePhotoSignedUrl(data.foto_url))
+      } catch {
+        setProfilePhoto('')
+      }
+    } else {
+      setProfilePhoto('')
+    }
     setAuthError('')
     setAuthLoading(false)
     return data
@@ -1497,7 +1541,7 @@ function App() {
 
     const { data, error: requestError } = await supabase
       .from('usuarios')
-      .select('id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, created_at')
+      .select(usuarioSelect)
       .order('nome', { ascending: true })
 
     if (requestError) {
@@ -1567,6 +1611,7 @@ function App() {
       if (!nextSession) {
         setSession(null)
         setCurrentUser(null)
+        setProfilePhoto('')
         setAuthLoading(false)
       }
     })
@@ -1955,6 +2000,7 @@ function App() {
     await supabase.auth.signOut()
     setSession(null)
     setCurrentUser(null)
+    setProfilePhoto('')
     setSelectedItem('dashboard')
     setUsuarios([])
     setLojas([])
@@ -1967,15 +2013,15 @@ function App() {
     event.preventDefault()
 
     const payload = {
-      p_nome: normalizaTexto(gerencialForm.nome),
-      p_email: gerencialForm.email.trim().toLowerCase(),
-      p_password: gerencialForm.senha,
+      nome: normalizaTexto(gerencialForm.nome),
+      email: gerencialForm.email.trim().toLowerCase(),
+      password: gerencialForm.senha,
     }
 
     if (
-      payload.p_nome.length < 4 ||
-      !emailPattern.test(payload.p_email) ||
-      payload.p_password.length < 8
+      payload.nome.length < 4 ||
+      !emailPattern.test(payload.email) ||
+      payload.password.length < 8
     ) {
       setGerencialError('Revise nome, email e senha antes de criar.')
       return
@@ -1984,10 +2030,10 @@ function App() {
     setGerencialBusy(true)
     setGerencialError('')
 
-    const { error: rpcError } = await supabase.rpc('create_gerencial_user', payload)
-
-    if (rpcError) {
-      setGerencialError(rpcError.message)
+    try {
+      await createGerencialUser(payload)
+    } catch (rpcError) {
+      setGerencialError(rpcError instanceof Error ? rpcError.message : 'Não foi possível criar o Gerencial.')
       setGerencialBusy(false)
       return
     }
@@ -2064,19 +2110,48 @@ function App() {
     )
   }
 
-  async function handleProfileSave(nome) {
+  async function handleProfileSave(nome, photoFile = null) {
     const normalizedName = normalizaTexto(nome).toUpperCase()
     if (normalizedName.length < 4) return
 
+    let uploadedPhoto = null
+
+    if (photoFile) {
+      if (!currentUser.auth_user_id) {
+        throw new Error('Usuário autenticado sem identificador de Auth.')
+      }
+
+      uploadedPhoto = await uploadProfilePhoto(currentUser.auth_user_id, photoFile)
+    }
+
+    const payload = uploadedPhoto
+      ? { nome: normalizedName, foto_url: uploadedPhoto.path }
+      : { nome: normalizedName }
+
     const { error: updateError } = await supabase
       .from('usuarios')
-      .update({ nome: normalizedName })
+      .update(payload)
       .eq('id', currentUser.id)
 
-    if (!updateError) {
-      setCurrentUser((current) => ({ ...current, nome: normalizedName }))
-      await loadUsuarios()
+    if (updateError) {
+      throw updateError
     }
+
+    setCurrentUser((current) =>
+      current
+        ? {
+            ...current,
+            nome: normalizedName,
+            foto_url: uploadedPhoto?.path ?? current.foto_url,
+          }
+        : current,
+    )
+
+    if (uploadedPhoto) {
+      setProfilePhoto(uploadedPhoto.signedUrl)
+    }
+
+    await loadUsuarios()
   }
 
   function handleSelectItem(item) {
@@ -2135,7 +2210,6 @@ function App() {
           <PerfilScreen
             user={currentUser}
             profilePhoto={profilePhoto}
-            onPhotoChange={setProfilePhoto}
             onSave={handleProfileSave}
           />
         ) : isConfiguracoes ? (
