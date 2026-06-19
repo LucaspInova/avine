@@ -56,6 +56,5 @@ Os apps originais compartilhavam dados por Google Sheets (`FSTD Digital`) e Glid
 
 - O repositorio atual e um app React/Vite.
 - O painel gerencial ja possui autenticacao, perfil, usuarios, lojas e roteirizacao.
-- A pasta `mobile/` existe como reserva historica, mas o primeiro mobile sera PWA dentro do mesmo app React.
 - O Supabase ja possui migrations para usuarios, lojas, vinculos e usuario gerencial.
 - A base FSTD foi adicionada por migration dedicada e ainda precisa ser aplicada/validada no banco alvo antes de operar em producao.

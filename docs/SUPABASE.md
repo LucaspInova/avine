@@ -18,7 +18,7 @@ Perfis validos:
 
 ### `lojas`
 
-Cadastro de lojas/PDVs exibido no gerencial e no mobile.
+Cadastro de lojas/PDVs exibido no gerencial.
 
 Campos principais: `id`, `codigo`, `nome`, `uf`, `cidade`, `created_at`.
 
@@ -84,7 +84,7 @@ Status:
 
 ## View `nfds_com_status`
 
-Classifica NFDs para o mobile e gerencial:
+Classifica NFDs para o gerencial:
 
 - `finalizada`: existe FSTD ativa para a NFD.
 - `avulsa`: NFD marcada com `origem = 'avulsa'`.
@@ -95,7 +95,7 @@ A view usa `security_invoker = true` para respeitar RLS das tabelas base.
 
 ## RPC `solicitar_fstd(...)`
 
-Usada pelo PWA Promotor para registrar uma devolucao.
+Usada pelo fluxo FSTD para registrar uma devolucao.
 
 Argumentos:
 

@@ -14,16 +14,12 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
+  { id: 'relatorios', label: 'Relatorio', icon: 'chart' },
   { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
-  { id: 'motivos', label: 'Motivos', icon: 'filter' },
-  { id: 'recolhimento', label: 'Recolhimento', icon: 'logs' },
-  { id: 'relatorios', label: 'Relatórios', icon: 'notes' },
   { id: 'fotos', label: 'Fotos', icon: 'camera' },
   { id: 'logs', label: 'Logs de Erro', icon: 'logs', separated: true },
-  { id: 'configuracoes', label: 'Configurações', icon: 'gear' },
 ]
 
 const initialUserForm = {
@@ -49,6 +45,88 @@ const initialGerencialForm = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const usuarioSelect = 'id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo, created_at'
+const mockPhotoImage = `data:image/svg+xml;utf8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 430">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#2f642b"/>
+      <stop offset="1" stop-color="#f1d24b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000" flood-opacity=".24"/>
+    </filter>
+  </defs>
+  <rect width="640" height="430" fill="url(#bg)"/>
+  <rect x="44" y="38" width="552" height="354" rx="22" fill="#ffffff" opacity=".18"/>
+  <ellipse cx="228" cy="226" rx="116" ry="148" fill="#fff8eb" filter="url(#shadow)" transform="rotate(-10 228 226)"/>
+  <ellipse cx="356" cy="224" rx="105" ry="138" fill="#fff2dc" filter="url(#shadow)" transform="rotate(9 356 224)"/>
+  <path d="M96 330c88-38 185-46 286-24 54 12 107 10 160-6v92H96z" fill="#2b4c28" opacity=".38"/>
+  <rect x="86" y="70" width="176" height="56" rx="12" fill="#ffffff" opacity=".9"/>
+  <text x="106" y="106" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#2f642b">avine</text>
+  <text x="190" y="244" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#d95e8d" transform="rotate(-10 190 244)">NFD 81727</text>
+  <text x="314" y="248" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#d95e8d" transform="rotate(9 314 248)">18/06/26</text>
+</svg>
+`)}`
+
+const mockPhotoRecords = [
+  { id: 'foto-1', loja: 'ATAC JABOATA', nfd: '81727', produto: 'GB 20x1', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:48' },
+  { id: 'foto-2', loja: 'ATAC JABOATA', nfd: '81727', produto: 'Codorna', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:46' },
+  { id: 'foto-3', loja: 'ATACADAO BOA', nfd: '448504', produto: 'Codorna', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:43' },
+  { id: 'foto-4', loja: 'LEONIDAS 2', nfd: '10669', produto: 'GB 20x1', promotor: 'CARLOS LIMA', enviadoEm: '18/06/2026, 14:21' },
+  { id: 'foto-5', loja: 'CASA SANTA L', nfd: '143266', produto: 'Ovos Galinha', promotor: 'MARCIA SILVA', enviadoEm: '18/06/2026, 11:08' },
+  { id: 'foto-6', loja: 'CASA SANTA L', nfd: '143267', produto: 'Codorna', promotor: 'MARCIA SILVA', enviadoEm: '18/06/2026, 11:06' },
+]
+
+const mockNotasGroups = [
+  {
+    date: '18/6/2026',
+    pages: 15,
+    rows: [
+      { loja: 'SPAZIO OLH', nfd: '1509', status: 'Pendente' },
+      { loja: 'MAT SUPER MA', nfd: '163614', status: 'Pendente' },
+      { loja: 'MAT BELEM 2', nfd: '166702', status: 'Pendente' },
+      { loja: 'MAT. ACAILAN', nfd: '67826', status: 'Pendente' },
+      { loja: 'MAT CANINDE', nfd: '22918', status: 'Pendente' },
+      { loja: 'MAT JK', nfd: '1977', status: 'Pendente' },
+      { loja: 'REDE MENOR 1', nfd: '97480', status: 'Pendente' },
+      { loja: 'MAT ZEQUIN', nfd: '105253', status: 'Pendente' },
+      { loja: 'MAT CRATEUS', nfd: '21171', status: 'FSTD' },
+      { loja: 'LIDER MARABA', nfd: '218115', status: 'Pendente' },
+    ],
+  },
+  {
+    date: '17/6/2026',
+    pages: 15,
+    rows: [
+      { loja: 'MAT ITAPIPOC', nfd: '39913', status: 'FSTD' },
+      { loja: 'SENDAS BATIS', nfd: '123186', status: 'Pendente' },
+      { loja: 'NORDESTAO 03', nfd: '117142', status: 'Pendente' },
+      { loja: 'MAXXI PI JOA', nfd: '53574', status: 'FSTD' },
+      { loja: 'VANGU JOAQUI', nfd: '45485', status: 'FSTD' },
+      { loja: 'MAT JARDIM R', nfd: '258733', status: 'FSTD' },
+      { loja: 'EVANDRO 05', nfd: '61202', status: 'FSTD' },
+      { loja: 'MAT CAJAZEIR', nfd: '175184', status: 'Pendente' },
+      { loja: 'MAT JARDIM R', nfd: '258737', status: 'FSTD' },
+      { loja: 'ATAC PALMARE', nfd: '44561', status: 'Pendente' },
+    ],
+  },
+  {
+    date: '16/6/2026',
+    pages: 18,
+    rows: [
+      { loja: 'SODEXO JABOA', nfd: '126651', status: 'Pendente' },
+      { loja: 'MAT ARACAJU', nfd: '61608', status: 'FSTD' },
+      { loja: 'MERC PIRAJA', nfd: '91736', status: 'Pendente' },
+      { loja: 'MAT FOOD', nfd: '9181', status: 'FSTD' },
+      { loja: 'CARONE MAIOB', nfd: '19495', status: 'FSTD' },
+      { loja: 'MAT CAXIAS 2', nfd: '1509', status: 'FSTD' },
+      { loja: 'MAT PORTO SE', nfd: '40522', status: 'FSTD' },
+      { loja: 'MAIS BARA 03', nfd: '85990', status: 'Pendente' },
+      { loja: 'ATAC PALMARE', nfd: '44530', status: 'FSTD' },
+      { loja: 'SUPER MAX 2', nfd: '7100', status: 'Pendente' },
+    ],
+  },
+]
 
 function normalizaNome(nome) {
   return nome.trim().replace(/\s+/g, ' ').toUpperCase()
@@ -347,7 +425,12 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
-    isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy
+    isEmailValid &&
+    isNameValid &&
+    !hasNomeDuplicado &&
+    isProfileValid &&
+    isEstadoValid &&
+    !busy
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -1436,290 +1519,305 @@ function GerenciaisScreen({
   )
 }
 
-function PromotorScreen({
-  user,
-  lojas,
-  nfds,
-  motivos,
-  loading,
-  error,
-  onLogout,
-  onRefresh,
-}) {
-  const [search, setSearch] = useState('')
-  const [selectedLojaId, setSelectedLojaId] = useState('')
-  const [activeStatus, setActiveStatus] = useState('atrasada')
-  const [form, setForm] = useState({
-    nfdId: '',
-    motivoId: '',
-    gal: '',
-    cod: '',
-    siu: '',
-    fotos: '',
-    observacao: '',
-  })
-  const [submitError, setSubmitError] = useState('')
-  const [submitSuccess, setSubmitSuccess] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+function Gauge({ value, label }) {
+  return (
+    <div className="report-gauge" style={{ '--value': `${value}%` }}>
+      <div className="gauge-ring">
+        <span>{value}%</span>
+      </div>
+      <strong>{label}</strong>
+    </div>
+  )
+}
 
-  const filteredLojas = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return lojas.filter((loja) =>
-      `${loja.codigo} ${loja.nome} ${loja.cidade} ${loja.uf}`.toLowerCase().includes(query),
-    )
-  }, [lojas, search])
-
-  const selectedLoja = useMemo(() => {
-    return lojas.find((loja) => loja.id === selectedLojaId) ?? filteredLojas[0] ?? null
-  }, [filteredLojas, lojas, selectedLojaId])
-
-  const lojaNfds = useMemo(() => {
-    if (!selectedLoja) return []
-    return nfds.filter((nfd) => nfd.loja_id === selectedLoja.id)
-  }, [nfds, selectedLoja])
-
-  const statusTabs = [
-    { id: 'atrasada', label: 'Atrasadas' },
-    { id: 'finalizada', label: 'Finalizadas' },
-    { id: 'avulsa', label: 'Avulsas' },
-    { id: 'outros', label: 'Outros' },
+function ReportScreen() {
+  const barItems = [
+    ['ATAKAREJO SE', 594724],
+    ['ATAKAREJO 21', 50138],
+    ['G BAR CD SE', 40694],
+    ['ATAC SOBRAL', 26644],
+    ['VANGUARDA CD', 19592],
+    ['ATAKAREJO VT', 11295],
+    ['ELIZEU MARTI', 10681],
+    ['MAT FREI SER', 9804],
+    ['WMS SANTA RI', 8594],
+    ['SUPER LITO', 8265],
   ]
 
-  const nfdsByStatus = statusTabs.reduce((acc, tab) => {
-    acc[tab.id] = lojaNfds.filter((nfd) => nfd.status_nfd === tab.id)
-    return acc
-  }, {})
-
-  const visibleNfds = nfdsByStatus[activeStatus] ?? []
-  const pendingCount = lojaNfds.filter((nfd) => nfd.status_nfd === 'atrasada' || nfd.status_nfd === 'outros').length
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-
-    if (!selectedLoja || !form.motivoId) {
-      setSubmitError('Selecione loja e motivo antes de solicitar.')
-      return
-    }
-
-    setSubmitting(true)
-    setSubmitError('')
-    setSubmitSuccess('')
-
-    const fotoPaths = form.fotos
-      .split(/\r?\n/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-
-    const { error: rpcError } = await supabase.rpc('solicitar_fstd', {
-      p_loja_id: selectedLoja.id,
-      p_motivo_id: form.motivoId,
-      p_nfd_id: form.nfdId || null,
-      p_quantidade_gal: Number(form.gal || 0),
-      p_quantidade_cod: Number(form.cod || 0),
-      p_quantidade_siu: Number(form.siu || 0),
-      p_fotos: fotoPaths,
-      p_observacao: form.observacao || null,
-    })
-
-    if (rpcError) {
-      setSubmitError(rpcError.message)
-      setSubmitting(false)
-      return
-    }
-
-    setSubmitSuccess('Retorno Solicitado!')
-    setForm({
-      nfdId: '',
-      motivoId: '',
-      gal: '',
-      cod: '',
-      siu: '',
-      fotos: '',
-      observacao: '',
-    })
-    setSubmitting(false)
-    await onRefresh()
-  }
+  const tableRows = [
+    ['17857', '1 de jun.', '3 de jun.', 'AVINE', '15921', 'MA DE JESUS', 'AVARIA NA ENTREGA', 'AVINE', 'R$ 90,10'],
+    ['171950', '1 de jun.', '5 de jun.', 'AVINE', '5528', 'MATEUS MAIOB', 'OVOS PODRES', 'AVINE', 'R$ 409,50'],
+    ['120152', '1 de jun.', '3 de jun.', 'AVINE', '1287', 'MAT. JOAO PA', 'AVARIA NO PDV', 'AVINE', 'R$ 324,01'],
+    ['40164', '1 de jun.', '2 de jun.', 'AVINE', '20189', 'MAT FLORIANO', 'AVARIA NA ENTREGA', 'AVINE', 'R$ 149,80'],
+    ['1000', '1 de jun.', '3 de jun.', 'AVINE', '25224', 'MAT HIPER DO', 'OVOS PODRES', 'AVINE', 'R$ 12,36'],
+  ]
 
   return (
-    <main className="mobile-shell">
-      <header className="mobile-topbar">
-        <div>
-          <span>FSTD Promotor</span>
-          <h1>{user?.nome ?? 'Promotor'}</h1>
+    <section className="report-page" aria-label="Relatorio Solicitante BI">
+      <div className="report-filters">
+        {['1 de jun. de 2026 - 17 de jun. de 2026', 'Vendedor', 'Cidade', 'UF', 'Motivo', 'NFD', 'Loja', 'Promotor'].map((label) => (
+          <button className="report-filter" type="button" key={label}>
+            <span>{label}</span>
+            <span className="select-chevron" />
+          </button>
+        ))}
+        <div className="report-status">
+          <span className="donut-mini" />
+          <small>Feita<br />Pendente</small>
         </div>
-        <button className="secondary-button" type="button" onClick={onLogout}>
-          Sair
-        </button>
-      </header>
-
-      <section className="mobile-section">
-        <label className="mobile-search">
-          <Icon name="search" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar loja"
-            type="search"
-          />
-        </label>
-
-        {error && <p className="table-message is-error">{error}</p>}
-        {loading && <p className="table-message">Carregando lojas...</p>}
-
-        <div className="mobile-store-list">
-          {filteredLojas.map((loja) => {
-            const lojaPendentes = nfds.filter(
-              (nfd) =>
-                nfd.loja_id === loja.id &&
-                (nfd.status_nfd === 'atrasada' || nfd.status_nfd === 'outros'),
-            ).length
-
-            return (
-              <button
-                key={loja.id}
-                className={`mobile-store-button ${selectedLoja?.id === loja.id ? 'is-active' : ''}`}
-                type="button"
-                onClick={() => {
-                  setSelectedLojaId(loja.id)
-                  setForm((current) => ({ ...current, nfdId: '' }))
-                }}
-              >
-                <strong>{loja.nome}</strong>
-                <span>{loja.codigo} - {loja.cidade}/{loja.uf}</span>
-                <small>{lojaPendentes} notas pendentes</small>
-              </button>
-            )
-          })}
+        <div className="report-kpi is-total">
+          <small>Valor Total</small>
+          <strong>R$ 1.491.439,77</strong>
         </div>
-      </section>
+        <div className="report-kpi">
+          <small>Total de NFD's</small>
+          <strong>2.448</strong>
+        </div>
+        <div className="report-kpi">
+          <small>FSTD Feita</small>
+          <strong>2.144</strong>
+        </div>
+        <div className="report-kpi is-danger">
+          <small>FSTD Pendente</small>
+          <strong>302</strong>
+        </div>
+      </div>
 
-      {selectedLoja && (
-        <section className="mobile-section">
-          <div className="mobile-store-title">
+      <div className="report-grid">
+        <div className="report-panel pie-panel">
+          <div className="pie-chart" />
+          <ul className="pie-legend">
+            {['AVARIA NA ENTREGA', 'AVARIA NO PDV', 'AVARIA NO DEPOSITO', 'OVOS PODRES', 'Pendente FSTD', 'AVARIA DE VIAGEM', 'OVOS VENCIDOS', 'FALTA DE PRODUTO', 'OVOS MOFADOS', 'Outros'].map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="report-panel metric-panel">
+          <Gauge value={53} label="Retorno GAL" />
+          <dl>
             <div>
-              <span>{selectedLoja.codigo}</span>
-              <h2>{selectedLoja.nome}</h2>
+              <dt>Total de Ovos Galinha</dt>
+              <dd>1.270.268</dd>
             </div>
-            <strong>{pendingCount}</strong>
-          </div>
+            <div>
+              <dt>Retorno GAL</dt>
+              <dd>671.634,31</dd>
+            </div>
+          </dl>
+        </div>
 
-          <div className="mobile-tabs" role="tablist" aria-label="Status de NFD">
-            {statusTabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={activeStatus === tab.id ? 'is-active' : ''}
-                type="button"
-                onClick={() => setActiveStatus(tab.id)}
-              >
-                {tab.label}
-                <span>{nfdsByStatus[tab.id]?.length ?? 0}</span>
-              </button>
-            ))}
-          </div>
+        <div className="report-panel metric-panel">
+          <dl>
+            <div>
+              <dt>Total de Ovos Codorna</dt>
+              <dd>329.340</dd>
+            </div>
+            <div>
+              <dt>Retorno COD</dt>
+              <dd>49.061</dd>
+            </div>
+          </dl>
+          <Gauge value={15} label="Retorno" />
+        </div>
 
-          <div className="mobile-nfd-list">
-            {visibleNfds.map((nfd) => (
-              <button
-                key={nfd.id}
-                className="mobile-nfd"
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, nfdId: nfd.id }))}
-              >
-                <strong>NFD {nfd.numero}</strong>
-                <span>Emissao {nfd.data_emissao ?? '-'}</span>
-                <small>{nfd.quantidade_total ?? 0} un. - R$ {Number(nfd.valor_total ?? 0).toFixed(2)}</small>
-              </button>
-            ))}
+        <div className="report-panel bar-panel">
+          <h3>Valor (R$)</h3>
+          {barItems.map(([label, value]) => (
+            <div className="bar-row" key={label}>
+              <span>{label}</span>
+              <strong style={{ width: `${Math.max(8, value / 11000)}%` }}>R$ {value.toLocaleString('pt-BR')}</strong>
+            </div>
+          ))}
+        </div>
 
-            {visibleNfds.length === 0 && (
-              <p className="table-message">0 Notas Pendentes!</p>
-            )}
-          </div>
-
-          <form className="mobile-fstd-form" onSubmit={handleSubmit}>
-            <h3>Solicitar FSTD</h3>
-
-            <label className="form-row">
-              <span>NFD</span>
-              <select
-                value={form.nfdId}
-                onChange={(event) => setForm((current) => ({ ...current, nfdId: event.target.value }))}
-              >
-                <option value="">FSTD Avulsa</option>
-                {lojaNfds
-                  .filter((nfd) => nfd.status_nfd !== 'finalizada')
-                  .map((nfd) => (
-                    <option key={nfd.id} value={nfd.id}>
-                      {nfd.numero}
-                    </option>
-                  ))}
-              </select>
-            </label>
-
-            <label className="form-row">
-              <span>Motivo</span>
-              <select
-                value={form.motivoId}
-                onChange={(event) => setForm((current) => ({ ...current, motivoId: event.target.value }))}
-                required
-              >
-                <option value="">Selecione</option>
-                {motivos.map((motivo) => (
-                  <option key={motivo.id} value={motivo.id}>
-                    {motivo.nome}
-                  </option>
+        <div className="report-panel report-table-wrap">
+          <table className="report-table">
+            <thead>
+              <tr>
+                {['NFD', 'Emissao', 'Envio', 'Regional Master', 'Cod', 'Loja', 'Motivo', 'Promotor', 'Valor (R$)'].map((head) => (
+                  <th key={head}>{head}</th>
                 ))}
-              </select>
+              </tr>
+            </thead>
+            <tbody>
+              {tableRows.map((row) => (
+                <tr key={row.join('-')}>
+                  {row.map((cell, index) => (
+                    <td key={`${cell}-${index}`}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="report-panel line-panel">
+          <svg viewBox="0 0 900 190" role="img" aria-label="Valor por dia">
+            <path className="line-grid" d="M20 25H875M20 75H875M20 125H875M20 175H875M90 15V180M180 15V180M270 15V180M360 15V180M450 15V180M540 15V180M630 15V180M720 15V180M810 15V180" />
+            <polyline className="line-chart" points="20,120 95,42 170,128 245,150 320,136 395,50 450,176 505,38 580,120 655,52 730,132 805,150 875,132" />
+            {[['20','120'],['95','42'],['170','128'],['245','150'],['320','136'],['395','50'],['450','176'],['505','38'],['580','120'],['655','52'],['730','132'],['805','150'],['875','132']].map(([x, y]) => (
+              <circle key={`${x}-${y}`} cx={x} cy={y} r="4" />
+            ))}
+          </svg>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function FotosScreen({ search, onSearch }) {
+  const query = search.trim().toLowerCase()
+  const filteredPhotos = mockPhotoRecords.filter((photo) =>
+    `${photo.loja} ${photo.nfd} ${photo.produto} ${photo.promotor}`.toLowerCase().includes(query),
+  )
+
+  return (
+    <section className="photo-page">
+      <div className="card-toolbar">
+        <h2>Registros</h2>
+        <label className="search-field">
+          <Icon name="search" />
+          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Procurar" type="search" />
+        </label>
+      </div>
+
+      <div className="photo-grid">
+        {filteredPhotos.map((photo) => (
+          <article className="photo-card" key={photo.id}>
+            <div className="photo-frame">
+              <img src={mockPhotoImage} alt={`Foto da NFD ${photo.nfd}`} />
+              <button className="photo-arrow is-left" type="button" aria-label="Foto anterior">&lsaquo;</button>
+              <button className="photo-arrow is-right" type="button" aria-label="Proxima foto">&rsaquo;</button>
+              <span className="photo-progress" />
+            </div>
+            <dl className="photo-meta">
+              <div>
+                <dt>Loja</dt>
+                <dd>{photo.loja}</dd>
+              </div>
+              <div>
+                <dt>NFD</dt>
+                <dd>{photo.nfd}</dd>
+              </div>
+              <div>
+                <dt>Produto</dt>
+                <dd>{photo.produto}</dd>
+              </div>
+            </dl>
+            <p>Enviado por {photo.promotor} em {photo.enviadoEm}</p>
+          </article>
+        ))}
+
+        {filteredPhotos.length === 0 && (
+          <p className="table-message">Nenhuma foto encontrada.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function NotaStatusIcon({ status }) {
+  const isDone = status === 'FSTD'
+
+  return (
+    <span className={`nota-file-icon ${isDone ? 'is-done' : 'is-pending'}`} aria-hidden="true">
+      <span />
+    </span>
+  )
+}
+
+function NotesPagination({ pages }) {
+  return (
+    <nav className="pagination notes-pagination" aria-label="Paginas da lista de NFD">
+      <button type="button" disabled aria-label="Pagina anterior">&lsaquo;</button>
+      <button className="is-active" type="button">1</button>
+      <button type="button">2</button>
+      <button type="button">3</button>
+      <button type="button">4</button>
+      <button type="button">5</button>
+      <span>...</span>
+      <button type="button">{pages}</button>
+      <button type="button" aria-label="Proxima pagina">&rsaquo;</button>
+    </nav>
+  )
+}
+
+function NotasScreen({ search, onSearch }) {
+  const [statusFilter, setStatusFilter] = useState('')
+  const query = search.trim().toLowerCase()
+
+  const filteredGroups = mockNotasGroups
+    .map((group) => ({
+      ...group,
+      rows: group.rows.filter((row) => {
+        const matchesQuery = `${row.loja} ${row.nfd} ${row.status}`.toLowerCase().includes(query)
+        const matchesStatus = !statusFilter || row.status === statusFilter
+        return matchesQuery && matchesStatus
+      }),
+    }))
+    .filter((group) => group.rows.length > 0)
+
+  return (
+    <section className="notes-page">
+      <div className="notes-card">
+        <div className="notes-toolbar">
+          <h2>NFD</h2>
+
+          <div className="toolbar-actions">
+            <label className="search-field">
+              <Icon name="search" />
+              <input
+                value={search}
+                onChange={(event) => onSearch(event.target.value)}
+                placeholder="Procurar"
+                type="search"
+              />
             </label>
 
-            <div className="mobile-quantities">
-              {[
-                ['gal', 'GAL'],
-                ['cod', 'COD'],
-                ['siu', 'SIU'],
-              ].map(([key, label]) => (
-                <label className="form-row" key={key}>
-                  <span>{label}</span>
-                  <input
-                    value={form[key]}
-                    min="0"
-                    onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
-                    type="number"
-                  />
-                </label>
+            <label className="filter-field">
+              <Icon name="filter" />
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="">Filtrar</option>
+                <option value="Pendente">Pendente</option>
+                <option value="FSTD">FSTD</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {filteredGroups.map((group) => (
+          <section className="notes-date-group" key={group.date}>
+            <h3>{group.date}</h3>
+
+            <div className="notes-table" role="table" aria-label={`NFDs de ${group.date}`}>
+              <div className="notes-row notes-head" role="row">
+                <span role="columnheader">LOJA</span>
+                <span role="columnheader">NFD</span>
+                <span role="columnheader">STATUS</span>
+              </div>
+
+              {group.rows.map((row) => (
+                <div className="notes-row" role="row" key={`${group.date}-${row.loja}-${row.nfd}`}>
+                  <span className="notes-store-cell" role="cell">
+                    <NotaStatusIcon status={row.status} />
+                    <strong>{row.loja}</strong>
+                  </span>
+                  <span role="cell">{row.nfd}</span>
+                  <span role="cell">{row.status}</span>
+                </div>
               ))}
             </div>
 
-            <label className="form-row">
-              <span>Fotos</span>
-              <textarea
-                value={form.fotos}
-                onChange={(event) => setForm((current) => ({ ...current, fotos: event.target.value }))}
-                placeholder="Um storage_path por linha"
-                rows="3"
-              />
-            </label>
+            <NotesPagination pages={group.pages} />
+          </section>
+        ))}
 
-            <label className="form-row">
-              <span>Observacao</span>
-              <textarea
-                value={form.observacao}
-                onChange={(event) => setForm((current) => ({ ...current, observacao: event.target.value }))}
-                rows="3"
-              />
-            </label>
-
-            {submitError && <p className="form-error">{submitError}</p>}
-            {submitSuccess && <p className="table-message">{submitSuccess}</p>}
-
-            <button className="login-submit" type="submit" disabled={submitting}>
-              {submitting ? 'Solicitando...' : 'Solicitar retorno'}
-            </button>
-          </form>
-        </section>
-      )}
-    </main>
+        {filteredGroups.length === 0 && (
+          <p className="table-message">Nenhuma NFD encontrada.</p>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -1733,9 +1831,8 @@ function PlaceholderScreen({ title }) {
 }
 
 function App() {
-  const routeMode = window.location.pathname.startsWith('/promotor') ? 'promotor' : 'gerencial'
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
-  const [selectedItem, setSelectedItem] = useState('dashboard')
+  const [selectedItem, setSelectedItem] = useState('relatorios')
   const [session, setSession] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -1780,10 +1877,6 @@ function App() {
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
   const [profilePhoto, setProfilePhoto] = useState('')
-  const [nfds, setNfds] = useState([])
-  const [nfdsError, setNfdsError] = useState('')
-  const [motivos, setMotivos] = useState([])
-
   async function validateSession(activeSession, options = {}) {
     const user = activeSession?.user
 
@@ -1801,7 +1894,7 @@ function App() {
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
-    const requiredPerfil = options.requiredPerfil ?? (routeMode === 'promotor' ? 'Promotor' : 'Gerencial')
+    const requiredPerfil = options.requiredPerfil ?? 'Gerencial'
 
     if (profileError || !data || data.perfil !== requiredPerfil || data.ativo !== true) {
       await supabase.auth.signOut()
@@ -1886,40 +1979,8 @@ function App() {
     setLojasLoading(false)
   }
 
-  async function loadNfds() {
-    setNfdsError('')
-
-    const { data, error: requestError } = await supabase
-      .from('nfds_com_status')
-      .select('*')
-      .order('data_emissao', { ascending: false })
-
-    if (requestError) {
-      setNfdsError(requestError.message)
-      setNfds([])
-    } else {
-      setNfds(data ?? [])
-    }
-  }
-
-  async function loadMotivos() {
-    const { data, error: requestError } = await supabase
-      .from('motivos_devolucao')
-      .select('id, nome, ativo, ordem, created_at')
-      .eq('ativo', true)
-      .order('ordem', { ascending: true })
-
-    if (requestError) {
-      setMotivos([])
-    } else {
-      setMotivos(data ?? [])
-    }
-  }
-
   async function loadOperationalData() {
-    const tasks = [loadLojas(), loadNfds(), loadMotivos()]
-    if (routeMode === 'gerencial') tasks.push(loadUsuarios())
-    await Promise.all(tasks)
+    await Promise.all([loadUsuarios(), loadLojas()])
   }
 
   useEffect(() => {
@@ -1999,13 +2060,13 @@ function App() {
         : isDashboard
           ? 'Dashboard'
           : isNotas
-            ? 'Notas'
+            ? 'Nota Fiscal'
             : isMotivos
               ? 'Motivos'
               : isRecolhimento
                 ? 'Recolhimento'
           : isRelatorios
-            ? 'Relatorios'
+            ? 'Relatorio'
             : isLogs
               ? 'Logs'
               : 'Cadastro de Usuario'
@@ -2015,19 +2076,19 @@ function App() {
     : isLojas
     ? 'Roteirizacao dos Promotores.'
     : isFotos
-      ? 'Seletor visual das fotos cadastradas por usuario.'
+      ? 'Fotos enviadas pelos promotores nas solicitacoes.'
       : isConfiguracoes
         ? 'Usuarios com acesso ao painel gerencial.'
         : isDashboard
           ? 'Visao geral do painel Avine.'
           : isNotas
-            ? 'NFDs importadas e status FSTD.'
+            ? 'Preenchimento de FSTD logistica ou lojas sem promotor.'
             : isMotivos
               ? 'Cadastro de motivos de devolucao.'
               : isRecolhimento
                 ? 'Fila logistica de recolhimentos.'
           : isRelatorios
-            ? 'Analises e acompanhamentos gerenciais.'
+            ? 'Relatorio Solicitante BI.'
             : isLogs
               ? 'Auditoria e eventos do sistema.'
               : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
@@ -2354,14 +2415,11 @@ function App() {
     setSession(null)
     setCurrentUser(null)
     setProfilePhoto('')
-    setSelectedItem('dashboard')
+    setSelectedItem('relatorios')
     setUsuarios([])
     setLojas([])
     setPromotores([])
     setLojaPromotores([])
-    setNfds([])
-    setMotivos([])
-    setNfdsError('')
     setAuthError('')
   }
 
@@ -2538,23 +2596,8 @@ function App() {
       <LoginScreen
         busy={loginBusy}
         error={authError}
-        title={routeMode === 'promotor' ? 'FSTD Promotor' : 'Painel Gerencial'}
+        title="Painel Gerencial"
         onSubmit={handleLogin}
-      />
-    )
-  }
-
-  if (routeMode === 'promotor') {
-    return (
-      <PromotorScreen
-        user={currentUser}
-        lojas={lojas}
-        nfds={nfds}
-        motivos={motivos}
-        loading={lojasLoading}
-        error={lojasError || nfdsError}
-        onLogout={handleLogout}
-        onRefresh={loadOperationalData}
       />
     )
   }
@@ -2609,6 +2652,12 @@ function App() {
             onCancelEdit={cancelEditGerencial}
             onSaveEdit={handleSaveGerencial}
           />
+        ) : isRelatorios ? (
+          <ReportScreen />
+        ) : isFotos ? (
+          <FotosScreen search={search} onSearch={setSearch} />
+        ) : isNotas ? (
+          <NotasScreen search={search} onSearch={setSearch} />
         ) : isLojas ? (
           <LojasScreen
             search={search}
@@ -2633,7 +2682,7 @@ function App() {
             onOpenCadastro={() => setCadastroOpen(true)}
             onChangePromotor={handlePromotorChange}
           />
-        ) : isUsuarios || isFotos ? (
+        ) : isUsuarios ? (
           <section className="users-card">
             <div className="card-toolbar">
               <h2>{tableTitle}</h2>
@@ -2738,7 +2787,7 @@ function App() {
         )}
       </main>
 
-      {isCadastroOpen && (isUsuarios || isFotos) && (
+      {isCadastroOpen && isUsuarios && (
         <CadastroModal
           form={form}
           usuarios={usuarios}
