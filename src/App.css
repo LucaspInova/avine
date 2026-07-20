@@ -2677,6 +2677,60 @@ select:focus-visible {
   text-align: center;
 }
 
+.profile-photo-field {
+  position: relative;
+  cursor: pointer;
+}
+
+.profile-file-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #e1e3e4;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #a9afb5;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.profile-file-control .icon {
+  width: 18px;
+  height: 18px;
+  color: #9aa1a6;
+  flex: 0 0 auto;
+}
+
+.profile-file-control span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-photo-field:hover .profile-file-control,
+.profile-photo-field:focus-within .profile-file-control {
+  border-color: #cfd6d1;
+  box-shadow: 0 0 0 3px rgb(47 100 43 / 8%);
+  color: #7f8780;
+}
+
+.edit-field .profile-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .profile-preview {
   width: 56px;
   height: 56px;

@@ -1,6 +1,6 @@
 # Supabase
 
-O Supabase e a fonte operacional principal do FSTD Avine. Sheets, JotForm e Looker Studio devem ser tratados como integracoes/importacoes, nao como banco permanente do app.
+O Supabase é a fonte operacional principal do FSTD Avine. Sheets, JotForm e Looker Studio devem ser tratados como integrações/importações, não como banco permanente do app.
 
 ## Schema Atual
 
@@ -10,7 +10,7 @@ Cadastro operacional compartilhado por Gerencial, Promotor e Entregador.
 
 Campos principais: `id`, `auth_user_id`, `email`, `nome`, `perfil`, `estado`, `fotos_habilitadas`, `foto_url`, `ativo`, `created_at`.
 
-Perfis validos:
+Perfis válidos:
 
 - `Gerencial`
 - `Promotor`
@@ -24,7 +24,7 @@ Campos principais: `id`, `codigo`, `nome`, `uf`, `cidade`, `created_at`.
 
 ### `loja_promotores`
 
-Vinculo entre lojas e promotores.
+Vínculo entre lojas e promotores.
 
 - `loja_id`
 - `promotor_id`
@@ -32,25 +32,25 @@ Vinculo entre lojas e promotores.
 
 ### Auth Gerencial
 
-- `usuarios.auth_user_id` referencia `auth.users`.
-- `public.is_current_user_gerencial_ativo()` identifica usuarios gerenciais ativos.
-- Edge Function `create-gerencial-user` cria usuario de Auth e chama RPC segura para registrar o perfil gerencial.
+- `usuarios.auth_user_id` faz referência a `auth.users`.
+- `public.is_current_user_gerencial_ativo()` identifica usuários gerenciais ativos.
+- Edge Function `create-gerencial-user` cria usuário de Auth e chama RPC segura para registrar o perfil gerencial.
 
 ## Schema FSTD Adicionado
 
 ### `motivos_devolucao`
 
-Lista administravel de motivos usados pelo formulario FSTD.
+Lista administrável de motivos usados pelo formulário FSTD.
 
 ### `nfds`
 
-Notas fiscais de devolucao importadas.
+Notas fiscais de devolução importadas.
 
 Status operacional e calculado pela view `nfds_com_status`.
 
 ### `fstds`
 
-Solicitacoes FSTD vinculadas a loja, promotor, motivo e opcionalmente a uma NFD.
+Solicitações FSTD vinculadas a loja, promotor, motivo e opcionalmente a uma NFD.
 
 Status:
 
@@ -73,7 +73,7 @@ Metadados de fotos anexadas. O arquivo deve ficar em Supabase Storage; esta tabe
 
 ### `recolhimentos`
 
-Fila logistica derivada de cada FSTD.
+Fila logística derivada de cada FSTD.
 
 Status:
 
@@ -88,14 +88,14 @@ Classifica NFDs para o gerencial:
 
 - `finalizada`: existe FSTD ativa para a NFD.
 - `avulsa`: NFD marcada com `origem = 'avulsa'`.
-- `atrasada`: sem FSTD ativa e emissao anterior a 21 dias.
+- `atrasada`: sem FSTD ativa e emissão anterior a 21 dias.
 - `outros`: demais NFDs.
 
 A view usa `security_invoker = true` para respeitar RLS das tabelas base.
 
 ## RPC `solicitar_fstd(...)`
 
-Usada pelo fluxo FSTD para registrar uma devolucao.
+Usada pelo fluxo FSTD para registrar uma devolução.
 
 Argumentos:
 
@@ -111,32 +111,32 @@ Argumentos:
 Comportamento:
 
 1. Identifica o promotor autenticado por `auth.uid()`.
-2. Confirma que a loja esta atribuida ao promotor.
+2. Confirma que a loja está atribuída ao promotor.
 3. Valida motivo ativo e NFD da mesma loja.
 4. Garante pelo menos uma quantidade positiva.
-5. Cria FSTD, itens, fotos e recolhimento na mesma transacao.
+5. Cria FSTD, itens, fotos e recolhimento na mesma transação.
 
-## RLS E Data API
+## RLS e Data API
 
-Regras praticas adotadas:
+Regras práticas adotadas:
 
 - RLS habilitado em toda tabela exposta no schema `public`.
-- `anon` sem acesso as tabelas operacionais.
-- `authenticated` recebe grants explicitos para tabelas e view usadas pelo app.
+- `anon` sem acesso às tabelas operacionais.
+- `authenticated` recebe grants explícitos para tabelas e view usadas pelo app.
 - Gerencial ativo administra cadastros e dados operacionais.
-- Promotor acessa apenas seu proprio usuario, suas lojas vinculadas e NFDs/FSTDs dessas lojas.
-- Functions expostas recebem `GRANT EXECUTE` explicito.
+- Promotor acessa apenas seu próprio usuário, suas lojas vinculadas e NFDs/FSTDs dessas lojas.
+- Functions expostas recebem `GRANT EXECUTE` explícito.
 
-Referencias oficiais:
+Referências oficiais:
 
 - Securing your API: https://supabase.com/docs/guides/api/securing-your-api
 - Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
 - Changelog Data API/grants: https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically
 
-## Proximas Validacoes
+## Próximas Validações
 
 - Aplicar migrations em banco local/remoto.
-- Rodar advisors de seguranca/performance.
+- Rodar advisors de segurança/performance.
 - Gerar `src/types/database.types.ts` a partir do banco aplicado.
 - Testar login Gerencial e Promotor com RLS real.
 - Criar bucket e policies de Storage para fotos FSTD.

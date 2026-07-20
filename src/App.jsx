@@ -14,7 +14,7 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
-  { id: 'relatorios', label: 'Relatorio', icon: 'chart' },
+  { id: 'relatorios', label: 'Relatório', icon: 'chart' },
   { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
@@ -134,6 +134,14 @@ function normalizaNome(nome) {
 
 function normalizaTexto(texto) {
   return texto.trim().replace(/\s+/g, ' ')
+}
+
+function normalizaUf(uf) {
+  return (uf ?? '').trim().toUpperCase()
+}
+
+function isMesmoUf(loja, promotor) {
+  return normalizaUf(loja?.uf) === normalizaUf(promotor?.estado)
 }
 
 function isNomeDuplicado(nome, usuarios, ignoredId = '') {
@@ -436,7 +444,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
     <div className="modal-backdrop" role="presentation">
       <form className="user-modal" onSubmit={onSubmit}>
         <div className="modal-titlebar">
-          <h3>Cadastro de Usuario</h3>
+          <h3>Cadastro de Usuário</h3>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar cadastro">
             <Icon name="x" />
           </button>
@@ -455,12 +463,12 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 required
               />
               {isEmailInvalid && (
-                <strong className="field-error">Insira um endereco de e-mail valido.</strong>
+                <strong className="field-error">Insira um endereço de e-mail válido.</strong>
               )}
             </label>
 
             <label className="form-row">
-              <span>Nome de Usuario</span>
+              <span>Nome de Usuário</span>
               <input
                 value={form.nome}
                 onChange={(event) => onChange({ nome: event.target.value })}
@@ -469,7 +477,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 required
               />
               {hasNomeDuplicado && (
-                <strong className="field-error">Informe o sobrenome para diferenciar este usuario.</strong>
+                <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
               )}
             </label>
 
@@ -520,15 +528,15 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
           <div className="modal-hints" aria-hidden="true">
             <span className={isEmailInvalid ? 'is-danger' : isEmailValid ? 'is-success' : ''}>
               <Icon name={isEmailInvalid ? 'alert' : isEmailValid ? 'check' : 'mail'} />
-              {isEmailInvalid ? 'Preencha um e-mail valido!' : isEmailValid ? 'E-mail valido' : 'Preencha o E-mail'}
+              {isEmailInvalid ? 'Preencha um e-mail válido!' : isEmailValid ? 'E-mail válido' : 'Preencha o e-mail'}
             </span>
             <span className={isNameValid && !hasNomeDuplicado ? 'is-success' : hasNomeDuplicado ? 'is-danger' : ''}>
               <Icon name={isNameValid && !hasNomeDuplicado ? 'check' : hasNomeDuplicado ? 'alert' : 'users'} />
               {hasNomeDuplicado
-                ? 'Informe o sobrenome para diferenciar este usuario.'
+                ? 'Informe o sobrenome para diferenciar este usuário.'
                 : isNameValid
-                  ? 'Nome valido'
-                  : 'Preencha o nome do usuario'}
+                  ? 'Nome válido'
+                  : 'Preencha o nome do usuário'}
             </span>
             <span className={isProfileValid ? 'is-success' : ''}>
               <Icon name={isProfileValid ? 'check' : 'gear'} />
@@ -575,7 +583,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
         <div className="store-modal-grid">
           <div className="store-modal-main">
             <label className="form-row">
-              <span>Codigo da Loja</span>
+              <span>Código da Loja</span>
               <input
                 className={form.codigo && !isCodigoValid ? 'is-invalid' : ''}
                 value={form.codigo}
@@ -584,7 +592,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
                 required
               />
               {form.codigo && isCodigoDuplicado(codigo, lojas) && (
-                <strong className="field-error">Este codigo ja esta cadastrado.</strong>
+                <strong className="field-error">Este código já está cadastrado.</strong>
               )}
             </label>
 
@@ -628,7 +636,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
           <div className="store-modal-hints" aria-hidden="true">
             <span className={isCodigoValid ? 'is-success' : form.codigo ? 'is-danger' : ''}>
               <Icon name={isCodigoValid ? 'check' : form.codigo ? 'alert' : 'filter'} />
-              {isCodigoValid ? 'Codigo valido' : 'Preencha o codigo da loja'}
+              {isCodigoValid ? 'Código válido' : 'Preencha o código da loja'}
             </span>
             <span className={isNomeValid ? 'is-success' : ''}>
               <Icon name={isNomeValid ? 'check' : 'notes'} />
@@ -663,8 +671,8 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
     <div className="modal-backdrop" role="presentation">
       <div className="info-modal">
         <div className="modal-titlebar">
-          <h3>Informacoes do Usuario</h3>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar informacoes">
+          <h3>Informações do Usuário</h3>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar informações">
             <Icon name="x" />
           </button>
         </div>
@@ -740,7 +748,7 @@ function EditarUsuarioModal({
             <Icon name="arrow-left" />
           </button>
           <h3>Editar</h3>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar edicao">
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar edição">
             <Icon name="x" />
           </button>
         </div>
@@ -749,7 +757,7 @@ function EditarUsuarioModal({
           <label className="edit-field">
             <span>
               Nome
-              <small>Necessario</small>
+              <small>Necessário</small>
             </span>
             <input
               value={form.nome}
@@ -759,14 +767,14 @@ function EditarUsuarioModal({
               required
             />
             {hasNomeDuplicado && (
-              <strong className="field-error">Informe o sobrenome para diferenciar este usuario.</strong>
+              <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
             )}
           </label>
 
           <label className="edit-field">
             <span>
               E-mail
-              <small>Necessario</small>
+              <small>Necessário</small>
             </span>
             <input
               className={trimmedEmail && !isEmailValid ? 'is-invalid' : ''}
@@ -776,14 +784,14 @@ function EditarUsuarioModal({
               required
             />
             {trimmedEmail && !isEmailValid && (
-              <strong className="field-error">Insira um endereco de e-mail valido.</strong>
+              <strong className="field-error">Insira um endereço de e-mail válido.</strong>
             )}
           </label>
 
           <fieldset className="edit-field">
             <legend>
               Perfil
-              <small>Necessario</small>
+              <small>Necessário</small>
             </legend>
             <div className="chip-group">
               {perfis.map((perfil) => (
@@ -802,7 +810,7 @@ function EditarUsuarioModal({
           <fieldset className="edit-field">
             <legend>
               UF
-              <small>Necessario</small>
+              <small>Necessário</small>
             </legend>
             <div className="chip-group state-chips">
               {estados.map((estado) => (
@@ -838,7 +846,7 @@ function EditarUsuarioModal({
             Cancelar
           </button>
           <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>
-            {deleting ? 'Excluindo...' : 'Excluir usuario'}
+            {deleting ? 'Excluindo...' : 'Excluir usuário'}
           </button>
         </div>
       </form>
@@ -1131,6 +1139,7 @@ function LojasScreen({
         <div className="store-cards-grid" aria-label="Lojas">
           {paginatedLojas.map((loja) => {
             const lojaVinculos = vinculos[loja.id] ?? {}
+            const promotoresDaUf = promotores.filter((promotor) => isMesmoUf(loja, promotor))
 
             return (
               <article className="route-store-card" key={loja.id}>
@@ -1145,7 +1154,7 @@ function LojasScreen({
                       <PromotorSelect
                         key={posicao}
                         value={lojaVinculos[posicao] ?? ''}
-                        promotores={promotores}
+                        promotores={promotoresDaUf}
                         disabled={savingKey === key}
                         onChange={(promotorId) => onChangePromotor(loja.id, posicao, promotorId)}
                       />
@@ -1180,8 +1189,8 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
   }, [])
 
   return (
-    <nav className="pagination" aria-label="Paginacao de lojas">
-      <button type="button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>‹</button>
+    <nav className="pagination" aria-label="Paginação de lojas">
+      <button type="button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>&lsaquo;</button>
       {items.map((item, index) =>
         item === 'ellipsis' ? (
           <span key={`ellipsis-${index}`}>...</span>
@@ -1196,7 +1205,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
           </button>
         ),
       )}
-      <button type="button" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>›</button>
+      <button type="button" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>&rsaquo;</button>
     </nav>
   )
 }
@@ -1269,7 +1278,7 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
         <div className="profile-drawer-backdrop">
           <form className="profile-drawer" onSubmit={handleSubmit}>
             <div className="modal-titlebar">
-              <h3>Edit</h3>
+              <h3>Editar</h3>
               <button className="icon-button" type="button" onClick={() => setOpen(false)} aria-label="Fechar">
                 <Icon name="x" />
               </button>
@@ -1277,14 +1286,18 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
             <div className="profile-edit-box">
               <strong>{user?.email}</strong>
               <label className="edit-field">
-                <span>Name</span>
+                <span>Nome</span>
                 <input value={name} onChange={(event) => setName(event.target.value)} type="text" minLength={4} required />
               </label>
-              <label className="edit-field">
+              <label className="edit-field profile-photo-field">
                 <span>Foto</span>
-                <input onChange={handleFile} type="file" accept="image/jpeg,image/png,image/webp" />
+                <div className="profile-file-control">
+                  <Icon name="camera" />
+                  <span>{selectedPhoto?.name ?? 'Escolha uma imagem...'}</span>
+                </div>
+                <input className="profile-file-input" onChange={handleFile} type="file" accept="image/jpeg,image/png,image/webp" />
               </label>
-              {photoPreview && <img className="profile-preview" src={photoPreview} alt="Previa" />}
+              {photoPreview && <img className="profile-preview" src={photoPreview} alt="Prévia" />}
             </div>
             {saveError && <p className="form-error">{saveError}</p>}
             <div className="edit-actions">
@@ -1318,7 +1331,7 @@ function LoginScreen({ error, busy, title = 'Painel Gerencial', onSubmit }) {
         <h1>{title}</h1>
 
         <label className="login-field">
-          <span>Email</span>
+          <span>E-mail</span>
           <input
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -1377,14 +1390,14 @@ function GerenciaisScreen({
   return (
     <section className="users-card gerenciais-card">
       <div className="card-toolbar">
-        <h2>Usuarios Gerenciais</h2>
+        <h2>Usuários Gerenciais</h2>
 
         <label className="search-field">
           <Icon name="search" />
           <input
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder="Nome ou email"
+            placeholder="Nome ou e-mail"
             type="search"
           />
         </label>
@@ -1402,7 +1415,7 @@ function GerenciaisScreen({
           />
         </label>
         <label className="form-row">
-          <span>Email</span>
+          <span>E-mail</span>
           <input
             value={form.email}
             onChange={(event) => onFormChange({ email: event.target.value })}
@@ -1420,7 +1433,7 @@ function GerenciaisScreen({
             required
             aria-describedby="gerencial-password-hint"
           />
-          <small id="gerencial-password-hint">Minimo 8 caracteres.</small>
+          <small id="gerencial-password-hint">Mínimo 8 caracteres.</small>
         </label>
         <button className="create-button" type="submit" disabled={busy}>
           <Icon name="plus" />
@@ -1429,15 +1442,15 @@ function GerenciaisScreen({
       </form>
 
       {error && <p className="table-message is-error">{error}</p>}
-      {loading && <p className="table-message">Carregando Gerenciais...</p>}
+      {loading && <p className="table-message">Carregando gerenciais...</p>}
 
       {!loading && (
-        <div className="users-table gerenciais-table" role="table" aria-label="Usuarios Gerenciais">
+        <div className="users-table gerenciais-table" role="table" aria-label="Usuários Gerenciais">
           <div className="table-row table-head" role="row">
             <span role="columnheader">NOME</span>
             <span role="columnheader">EMAIL</span>
             <span role="columnheader">STATUS</span>
-            <span role="columnheader">ACOES</span>
+            <span role="columnheader">AÇÕES</span>
           </div>
 
           {filtered.map((usuario) => {
@@ -1512,7 +1525,7 @@ function GerenciaisScreen({
             )
           })}
 
-          {filtered.length === 0 && <p className="table-message">Nenhum Gerencial encontrado.</p>}
+          {filtered.length === 0 && <p className="table-message">Nenhum gerencial encontrado.</p>}
         </div>
       )}
     </section>
@@ -1553,7 +1566,7 @@ function ReportScreen() {
   ]
 
   return (
-    <section className="report-page" aria-label="Relatorio Solicitante BI">
+    <section className="report-page" aria-label="Relatório Solicitante BI">
       <div className="report-filters">
         {['1 de jun. de 2026 - 17 de jun. de 2026', 'Vendedor', 'Cidade', 'UF', 'Motivo', 'NFD', 'Loja', 'Promotor'].map((label) => (
           <button className="report-filter" type="button" key={label}>
@@ -1587,7 +1600,7 @@ function ReportScreen() {
         <div className="report-panel pie-panel">
           <div className="pie-chart" />
           <ul className="pie-legend">
-            {['AVARIA NA ENTREGA', 'AVARIA NO PDV', 'AVARIA NO DEPOSITO', 'OVOS PODRES', 'Pendente FSTD', 'AVARIA DE VIAGEM', 'OVOS VENCIDOS', 'FALTA DE PRODUTO', 'OVOS MOFADOS', 'Outros'].map((item) => (
+            {['AVARIA NA ENTREGA', 'AVARIA NO PDV', 'AVARIA NO DEPÓSITO', 'OVOS PODRES', 'Pendente FSTD', 'AVARIA DE VIAGEM', 'OVOS VENCIDOS', 'FALTA DE PRODUTO', 'OVOS MOFADOS', 'Outros'].map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -1635,7 +1648,7 @@ function ReportScreen() {
           <table className="report-table">
             <thead>
               <tr>
-                {['NFD', 'Emissao', 'Envio', 'Regional Master', 'Cod', 'Loja', 'Motivo', 'Promotor', 'Valor (R$)'].map((head) => (
+                {['NFD', 'Emissão', 'Envio', 'Regional Master', 'Cód.', 'Loja', 'Motivo', 'Promotor', 'Valor (R$)'].map((head) => (
                   <th key={head}>{head}</th>
                 ))}
               </tr>
@@ -1688,7 +1701,7 @@ function FotosScreen({ search, onSearch }) {
             <div className="photo-frame">
               <img src={mockPhotoImage} alt={`Foto da NFD ${photo.nfd}`} />
               <button className="photo-arrow is-left" type="button" aria-label="Foto anterior">&lsaquo;</button>
-              <button className="photo-arrow is-right" type="button" aria-label="Proxima foto">&rsaquo;</button>
+              <button className="photo-arrow is-right" type="button" aria-label="Próxima foto">&rsaquo;</button>
               <span className="photo-progress" />
             </div>
             <dl className="photo-meta">
@@ -1729,8 +1742,8 @@ function NotaStatusIcon({ status }) {
 
 function NotesPagination({ pages }) {
   return (
-    <nav className="pagination notes-pagination" aria-label="Paginas da lista de NFD">
-      <button type="button" disabled aria-label="Pagina anterior">&lsaquo;</button>
+    <nav className="pagination notes-pagination" aria-label="Páginas da lista de NFD">
+      <button type="button" disabled aria-label="Página anterior">&lsaquo;</button>
       <button className="is-active" type="button">1</button>
       <button type="button">2</button>
       <button type="button">3</button>
@@ -1738,7 +1751,7 @@ function NotesPagination({ pages }) {
       <button type="button">5</button>
       <span>...</span>
       <button type="button">{pages}</button>
-      <button type="button" aria-label="Proxima pagina">&rsaquo;</button>
+      <button type="button" aria-label="Próxima página">&rsaquo;</button>
     </nav>
   )
 }
@@ -1825,7 +1838,7 @@ function PlaceholderScreen({ title }) {
   return (
     <section className="users-card placeholder-card">
       <h2>{title}</h2>
-      <p className="table-message">Modulo protegido para Gerenciais ativos.</p>
+      <p className="table-message">Módulo protegido para gerenciais ativos.</p>
     </section>
   )
 }
@@ -1902,7 +1915,7 @@ function App() {
       setCurrentUser(null)
       setAuthError(
         options.permissionMessage ??
-          `Acesso permitido somente para usuarios ${requiredPerfil} ativos.`,
+          `Acesso permitido somente para usuários ${requiredPerfil} ativos.`,
       )
       setAuthLoading(false)
       return null
@@ -1954,7 +1967,7 @@ function App() {
         .order('codigo', { ascending: true }),
       supabase
         .from('usuarios')
-        .select('id, nome, perfil')
+        .select('id, nome, perfil, estado')
         .eq('perfil', 'Promotor')
         .order('nome', { ascending: true }),
       supabase
@@ -2056,7 +2069,7 @@ function App() {
     : isFotos
       ? 'Fotos'
       : isConfiguracoes
-        ? 'Configuracoes'
+        ? 'Configurações'
         : isDashboard
           ? 'Dashboard'
           : isNotas
@@ -2066,32 +2079,32 @@ function App() {
               : isRecolhimento
                 ? 'Recolhimento'
           : isRelatorios
-            ? 'Relatorio'
+            ? 'Relatório'
             : isLogs
               ? 'Logs'
-              : 'Cadastro de Usuario'
-  const tableTitle = isFotos ? 'Fotos' : 'Usuarios'
+              : 'Cadastro de Usuário'
+  const tableTitle = isFotos ? 'Fotos' : 'Usuários'
   const pageSubtitle = isPerfil
     ? 'Dados da conta gerencial.'
     : isLojas
-    ? 'Roteirizacao dos Promotores.'
+    ? 'Roteirização dos promotores.'
     : isFotos
-      ? 'Fotos enviadas pelos promotores nas solicitacoes.'
+      ? 'Fotos enviadas pelos promotores nas solicitações.'
       : isConfiguracoes
-        ? 'Usuarios com acesso ao painel gerencial.'
+        ? 'Usuários com acesso ao painel gerencial.'
         : isDashboard
-          ? 'Visao geral do painel Avine.'
+          ? 'Visão geral do painel Avine.'
           : isNotas
-            ? 'Preenchimento de FSTD logistica ou lojas sem promotor.'
+            ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
             : isMotivos
-              ? 'Cadastro de motivos de devolucao.'
+              ? 'Cadastro de motivos de devolução.'
               : isRecolhimento
-                ? 'Fila logistica de recolhimentos.'
+                ? 'Fila logística de recolhimentos.'
           : isRelatorios
-            ? 'Relatorio Solicitante BI.'
+            ? 'Relatório Solicitante BI.'
             : isLogs
               ? 'Auditoria e eventos do sistema.'
-              : 'Lista de cadastro de usuarios (Promotores e Motoristas).'
+              : 'Lista de cadastro de usuários (promotores e motoristas).'
   const heroIcon = isPerfil
     ? 'users'
     : isLojas
@@ -2129,8 +2142,8 @@ function App() {
     ) {
       setFormError(
         isNomeDuplicado(payload.nome, usuarios)
-          ? 'Informe o sobrenome para diferenciar este usuario.'
-          : 'Revise os campos obrigatorios antes de cadastrar.',
+          ? 'Informe o sobrenome para diferenciar este usuário.'
+          : 'Revise os campos obrigatórios antes de cadastrar.',
       )
       return
     }
@@ -2144,8 +2157,8 @@ function App() {
       setFormError(
         insertError.code === '23505'
           ? insertError.message.includes('usuarios_nome')
-            ? 'Informe o sobrenome para diferenciar este usuario.'
-            : 'Este e-mail ja esta cadastrado.'
+            ? 'Informe o sobrenome para diferenciar este usuário.'
+            : 'Este e-mail já está cadastrado.'
           : insertError.message,
       )
       setSaving(false)
@@ -2178,8 +2191,8 @@ function App() {
     ) {
       setLojaFormError(
         isCodigoDuplicado(payload.codigo, lojas)
-          ? 'Este codigo ja esta cadastrado.'
-          : 'Revise os campos obrigatorios antes de cadastrar.',
+          ? 'Este código já está cadastrado.'
+          : 'Revise os campos obrigatórios antes de cadastrar.',
       )
       return
     }
@@ -2190,7 +2203,7 @@ function App() {
     const { error: insertError } = await supabase.from('lojas').insert(payload)
 
     if (insertError) {
-      setLojaFormError(insertError.code === '23505' ? 'Este codigo ja esta cadastrado.' : insertError.message)
+      setLojaFormError(insertError.code === '23505' ? 'Este código já está cadastrado.' : insertError.message)
       setSavingLoja(false)
       return
     }
@@ -2247,6 +2260,15 @@ function App() {
         )
       }
 
+      setStoreSavingKey('')
+      return
+    }
+
+    const loja = lojas.find((item) => item.id === lojaId)
+    const promotor = promotores.find((item) => item.id === promotorId)
+
+    if (!loja || !promotor || !isMesmoUf(loja, promotor)) {
+      setLojasError('Selecione um promotor com a mesma UF da loja.')
       setStoreSavingKey('')
       return
     }
@@ -2326,8 +2348,8 @@ function App() {
     ) {
       setEditError(
         isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id)
-          ? 'Informe o sobrenome para diferenciar este usuario.'
-          : 'Revise os campos obrigatorios antes de salvar.',
+          ? 'Informe o sobrenome para diferenciar este usuário.'
+          : 'Revise os campos obrigatórios antes de salvar.',
       )
       return
     }
@@ -2344,8 +2366,8 @@ function App() {
       setEditError(
         updateError.code === '23505'
           ? updateError.message.includes('usuarios_nome')
-            ? 'Informe o sobrenome para diferenciar este usuario.'
-            : 'Este e-mail ja esta cadastrado.'
+            ? 'Informe o sobrenome para diferenciar este usuário.'
+            : 'Este e-mail já está cadastrado.'
           : updateError.message,
       )
       setSavingEdit(false)
@@ -2361,7 +2383,7 @@ function App() {
   async function handleDeleteUsuario() {
     if (!selectedUsuario) return
 
-    const shouldDelete = window.confirm(`Excluir usuario ${selectedUsuario.nome}?`)
+    const shouldDelete = window.confirm(`Excluir usuário ${selectedUsuario.nome}?`)
     if (!shouldDelete) return
 
     setDeletingUser(true)
@@ -2394,13 +2416,13 @@ function App() {
     })
 
     if (loginError) {
-      setAuthError('Email ou senha invalidos.')
+      setAuthError('E-mail ou senha inválidos.')
       setLoginBusy(false)
       return
     }
 
     const usuario = await validateSession(data.session, {
-      permissionMessage: 'Voce nao tem permissao para acessar o painel gerencial.',
+      permissionMessage: 'Você não tem permissão para acessar o painel gerencial.',
     })
 
     if (usuario) {
@@ -2586,7 +2608,7 @@ function App() {
   if (authLoading) {
     return (
       <main className="login-shell">
-        <p className="auth-loading">Validando sessao...</p>
+        <p className="auth-loading">Validando sessão...</p>
       </main>
     )
   }
@@ -2721,16 +2743,16 @@ function App() {
 
                 <button className="create-button" type="button" onClick={() => setCadastroOpen(true)}>
                   <Icon name="plus" />
-                  <span>Cadastrar Usuario</span>
+                  <span>Cadastrar Usuário</span>
                 </button>
               </div>
             </div>
 
             {error && <p className="table-message is-error">{error}</p>}
-            {loading && <p className="table-message">Carregando usuarios...</p>}
+            {loading && <p className="table-message">Carregando usuários...</p>}
 
             {!loading && (
-              <div className="users-table" role="table" aria-label="Usuarios">
+              <div className="users-table" role="table" aria-label="Usuários">
                 <div className="table-row table-head" role="row">
                   <span role="columnheader">NOME</span>
                   <span role="columnheader">EMAIL</span>
@@ -2777,7 +2799,7 @@ function App() {
                 ))}
 
                 {filteredUsers.length === 0 && (
-                  <p className="table-message">Nenhum usuario encontrado.</p>
+                  <p className="table-message">Nenhum usuário encontrado.</p>
                 )}
               </div>
             )}
@@ -2845,3 +2867,4 @@ function App() {
 }
 
 export default App
+

@@ -56,5 +56,6 @@ Os apps originais compartilhavam dados por Google Sheets (`FSTD Digital`) e Glid
 
 - O repositorio atual e um app React/Vite.
 - O painel gerencial ja possui autenticacao, perfil, usuarios, lojas e roteirizacao.
+- A rota `/promotor` foi adicionada para o FSTD Digital programado, com login do promotor, lojas vinculadas, consulta de NFDs e envio pela RPC `solicitar_fstd`.
 - O Supabase ja possui migrations para usuarios, lojas, vinculos e usuario gerencial.
 - A base FSTD foi adicionada por migration dedicada e ainda precisa ser aplicada/validada no banco alvo antes de operar em producao.
