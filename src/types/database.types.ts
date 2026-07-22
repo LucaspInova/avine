@@ -222,6 +222,57 @@ export type Database = {
           },
         ]
       }
+      nfd_desconhecimentos: {
+        Row: {
+          id: string
+          loja_id: string
+          promotor_id: string
+          nfd_referencia: string
+          nfd_chave_acesso: string | null
+          nfd_numero: string
+          loja_codigo: string | null
+          comentario: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          loja_id: string
+          promotor_id: string
+          nfd_referencia: string
+          nfd_chave_acesso?: string | null
+          nfd_numero: string
+          loja_codigo?: string | null
+          comentario: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          loja_id?: string
+          promotor_id?: string
+          nfd_referencia?: string
+          nfd_chave_acesso?: string | null
+          nfd_numero?: string
+          loja_codigo?: string | null
+          comentario?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'nfd_desconhecimentos_loja_id_fkey'
+            columns: ['loja_id']
+            isOneToOne: false
+            referencedRelation: 'lojas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'nfd_desconhecimentos_promotor_id_fkey'
+            columns: ['promotor_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       fstds: {
         Row: {
           id: string
@@ -435,6 +486,145 @@ export type Database = {
         ]
       }
     }
+      fstd_processos: {
+        Row: {
+          id: string
+          nfd_chave_acesso: string
+          nfd_numero: string
+          loja_id: string
+          promotor_id: string
+          status: 'em_andamento' | 'concluida' | 'cancelada'
+          finalizada_em: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nfd_chave_acesso: string
+          nfd_numero: string
+          loja_id: string
+          promotor_id: string
+          status?: 'em_andamento' | 'concluida' | 'cancelada'
+          finalizada_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nfd_chave_acesso?: string
+          nfd_numero?: string
+          loja_id?: string
+          promotor_id?: string
+          status?: 'em_andamento' | 'concluida' | 'cancelada'
+          finalizada_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fstd_produtos: {
+        Row: {
+          id: string
+          processo_id: string
+          produto_id: string | null
+          codigo_produto: string
+          nome: string
+          descricao: string | null
+          imagem_url: string | null
+          quantidade_faturada_galinha: number
+          quantidade_faturada_codorna: number
+          quantidade_retorno: number
+          motivo_id: string | null
+          observacao: string | null
+          fotos: Json
+          status: 'pendente' | 'concluido'
+          concluido_em: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          processo_id: string
+          produto_id?: string | null
+          codigo_produto: string
+          nome: string
+          descricao?: string | null
+          imagem_url?: string | null
+          quantidade_faturada_galinha?: number
+          quantidade_faturada_codorna?: number
+          quantidade_retorno?: number
+          motivo_id?: string | null
+          observacao?: string | null
+          fotos?: Json
+          status?: 'pendente' | 'concluido'
+          concluido_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          processo_id?: string
+          produto_id?: string | null
+          codigo_produto?: string
+          nome?: string
+          descricao?: string | null
+          imagem_url?: string | null
+          quantidade_faturada_galinha?: number
+          quantidade_faturada_codorna?: number
+          quantidade_retorno?: number
+          motivo_id?: string | null
+          observacao?: string | null
+          fotos?: Json
+          status?: 'pendente' | 'concluido'
+          concluido_em?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fstd_produto_motivos: {
+        Row: {
+          id: string
+          produto_id: string
+          motivo_id: string
+          quantidade_faturada: number
+          quantidade: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          produto_id: string
+          motivo_id: string
+          quantidade_faturada: number
+          quantidade: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          produto_id?: string
+          motivo_id?: string
+          quantidade_faturada?: number
+          quantidade?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'fstd_produto_motivos_produto_id_fkey'
+            columns: ['produto_id']
+            isOneToOne: false
+            referencedRelation: 'fstd_produtos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fstd_produto_motivos_motivo_id_fkey'
+            columns: ['motivo_id']
+            isOneToOne: false
+            referencedRelation: 'motivos_devolucao'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+    }
     Views: {
       lojas_com_promotores: {
         Row: {
@@ -468,6 +658,43 @@ export type Database = {
           fstd_id: string | null
           fstd_status: StatusFstd | null
           status_nfd: StatusNfd | null
+        }
+        Relationships: []
+      }
+      nfd_notas: {
+        Row: {
+          chave_acesso: string | null
+          estabelecimento: string | null
+          nota_fiscal: number | null
+          data_emissao: string | null
+          data_referencia: string | null
+          codigo_cliente: number | null
+          nome_abreviado: string | null
+          uf: Estado | null
+          cidade: string | null
+          quantidade_galinha: number | null
+          valor_galinha: number | null
+          quantidade_codorna: number | null
+          valor_codorna: number | null
+          valor_total: number | null
+          quantidade_itens: number | null
+          quantidade_produtos_distintos: number | null
+          detalhes: Json | null
+        }
+        Relationships: []
+      }
+      produtos_expandidos: {
+        Row: {
+          produto_id: string | null
+          produto_codigo_id: string | null
+          codigo_produto: string | null
+          status: boolean | null
+          nome: string | null
+          ovos_und: number | null
+          categoria: string | null
+          imagem_url: string | null
+          class_ia: string | null
+          color_ia: string | null
         }
         Relationships: []
       }
@@ -507,6 +734,41 @@ export type Database = {
         }
         Returns: Database['public']['Tables']['fstds']['Row']
       }
+      iniciar_fstd_produtos: {
+        Args: {
+          p_loja_id: string
+          p_nfd_chave_acesso: string
+          p_nfd_numero: string
+          p_produtos: Json
+        }
+        Returns: string
+      }
+      concluir_fstd_produto: {
+        Args: {
+          p_produto_id: string
+          p_divisoes: Json
+          p_observacao?: string | null
+          p_fotos?: Json
+        }
+        Returns: Database['public']['Tables']['fstd_produtos']['Row']
+      }
+      editar_fstd_produto: {
+        Args: {
+          p_produto_id: string
+          p_divisoes: Json
+          p_quantidade_faturada_galinha: number
+          p_quantidade_faturada_codorna: number
+          p_observacao?: string | null
+          p_fotos?: Json
+        }
+        Returns: Database['public']['Tables']['fstd_produtos']['Row']
+      }
+      finalizar_fstd_produtos: {
+        Args: {
+          p_processo_id: string
+        }
+        Returns: Database['public']['Tables']['fstd_processos']['Row']
+      }
     }
     Enums: {
       [_ in never]: never
@@ -533,8 +795,10 @@ export type LojaComPromotores = Database['public']['Views']['lojas_com_promotore
 
 export type MotivoDevolucao = Database['public']['Tables']['motivos_devolucao']['Row']
 export type Nfd = Database['public']['Tables']['nfds']['Row']
+export type NfdDesconhecimento = Database['public']['Tables']['nfd_desconhecimentos']['Row']
 export type Fstd = Database['public']['Tables']['fstds']['Row']
 export type FstdItem = Database['public']['Tables']['fstd_itens']['Row']
 export type FstdFoto = Database['public']['Tables']['fstd_fotos']['Row']
 export type Recolhimento = Database['public']['Tables']['recolhimentos']['Row']
 export type NfdComStatus = Database['public']['Views']['nfds_com_status']['Row']
+export type NfdNota = Database['public']['Views']['nfd_notas']['Row']

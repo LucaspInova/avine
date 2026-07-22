@@ -6,6 +6,15 @@ export type CreateGerencialUserPayload = {
   password: string
 }
 
+export type CreateOperationalUserPayload = {
+  nome: string
+  email: string
+  password: string
+  perfil: 'Promotor' | 'Entregador'
+  estado: string
+  fotos_habilitadas: boolean
+}
+
 type CreateGerencialUserResponse = {
   error?: string
 }
@@ -17,7 +26,7 @@ function getFunctionResponse(error: unknown): Response | null {
   return context instanceof Response ? context : null
 }
 
-export async function createGerencialUser(payload: CreateGerencialUserPayload): Promise<void> {
+async function createUser(payload: CreateGerencialUserPayload | CreateOperationalUserPayload): Promise<void> {
   const { data, error } = await supabase.functions.invoke<CreateGerencialUserResponse>(
     'create-gerencial-user',
     { body: payload },
@@ -35,4 +44,12 @@ export async function createGerencialUser(payload: CreateGerencialUserPayload): 
   }
 
   if (data?.error) throw new Error(data.error)
+}
+
+export async function createGerencialUser(payload: CreateGerencialUserPayload): Promise<void> {
+  return createUser(payload)
+}
+
+export async function createOperationalUser(payload: CreateOperationalUserPayload): Promise<void> {
+  return createUser(payload)
 }

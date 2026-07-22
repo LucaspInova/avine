@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabaseClient'
-import { createGerencialUser } from './lib/gerencialUsers'
+import { createGerencialUser, createOperationalUser } from './lib/gerencialUsers'
 import {
   getProfilePhotoSignedUrl,
   uploadProfilePhoto,
   validateProfilePhoto,
 } from './lib/profilePhoto'
-import avineLogo from './assets/avine-logo.svg'
+import avineLogo from './assets/foto_logoavine.png'
 import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -18,13 +19,12 @@ const navItems = [
   { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
-  { id: 'fotos', label: 'Fotos', icon: 'camera' },
-  { id: 'logs', label: 'Logs de Erro', icon: 'logs', separated: true },
 ]
 
 const initialUserForm = {
   email: '',
   nome: '',
+  senha: '',
   perfil: '',
   estado: '',
   fotos_habilitadas: false,
@@ -45,38 +45,6 @@ const initialGerencialForm = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const usuarioSelect = 'id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo, created_at'
-const mockPhotoImage = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 430">
-  <defs>
-    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-      <stop stop-color="#2f642b"/>
-      <stop offset="1" stop-color="#f1d24b"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000" flood-opacity=".24"/>
-    </filter>
-  </defs>
-  <rect width="640" height="430" fill="url(#bg)"/>
-  <rect x="44" y="38" width="552" height="354" rx="22" fill="#ffffff" opacity=".18"/>
-  <ellipse cx="228" cy="226" rx="116" ry="148" fill="#fff8eb" filter="url(#shadow)" transform="rotate(-10 228 226)"/>
-  <ellipse cx="356" cy="224" rx="105" ry="138" fill="#fff2dc" filter="url(#shadow)" transform="rotate(9 356 224)"/>
-  <path d="M96 330c88-38 185-46 286-24 54 12 107 10 160-6v92H96z" fill="#2b4c28" opacity=".38"/>
-  <rect x="86" y="70" width="176" height="56" rx="12" fill="#ffffff" opacity=".9"/>
-  <text x="106" y="106" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#2f642b">avine</text>
-  <text x="190" y="244" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#d95e8d" transform="rotate(-10 190 244)">NFD 81727</text>
-  <text x="314" y="248" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#d95e8d" transform="rotate(9 314 248)">18/06/26</text>
-</svg>
-`)}`
-
-const mockPhotoRecords = [
-  { id: 'foto-1', loja: 'ATAC JABOATA', nfd: '81727', produto: 'GB 20x1', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:48' },
-  { id: 'foto-2', loja: 'ATAC JABOATA', nfd: '81727', produto: 'Codorna', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:46' },
-  { id: 'foto-3', loja: 'ATACADAO BOA', nfd: '448504', produto: 'Codorna', promotor: 'ANDERSON BARBOSA', enviadoEm: '18/06/2026, 15:43' },
-  { id: 'foto-4', loja: 'LEONIDAS 2', nfd: '10669', produto: 'GB 20x1', promotor: 'CARLOS LIMA', enviadoEm: '18/06/2026, 14:21' },
-  { id: 'foto-5', loja: 'CASA SANTA L', nfd: '143266', produto: 'Ovos Galinha', promotor: 'MARCIA SILVA', enviadoEm: '18/06/2026, 11:08' },
-  { id: 'foto-6', loja: 'CASA SANTA L', nfd: '143267', produto: 'Codorna', promotor: 'MARCIA SILVA', enviadoEm: '18/06/2026, 11:06' },
-]
-
 const mockNotasGroups = [
   {
     date: '18/6/2026',
@@ -142,6 +110,24 @@ function normalizaUf(uf) {
 
 function isMesmoUf(loja, promotor) {
   return normalizaUf(loja?.uf) === normalizaUf(promotor?.estado)
+}
+
+async function fetchAllNfdNotas(select, configureQuery) {
+  const pageSize = 1000
+  const rows = []
+
+  for (let from = 0; ; from += pageSize) {
+    let query = supabase.from('nfd_notas').select(select)
+    query = configureQuery ? configureQuery(query) : query
+
+    const { data, error } = await query.range(from, from + pageSize - 1)
+    if (error) return { data: [], error }
+
+    rows.push(...(data ?? []))
+    if ((data ?? []).length < pageSize) break
+  }
+
+  return { data: rows, error: null }
 }
 
 function isNomeDuplicado(nome, usuarios, ignoredId = '') {
@@ -425,16 +411,19 @@ function PhotoSwitch({ checked, disabled = false, onChange, label }) {
 function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmit }) {
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
+  const password = form.senha
   const hasEmailInput = trimmedEmail.length > 0
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
   const isNameValid = trimmedName.length >= 4
+  const isPasswordValid = password.length >= 8
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
     isEmailValid &&
     isNameValid &&
+    isPasswordValid &&
     !hasNomeDuplicado &&
     isProfileValid &&
     isEstadoValid &&
@@ -478,6 +467,22 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
               />
               {hasNomeDuplicado && (
                 <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
+              )}
+            </label>
+
+            <label className="form-row">
+              <span>Senha</span>
+              <input
+                className={password && !isPasswordValid ? 'is-invalid' : ''}
+                value={password}
+                onChange={(event) => onChange({ senha: event.target.value })}
+                minLength={8}
+                type="password"
+                autoComplete="new-password"
+                required
+              />
+              {password && !isPasswordValid && (
+                <strong className="field-error">A senha deve ter pelo menos 8 caracteres.</strong>
               )}
             </label>
 
@@ -537,6 +542,10 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 : isNameValid
                   ? 'Nome válido'
                   : 'Preencha o nome do usuário'}
+            </span>
+            <span className={isPasswordValid ? 'is-success' : password ? 'is-danger' : ''}>
+              <Icon name={isPasswordValid ? 'check' : password ? 'alert' : 'gear'} />
+              {isPasswordValid ? 'Senha válida' : 'Senha mínima de 8 caracteres'}
             </span>
             <span className={isProfileValid ? 'is-success' : ''}>
               <Icon name={isProfileValid ? 'check' : 'gear'} />
@@ -1679,57 +1688,6 @@ function ReportScreen() {
   )
 }
 
-function FotosScreen({ search, onSearch }) {
-  const query = search.trim().toLowerCase()
-  const filteredPhotos = mockPhotoRecords.filter((photo) =>
-    `${photo.loja} ${photo.nfd} ${photo.produto} ${photo.promotor}`.toLowerCase().includes(query),
-  )
-
-  return (
-    <section className="photo-page">
-      <div className="card-toolbar">
-        <h2>Registros</h2>
-        <label className="search-field">
-          <Icon name="search" />
-          <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Procurar" type="search" />
-        </label>
-      </div>
-
-      <div className="photo-grid">
-        {filteredPhotos.map((photo) => (
-          <article className="photo-card" key={photo.id}>
-            <div className="photo-frame">
-              <img src={mockPhotoImage} alt={`Foto da NFD ${photo.nfd}`} />
-              <button className="photo-arrow is-left" type="button" aria-label="Foto anterior">&lsaquo;</button>
-              <button className="photo-arrow is-right" type="button" aria-label="Próxima foto">&rsaquo;</button>
-              <span className="photo-progress" />
-            </div>
-            <dl className="photo-meta">
-              <div>
-                <dt>Loja</dt>
-                <dd>{photo.loja}</dd>
-              </div>
-              <div>
-                <dt>NFD</dt>
-                <dd>{photo.nfd}</dd>
-              </div>
-              <div>
-                <dt>Produto</dt>
-                <dd>{photo.produto}</dd>
-              </div>
-            </dl>
-            <p>Enviado por {photo.promotor} em {photo.enviadoEm}</p>
-          </article>
-        ))}
-
-        {filteredPhotos.length === 0 && (
-          <p className="table-message">Nenhuma foto encontrada.</p>
-        )}
-      </div>
-    </section>
-  )
-}
-
 function NotaStatusIcon({ status }) {
   const isDone = status === 'FSTD'
 
@@ -1844,6 +1802,7 @@ function PlaceholderScreen({ title }) {
 }
 
 function App() {
+  const navigate = useNavigate()
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const [selectedItem, setSelectedItem] = useState('relatorios')
   const [session, setSession] = useState(null)
@@ -1909,13 +1868,34 @@ function App() {
 
     const requiredPerfil = options.requiredPerfil ?? 'Gerencial'
 
-    if (profileError || !data || data.perfil !== requiredPerfil || data.ativo !== true) {
+    if (profileError || !data || data.ativo !== true) {
       await supabase.auth.signOut()
       setSession(null)
       setCurrentUser(null)
       setAuthError(
         options.permissionMessage ??
           `Acesso permitido somente para usuários ${requiredPerfil} ativos.`,
+      )
+      setAuthLoading(false)
+      return null
+    }
+
+    if (data.perfil !== requiredPerfil) {
+      if (data.perfil === 'Promotor' || data.perfil === 'Entregador') {
+        setSession(null)
+        setCurrentUser(null)
+        setAuthError('')
+        setAuthLoading(false)
+        navigate(`/acesso/${data.perfil.toLowerCase()}`, { replace: true })
+        return null
+      }
+
+      await supabase.auth.signOut()
+      setSession(null)
+      setCurrentUser(null)
+      setAuthError(
+        options.permissionMessage ??
+          `Acesso permitido somente para usuÃ¡rios ${requiredPerfil} ativos.`,
       )
       setAuthLoading(false)
       return null
@@ -1960,11 +1940,11 @@ function App() {
     setLojasLoading(true)
     setLojasError('')
 
-    const [lojasResult, promotoresResult, vinculosResult] = await Promise.all([
-      supabase
-        .from('lojas')
-        .select('id, codigo, nome, uf, cidade, created_at')
-        .order('codigo', { ascending: true }),
+    const [nfdNotasResult, promotoresResult, vinculosResult] = await Promise.all([
+      fetchAllNfdNotas(
+        'codigo_cliente, nome_abreviado, uf, cidade',
+        (query) => query.order('codigo_cliente', { ascending: true }),
+      ),
       supabase
         .from('usuarios')
         .select('id, nome, perfil, estado')
@@ -1976,7 +1956,7 @@ function App() {
         .order('posicao', { ascending: true }),
     ])
 
-    const requestError = lojasResult.error || promotoresResult.error || vinculosResult.error
+    const requestError = nfdNotasResult.error || promotoresResult.error || vinculosResult.error
 
     if (requestError) {
       setLojasError(requestError.message)
@@ -1984,9 +1964,38 @@ function App() {
       setPromotores([])
       setLojaPromotores([])
     } else {
-      setLojas(lojasResult.data ?? [])
-      setPromotores(promotoresResult.data ?? [])
-      setLojaPromotores(vinculosResult.data ?? [])
+      const lojasPorCodigo = new Map()
+
+      for (const nota of nfdNotasResult.data ?? []) {
+        const codigo = String(nota.codigo_cliente ?? '').trim()
+        const nome = String(nota.nome_abreviado ?? '').trim()
+        const uf = normalizaUf(nota.uf)
+        const cidade = String(nota.cidade ?? '').trim()
+
+        if (codigo && nome && uf && cidade && !lojasPorCodigo.has(codigo)) {
+          lojasPorCodigo.set(codigo, { codigo, nome, uf, cidade })
+        }
+      }
+
+      const lojasReais = [...lojasPorCodigo.values()]
+      const { data: lojasSincronizadas, error: lojasSyncError } = lojasReais.length
+        ? await supabase
+            .from('lojas')
+            .upsert(lojasReais, { onConflict: 'codigo' })
+            .select('id, codigo, nome, uf, cidade, created_at')
+            .order('codigo', { ascending: true })
+        : { data: [], error: null }
+
+      if (lojasSyncError) {
+        setLojasError(lojasSyncError.message)
+        setLojas([])
+        setPromotores([])
+        setLojaPromotores([])
+      } else {
+        setLojas(lojasSincronizadas ?? [])
+        setPromotores(promotoresResult.data ?? [])
+        setLojaPromotores(vinculosResult.data ?? [])
+      }
     }
 
     setLojasLoading(false)
@@ -2053,7 +2062,6 @@ function App() {
   const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
   const isPerfil = selectedItem === 'perfil'
   const isLojas = selectedItem === 'lojas'
-  const isFotos = selectedItem === 'fotos'
   const isUsuarios = selectedItem === 'usuarios'
   const isConfiguracoes = selectedItem === 'configuracoes'
   const isDashboard = selectedItem === 'dashboard'
@@ -2061,14 +2069,11 @@ function App() {
   const isMotivos = selectedItem === 'motivos'
   const isRecolhimento = selectedItem === 'recolhimento'
   const isRelatorios = selectedItem === 'relatorios'
-  const isLogs = selectedItem === 'logs'
   const pageTitle = isPerfil
     ? 'Perfil'
     : isLojas
     ? 'Lojas'
-    : isFotos
-      ? 'Fotos'
-      : isConfiguracoes
+    : isConfiguracoes
         ? 'Configurações'
         : isDashboard
           ? 'Dashboard'
@@ -2080,17 +2085,13 @@ function App() {
                 ? 'Recolhimento'
           : isRelatorios
             ? 'Relatório'
-            : isLogs
-              ? 'Logs'
-              : 'Cadastro de Usuário'
-  const tableTitle = isFotos ? 'Fotos' : 'Usuários'
+            : 'Cadastro de Usuário'
+  const tableTitle = 'Usuários'
   const pageSubtitle = isPerfil
     ? 'Dados da conta gerencial.'
     : isLojas
     ? 'Roteirização dos promotores.'
-    : isFotos
-      ? 'Fotos enviadas pelos promotores nas solicitações.'
-      : isConfiguracoes
+    : isConfiguracoes
         ? 'Usuários com acesso ao painel gerencial.'
         : isDashboard
           ? 'Visão geral do painel Avine.'
@@ -2102,16 +2103,12 @@ function App() {
                 ? 'Fila logística de recolhimentos.'
           : isRelatorios
             ? 'Relatório Solicitante BI.'
-            : isLogs
-              ? 'Auditoria e eventos do sistema.'
-              : 'Lista de cadastro de usuários (promotores e motoristas).'
+            : 'Lista de cadastro de usuários (promotores e motoristas).'
   const heroIcon = isPerfil
     ? 'users'
     : isLojas
     ? 'pin'
-    : isFotos
-      ? 'camera'
-      : isConfiguracoes
+    : isConfiguracoes
         ? 'gear'
         : isNotas || isMotivos
           ? 'notes'
@@ -2119,15 +2116,14 @@ function App() {
             ? 'logs'
         : isRelatorios || isDashboard
           ? 'chart'
-          : isLogs
-            ? 'logs'
-            : 'users'
+          : 'users'
 
   async function handleCreateUsuario(event) {
     event.preventDefault()
     const payload = {
       email: form.email.trim().toLowerCase(),
       nome: form.nome.trim().toUpperCase(),
+      password: form.senha,
       perfil: form.perfil,
       estado: form.estado,
       fotos_habilitadas: form.fotos_habilitadas,
@@ -2136,6 +2132,7 @@ function App() {
     if (
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
+      payload.password.length < 8 ||
       isNomeDuplicado(payload.nome, usuarios) ||
       !perfis.includes(payload.perfil) ||
       !estados.includes(payload.estado)
@@ -2151,7 +2148,12 @@ function App() {
     setSaving(true)
     setFormError('')
 
-    const { error: insertError } = await supabase.from('usuarios').insert(payload)
+    let insertError = null
+    try {
+      await createOperationalUser(payload)
+    } catch (createError) {
+      insertError = createError
+    }
 
     if (insertError) {
       setFormError(
@@ -2676,8 +2678,6 @@ function App() {
           />
         ) : isRelatorios ? (
           <ReportScreen />
-        ) : isFotos ? (
-          <FotosScreen search={search} onSearch={setSearch} />
         ) : isNotas ? (
           <NotasScreen search={search} onSearch={setSearch} />
         ) : isLojas ? (

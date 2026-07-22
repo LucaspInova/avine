@@ -53,7 +53,14 @@ Deno.serve(async (request) => {
     return jsonResponse(401, { error: 'Sessao invalida. Entre novamente.' })
   }
 
-  let body: { nome?: unknown; email?: unknown; password?: unknown }
+  let body: {
+    nome?: unknown
+    email?: unknown
+    password?: unknown
+    perfil?: unknown
+    estado?: unknown
+    fotos_habilitadas?: unknown
+  }
   try {
     body = await request.json()
   } catch {
@@ -63,6 +70,11 @@ Deno.serve(async (request) => {
   const nome = typeof body.nome === 'string' ? body.nome.trim() : ''
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   const password = typeof body.password === 'string' ? body.password : ''
+  const perfil = typeof body.perfil === 'string' ? body.perfil : 'Gerencial'
+  const estado = typeof body.estado === 'string' ? body.estado : 'CE'
+  const fotosHabilitadas = body.fotos_habilitadas === true
+  const perfisPermitidos = ['Promotor', 'Entregador', 'Gerencial']
+  const estadosPermitidos = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 
   if (nome.length < 4) return jsonResponse(400, { error: 'Informe um nome valido.' })
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -70,6 +82,12 @@ Deno.serve(async (request) => {
   }
   if (password.length < 8) {
     return jsonResponse(400, { error: 'A senha deve ter pelo menos 8 caracteres.' })
+  }
+  if (!perfisPermitidos.includes(perfil)) {
+    return jsonResponse(400, { error: 'Perfil de acesso invalido.' })
+  }
+  if (!estadosPermitidos.includes(estado)) {
+    return jsonResponse(400, { error: 'Estado invalido.' })
   }
 
   const callerClient = createClient(supabaseUrl, publishableKey, {
@@ -97,7 +115,7 @@ Deno.serve(async (request) => {
     email,
     password,
     email_confirm: true,
-    app_metadata: { role: 'gerencial' },
+    app_metadata: { role: perfil.toLowerCase() },
     user_metadata: { nome },
   })
 
@@ -109,11 +127,37 @@ Deno.serve(async (request) => {
     })
   }
 
-  const { data: usuario, error: profileError } = await callerClient.rpc('create_gerencial_user', {
-    p_auth_user_id: authData.user.id,
-    p_nome: nome,
-    p_email: email,
-  })
+  let usuario
+  let profileError
+
+  if (perfil === 'Gerencial') {
+    const result = await callerClient.rpc('create_gerencial_user', {
+      p_auth_user_id: authData.user.id,
+      p_nome: nome,
+      p_email: email,
+    })
+    usuario = result.data
+    profileError = result.error
+  } else {
+    const result = await adminClient
+      .from('usuarios')
+      .upsert(
+        {
+          auth_user_id: authData.user.id,
+          nome,
+          email,
+          perfil,
+          estado,
+          fotos_habilitadas: fotosHabilitadas,
+          ativo: true,
+        },
+        { onConflict: 'email' },
+      )
+      .select()
+      .single()
+    usuario = result.data
+    profileError = result.error
+  }
 
   if (profileError) {
     await adminClient.auth.admin.deleteUser(authData.user.id)

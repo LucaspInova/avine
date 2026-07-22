@@ -82,6 +82,19 @@ Status:
 - `recolhido`
 - `cancelado`
 
+### `nfd_desconhecimentos`
+
+Histórico das movimentações enviadas pelo promotor no botão **Desconheço NFD**.
+
+O fluxo grava uma linha por envio com:
+
+- `promotor_id` e `loja_id`, protegidos por RLS;
+- `nfd_referencia` no formato usado pelo app (`codigo_cliente:nota_fiscal`);
+- `nfd_chave_acesso`, `nfd_numero`, `loja_codigo` e `comentario`;
+- `created_at` para auditoria do momento do envio.
+
+Promotores só podem inserir e consultar seus próprios registros em lojas atribuídas. Usuários gerenciais ativos podem consultar o histórico.
+
 ## View `nfds_com_status`
 
 Classifica NFDs para o gerencial:
