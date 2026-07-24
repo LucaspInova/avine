@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider.jsx'
 import { supabase } from '../lib/supabaseClient'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
+import LogoutConfirmDialog from '../components/LogoutConfirmDialog.jsx'
 import avineLogo from '../assets/foto_logoavine.png'
 import profileUserIcon from '../assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../assets/ui-icons/arquivo-pdf.png'
@@ -425,6 +426,23 @@ function AppHeader({
   onCloseProfileMenu,
 }) {
   const profileControlRef = useRef(null)
+  const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [isLoggingOut, setLoggingOut] = useState(false)
+
+  function requestLogout() {
+    if (!onLogout) return
+    onCloseProfileMenu?.()
+    setLogoutConfirmOpen(true)
+  }
+
+  async function confirmLogout() {
+    setLoggingOut(true)
+    try {
+      await onLogout?.()
+    } finally {
+      setLoggingOut(false)
+    }
+  }
 
   useEffect(() => {
     if (!profileMenuOpen || !onCloseProfileMenu) return undefined
@@ -480,7 +498,7 @@ function AppHeader({
 
             {profileMenuOpen && (
               <MobileProfileMenu
-                onLogout={onLogout}
+                onLogout={requestLogout}
                 onUploadPhoto={onUploadPhoto}
                 photoBusy={photoBusy}
                 profile={profile}
@@ -489,7 +507,7 @@ function AppHeader({
             )}
           </div>
         ) : onLogout ? (
-          <button className="mobile-icon-button mobile-logout-button" type="button" onClick={onLogout} aria-label="Sair" title="Sair">
+          <button className="mobile-icon-button mobile-logout-button" type="button" onClick={requestLogout} aria-label="Sair" title="Sair">
             <svg
               className="mobile-logout-icon"
               xmlns="http://www.w3.org/2000/svg"
@@ -508,6 +526,12 @@ function AppHeader({
           <span className="mobile-spacer" />
         )}
       </div>
+      <LogoutConfirmDialog
+        isLoading={isLoggingOut}
+        isOpen={isLogoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </header>
   )
 }
@@ -1202,6 +1226,7 @@ function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMark
   const isFinalized = visualStatus === 'sent'
     || visualStatus === 'avulsa-finalizada'
     || nfd.status_nfd === 'finalizada'
+  const isUnknown = visualStatus === 'unknown' || nfd.status_nfd === 'outros'
 
   function handleOpenInvoice() {
     onOpenInvoice()
@@ -1265,7 +1290,7 @@ function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMark
               Nota Fiscal
             </button>
           )}
-          {!nfd.is_avulsa && (
+          {!nfd.is_avulsa && !isFinalized && !isUnknown && (
             <button className="unknown-nfd-button" type="button" onClick={() => setUnknownOpen(true)}>
               <NfdActionIcon name="unknown" />
               Desconheço NFD

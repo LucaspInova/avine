@@ -16,6 +16,7 @@ import {
 } from './lib/profilePhoto'
 import avineLogo from './assets/foto_logoavine.png'
 import profileUserIcon from './assets/ui-icons/do-utilizador.png'
+import LogoutConfirmDialog from './components/LogoutConfirmDialog.jsx'
 import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -314,6 +315,8 @@ function Icon({ name, className = '' }) {
 function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
   const profileMenuRef = useRef(null)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [isLoggingOut, setLoggingOut] = useState(false)
   const profileName = currentUser?.nome ?? 'Usuário'
   const profileRole = currentUser?.perfil ?? 'Gerencial'
   const profileState = currentUser?.estado || 'Não informado'
@@ -420,7 +423,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
               role="menuitem"
               onClick={() => {
                 setProfileMenuOpen(false)
-                onLogout()
+                setLogoutConfirmOpen(true)
               }}
             >
               <Icon name="logout" />
@@ -429,6 +432,19 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
           </div>
         )}
       </div>
+      <LogoutConfirmDialog
+        isLoading={isLoggingOut}
+        isOpen={isLogoutConfirmOpen}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={async () => {
+          setLoggingOut(true)
+          try {
+            await onLogout()
+          } finally {
+            setLoggingOut(false)
+          }
+        }}
+      />
     </aside>
   )
 }

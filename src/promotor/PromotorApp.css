@@ -1170,8 +1170,10 @@
 }
 
 .nfd-actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1182,6 +1184,7 @@
 .nfd-actions button {
   display: grid;
   place-items: center;
+  width: 115px;
   min-height: 50px;
   border: 0;
   border-radius: 8px;
