@@ -32,9 +32,9 @@ Os apps originais compartilhavam dados por Google Sheets (`FSTD Digital`) e Glid
 2. Promotor faz login no PWA.
 3. App lista apenas lojas vinculadas ao promotor.
 4. Promotor abre loja e visualiza NFDs por status: atrasada, finalizada, avulsa ou outros.
-5. Promotor solicita FSTD informando motivo, quantidades GAL/COD/SIU e fotos.
-6. Supabase grava FSTD, itens, fotos e recolhimento em uma unica transacao.
-7. Gerencial valida a solicitacao, organiza recolhimento e acompanha indicadores.
+5. O servidor deriva produtos e quantidades diretamente de `nfd_itens`.
+6. Promotor informa motivos, retornos, observacao e fotos produto a produto.
+7. Supabase valida propriedade, somas e evidencias antes de finalizar o processo.
 
 ## Mapa Glide -> Sistema Programado
 
@@ -44,18 +44,20 @@ Os apps originais compartilhavam dados por Google Sheets (`FSTD Digital`) e Glid
 | `AVINE - LOJAS` / `Rota Geral` | `lojas` |
 | `PROMOTOR1/2/3` | `loja_promotores.posicao` |
 | `AVINE - MOTIVOS` | `motivos_devolucao` |
-| `Import NFD (21-Dias)` / `QUERY NFD` | `nfds` + view `nfds_com_status` |
-| `FSTD DIGITAL` | `fstds`, `fstd_itens`, `recolhimentos` |
-| `AVINE - FOTOS` | `fstd_fotos` + Supabase Storage |
-| `WEB EMBED` | modulo Relatorios / Looker Studio |
-| Workflow `Fazer FSTD` | RPC `solicitar_fstd(...)` |
-| Workflow `NewUser` | Edge Function `create-gerencial-user` e CRUD gerencial |
+| `Import NFD (21-Dias)` / `QUERY NFD` | `nfd_itens` + view `nfd_notas` |
+| `FSTD DIGITAL` | `fstd_processos`, `fstd_produtos`, `fstd_produto_motivos` |
+| `AVINE - FOTOS` | bucket privado `fstd-fotos` |
+| `WEB EMBED` | oculto ate existir integracao real |
+| Workflow `Fazer FSTD` | RPCs transacionais do fluxo por produto |
+| Workflow `NewUser` | Edge Function `manage-users` |
 | Workflow `NewLoja` | CRUD `lojas` e `loja_promotores` |
 
 ## Estado Real Do Projeto
 
 - O repositorio atual e um app React/Vite.
 - O painel gerencial ja possui autenticacao, perfil, usuarios, lojas e roteirizacao.
-- A rota `/promotor` foi adicionada para o FSTD Digital programado, com login do promotor, lojas vinculadas, consulta de NFDs e envio pela RPC `solicitar_fstd`.
-- O Supabase ja possui migrations para usuarios, lojas, vinculos e usuario gerencial.
-- A base FSTD foi adicionada por migration dedicada e ainda precisa ser aplicada/validada no banco alvo antes de operar em producao.
+- A rota `/promotor` possui login, lojas vinculadas, consulta de NFDs e fluxo
+  produto a produto protegido por RPC.
+- O Supabase de producao usa RLS, grants explicitos, Storage privado e
+  `acesso_habilitado` separado do cadastro operacional.
+- Relatorio e Notas mockados estao ocultos ate receberem uma fonte real.

@@ -1,3 +1,184 @@
+-- Canonical baseline for the operational synchronization objects that existed
+-- in production before migrations were tracked. All statements are idempotent
+-- so this file remains safe on the existing project and on fresh environments.
+create table if not exists public.motivos_devolucao (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null unique,
+  ativo boolean not null default true,
+  ordem integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.motivos_devolucao enable row level security;
+
+-- Kept only for compatibility during the first delivery. The current workflow
+-- uses fstd_processos/fstd_produtos and never writes to this table.
+create table if not exists public.fstds (
+  id uuid primary key default gen_random_uuid(),
+  nfd_id uuid,
+  loja_id uuid not null references public.lojas(id) on delete restrict,
+  promotor_id uuid not null references public.usuarios(id) on delete restrict,
+  motivo_id uuid not null references public.motivos_devolucao(id) on delete restrict,
+  status text not null default 'solicitada'
+    check (status in ('solicitada', 'validada', 'cancelada', 'recolhida')),
+  origem text not null default 'mobile'
+    check (origem in ('mobile', 'gerencial', 'importacao')),
+  observacao text,
+  solicitada_em timestamptz not null default now(),
+  validada_em timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists fstds_nfd_id_unique_idx
+  on public.fstds (nfd_id)
+  where nfd_id is not null and status <> 'cancelada';
+create index if not exists fstds_loja_id_idx
+  on public.fstds (loja_id, solicitada_em desc);
+create index if not exists fstds_promotor_id_idx
+  on public.fstds (promotor_id, solicitada_em desc);
+create index if not exists fstds_motivo_id_idx
+  on public.fstds (motivo_id);
+create index if not exists fstds_status_idx
+  on public.fstds (status, solicitada_em desc);
+
+alter table public.fstds enable row level security;
+
+create table if not exists public.nfd_itens (
+  id bigint primary key,
+  estabelecimento text not null,
+  nota_fiscal integer not null,
+  chave_acesso varchar not null,
+  data_emissao date not null,
+  valor numeric not null default 0,
+  quantidade_galinha integer not null default 0,
+  valor_galinha numeric not null default 0,
+  quantidade_codorna integer not null default 0,
+  valor_codorna numeric not null default 0,
+  codigo_cliente integer not null,
+  nome_abreviado text,
+  uf varchar,
+  cidade text,
+  codigo_produto text not null,
+  descricao_produto text,
+  data_referencia date not null,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+create unique index if not exists devolucoes_avine_chave_produto_uidx
+  on public.nfd_itens (chave_acesso, codigo_produto);
+create index if not exists devolucoes_avine_codigo_cliente_idx
+  on public.nfd_itens (codigo_cliente);
+create index if not exists devolucoes_avine_data_emissao_idx
+  on public.nfd_itens (data_emissao);
+create index if not exists devolucoes_avine_data_referencia_idx
+  on public.nfd_itens (data_referencia);
+create index if not exists devolucoes_avine_estabelecimento_idx
+  on public.nfd_itens (estabelecimento);
+create index if not exists devolucoes_avine_nota_fiscal_idx
+  on public.nfd_itens (nota_fiscal);
+create index if not exists devolucoes_avine_uf_cidade_idx
+  on public.nfd_itens (uf, cidade);
+
+create table if not exists public.nfd_logs (
+  id bigint primary key,
+  data_referencia date not null,
+  iniciado_em timestamptz not null default now(),
+  finalizado_em timestamptz,
+  status text not null default 'executando'
+    check (status in ('executando', 'sucesso', 'sem_dados', 'erro')),
+  registros_recebidos integer not null default 0,
+  registros_processados integer not null default 0,
+  url_consultada text,
+  mensagem text,
+  erro text,
+  registros_invalidos integer not null default 0,
+  detalhes_invalidos jsonb
+);
+
+create index if not exists devolucoes_avine_sync_logs_data_idx
+  on public.nfd_logs (data_referencia);
+create index if not exists devolucoes_avine_sync_logs_status_idx
+  on public.nfd_logs (status);
+
+create table if not exists public.produtos (
+  status boolean,
+  nome text,
+  codigos_vinculados text,
+  ovos_und bigint,
+  categoria text,
+  imagem_url text,
+  class_ia text,
+  color_ia text,
+  id uuid primary key default gen_random_uuid()
+);
+
+create or replace view public.nfd_notas
+with (security_invoker = true)
+as
+select
+  chave_acesso,
+  estabelecimento,
+  nota_fiscal,
+  data_emissao,
+  data_referencia,
+  codigo_cliente,
+  nome_abreviado,
+  uf,
+  cidade,
+  sum(coalesce(quantidade_galinha, 0)) as quantidade_galinha,
+  round(sum(coalesce(valor_galinha, 0)), 2)::numeric(14, 2) as valor_galinha,
+  sum(coalesce(quantidade_codorna, 0)) as quantidade_codorna,
+  round(sum(coalesce(valor_codorna, 0)), 2)::numeric(14, 2) as valor_codorna,
+  round(sum(coalesce(valor, 0)), 2)::numeric(14, 2) as valor_total,
+  count(*)::integer as quantidade_itens,
+  count(distinct codigo_produto)::integer as quantidade_produtos_distintos,
+  jsonb_agg(
+    jsonb_build_object(
+      'codigo_produto', codigo_produto,
+      'descricao_produto', descricao_produto,
+      'quantidade_galinha', quantidade_galinha,
+      'valor_galinha', valor_galinha,
+      'quantidade_codorna', quantidade_codorna,
+      'valor_codorna', valor_codorna,
+      'valor', valor
+    )
+    order by codigo_produto, descricao_produto
+  ) as detalhes
+from public.nfd_itens
+group by
+  chave_acesso,
+  estabelecimento,
+  nota_fiscal,
+  data_emissao,
+  data_referencia,
+  codigo_cliente,
+  nome_abreviado,
+  uf,
+  cidade;
+
+create or replace view public.produtos_expandidos
+with (security_invoker = true)
+as
+select
+  p.id as produto_id,
+  p.id::text || ':' || upper(btrim(c.codigo_produto)) as produto_codigo_id,
+  upper(btrim(c.codigo_produto)) as codigo_produto,
+  p.status,
+  p.nome,
+  p.ovos_und,
+  p.categoria,
+  p.imagem_url,
+  p.class_ia,
+  p.color_ia
+from public.produtos as p
+cross join lateral regexp_split_to_table(
+  coalesce(p.codigos_vinculados, ''),
+  '\s*;\s*'
+) as c(codigo_produto)
+where btrim(c.codigo_produto) <> '';
+
 -- Workflow de FSTD por produto para NFDs vindas da view nfd_notas.
 
 create table if not exists public.fstd_processos (

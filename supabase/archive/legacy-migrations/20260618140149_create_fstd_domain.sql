@@ -1,4 +1,4 @@
--- FSTD domain base for the React + Supabase migration.
+-- ARCHIVED: FSTD prototype containing tables not present in production.
 -- Supabase Data API note: SQL-created public tables need explicit grants in
 -- projects using the 2026 stricter default privileges model.
 

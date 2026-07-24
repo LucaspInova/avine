@@ -49,28 +49,5 @@ with check (
   and estado in ('CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL')
 );
 
-insert into public.usuarios (email, nome, perfil, estado, fotos_habilitadas)
-values
-  ('adeilda.avine@gmail.com', 'ADEILDA', 'Promotor', 'CE', true),
-  ('adrianavedo91@gmail.com', 'ADRIANA LIMA', 'Promotor', 'BA', true),
-  ('adrianosantos9945@gmail.com', 'ADRIANO SANTOS', 'Promotor', 'MA', true),
-  ('adriel.ramos@grupomateus.com', 'ADRIEL RAMOS', 'Promotor', 'BA', true),
-  ('adrielecj23@gmail.com', 'ADRIELE CARVALHO DE JESUS', 'Promotor', 'BA', true),
-  ('afonsobernardo1215@gmail.com', 'AFONSO', 'Promotor', 'PI', false),
-  ('alanhendel364@gmail.com', 'ALAN', 'Promotor', 'PI', false),
-  ('diasalba100@gmail.com', 'ALBA', 'Promotor', 'PA', true),
-  ('alelucas04@hotmail.com', 'ALESSANDRA', 'Promotor', 'PA', true),
-  ('damasceno2602@hotmail.com', 'ALEXANDRE DAMASCENO', 'Promotor', 'MA', true),
-  ('sobralaline611@gmail.com', 'ALINE', 'Promotor', 'MA', true),
-  ('alinelimax05@gmail.com', 'ALINE LIMA', 'Promotor', 'MA', true),
-  ('alisson.16@outlook.com', 'ALISSON GONCALVES CRUZ', 'Promotor', 'CE', true),
-  ('alysonsousa119@gmail.com', 'ALYSON SOUSA', 'Promotor', 'CE', true),
-  ('alyssonmartins94@icloud.com', 'ALYSSON MARTINS', 'Promotor', 'PB', true),
-  ('bruno.entregas@avine.test', 'BRUNO ENTREGAS', 'Entregador', 'PE', false),
-  ('carla.rotas@avine.test', 'CARLA ROTAS', 'Entregador', 'RN', true)
-on conflict (email) do update
-set
-  nome = excluded.nome,
-  perfil = excluded.perfil,
-  estado = excluded.estado,
-  fotos_habilitadas = excluded.fotos_habilitadas;
+-- Operational profiles are production data. They are provisioned through the
+-- administrative Edge Function and are intentionally not seeded by migrations.

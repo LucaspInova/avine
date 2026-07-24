@@ -17,22 +17,29 @@ Sistema de gestao de devolucoes da Avine Alimentos, em migracao dos apps Glide p
 
 ## Estado Atual
 
-- Painel gerencial implementado para login, perfil, usuarios, lojas e ate 3 promotores por loja.
-- Roteamento React adicionado para separar `/gerencial` e `/promotor`.
-- App Promotor inicial implementado com login, lojas vinculadas por RLS, NFDs por status e formulario de solicitacao via RPC `solicitar_fstd`.
-- TanStack Query adicionado para cache e invalidacao de consultas operacionais.
-- Edge Function `create-gerencial-user` usada para criar usuarios de Auth gerencial de forma controlada.
-- Migrations existentes criam `usuarios`, `lojas`, `loja_promotores`, auth gerencial e RLS base.
-- Nova base de dominio FSTD adiciona `motivos_devolucao`, `nfds`, `fstds`, `fstd_itens`, `fstd_fotos`, `recolhimentos`, view `nfds_com_status` e RPC `solicitar_fstd`.
-- Docs em `docs/` descrevem contexto de negocio e Supabase.
+- Gerencial funcional para usuarios, lojas e vinculos; Relatorio e Notas permanecem ocultos ate terem dados reais.
+- Promotor usa `iniciar_fstd_produtos_v2`, que deriva NFD, produtos e quantidades no servidor.
+- `manage-users` centraliza criacao, edicao e bloqueio de acesso com validacao Gerencial.
+- Cadastro operacional (`usuarios`) e acesso (`acesso_habilitado`) sao estados separados.
+- RLS, grants explicitos, Storage privado e funcoes transacionais protegem os dados operacionais.
+- Migrations locais e remotas usam a mesma linha do tempo; prototipos nao implantados ficam arquivados fora de `supabase/migrations`.
+- Vitest, Playwright, pgTAP, audit, lint, typecheck, build e orçamento de bundle rodam no CI.
 
 ## Comandos
 
 ```bash
-npm install
+nvm use
+npm ci
 npm run dev
-npm run lint
-npm run build
+```
+
+Antes de iniciar, crie o arquivo `.env.local` a partir de `.env.example` e preencha as credenciais publicáveis do projeto Supabase:
+
+```bash
+cp .env.example .env.local
+npm run dev
+npm run verify
+npm run test:e2e
 ```
 
 Supabase:
@@ -40,6 +47,8 @@ Supabase:
 ```bash
 supabase migration list --local
 supabase db reset
+supabase test db
+supabase db lint --level error
 ```
 
 Depois de aplicar migrations no banco alvo, gere novamente os tipos:
@@ -55,11 +64,11 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 
 ## Modelo Operacional
 
-1. Importacoes alimentam NFDs e dados auxiliares no Supabase.
-2. Gerencial administra usuarios, lojas, vinculos, notas, motivos e fotos.
-3. Promotor acessa `/promotor`, ve apenas lojas liberadas pela RLS e solicita FSTD.
-4. RPC `solicitar_fstd` grava FSTD, itens, fotos e recolhimento na mesma transacao quando o fluxo de solicitacao for usado.
-5. Gerencial acompanha validacao, recolhimento, relatorios, fotos e logs.
+1. `sync-devolucoes-avine` importa NFDs e atualiza lojas no servidor.
+2. Gerencial administra perfis, contas de acesso, lojas e vinculos.
+3. Promotor acessa somente lojas e NFDs liberadas pela RLS.
+4. `iniciar_fstd_produtos_v2` cria o processo usando exclusivamente dados de `nfd_itens`.
+5. As RPCs de conclusao, edicao e finalizacao validam propriedade, somas e fotos.
 
 ## Referencias Supabase
 

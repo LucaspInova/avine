@@ -1,4 +1,4 @@
--- Initial public schema for the Glide to React + Supabase migration.
+-- ARCHIVED: Initial public schema for the abandoned profiles/stores domain.
 -- All application tables and helper functions are created in public.
 
 -- ============================================================

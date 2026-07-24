@@ -107,48 +107,5 @@ for delete
 to anon, authenticated
 using (true);
 
-insert into public.lojas (codigo, nome, uf, cidade)
-values
-  ('228', 'BOM PAP 0094', 'CE', 'Fortaleza'),
-  ('229', 'BOM NOI 0355', 'PI', 'Teresina'),
-  ('232', 'BOMPRE CD PE', 'PE', 'Recife'),
-  ('282', 'SUPER VILTON', 'CE', 'Caucaia'),
-  ('289', 'CARREF PARAN', 'CE', 'Fortaleza'),
-  ('290', 'CARREF ALDEO', 'CE', 'Fortaleza'),
-  ('301', 'CASA SANTA L', 'PA', 'Belem'),
-  ('330', 'SHALOM', 'CE', 'Maracanau'),
-  ('337', 'P.A. 225', 'PI', 'Parnaiba'),
-  ('338', 'P.A. 228', 'PI', 'Teresina'),
-  ('339', 'P.A. 2382', 'PI', 'Picos'),
-  ('340', 'P.A. 223', 'PI', 'Teresina')
-on conflict (codigo) do update
-set
-  nome = excluded.nome,
-  uf = excluded.uf,
-  cidade = excluded.cidade;
-
-with promotores as (
-  select id, row_number() over (order by nome) as rn
-  from public.usuarios
-  where perfil = 'Promotor'
-), vinculos(codigo, posicao, rn) as (
-  values
-    ('301', 1, 9),
-    ('228', 1, 1),
-    ('229', 1, 2),
-    ('232', 1, 3),
-    ('289', 2, 4),
-    ('290', 2, 5),
-    ('330', 3, 6),
-    ('337', 1, 7),
-    ('338', 2, 8),
-    ('339', 3, 10),
-    ('340', 1, 11)
-)
-insert into public.loja_promotores (loja_id, posicao, promotor_id)
-select l.id, v.posicao, p.id
-from vinculos as v
-join public.lojas as l on l.codigo = v.codigo
-join promotores as p on p.rn = v.rn
-on conflict (loja_id, posicao) do update
-set promotor_id = excluded.promotor_id;
+-- Stores and assignments are synchronized/provisioned server-side. Production
+-- data is intentionally not reproduced by migrations.

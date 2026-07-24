@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from './auth/AuthProvider.jsx'
 import { supabase } from './lib/supabaseClient'
-import { createGerencialUser, createOperationalUser } from './lib/gerencialUsers'
+import {
+  createGerencialUser,
+  createOperationalUser,
+  listManagedUsers,
+  setManagedUserAccess,
+  updateManagedUser,
+} from './lib/gerencialUsers'
 import {
   getProfilePhotoSignedUrl,
   uploadProfilePhoto,
@@ -15,8 +22,6 @@ const perfis = ['Promotor', 'Entregador']
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
-  { id: 'relatorios', label: 'Relatório', icon: 'chart' },
-  { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
 ]
@@ -44,7 +49,6 @@ const initialGerencialForm = {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const usuarioSelect = 'id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo, created_at'
 const mockNotasGroups = [
   {
     date: '18/6/2026',
@@ -110,24 +114,6 @@ function normalizaUf(uf) {
 
 function isMesmoUf(loja, promotor) {
   return normalizaUf(loja?.uf) === normalizaUf(promotor?.estado)
-}
-
-async function fetchAllNfdNotas(select, configureQuery) {
-  const pageSize = 1000
-  const rows = []
-
-  for (let from = 0; ; from += pageSize) {
-    let query = supabase.from('nfd_notas').select(select)
-    query = configureQuery ? configureQuery(query) : query
-
-    const { data, error } = await query.range(from, from + pageSize - 1)
-    if (error) return { data: [], error }
-
-    rows.push(...(data ?? []))
-    if ((data ?? []).length < pageSize) break
-  }
-
-  return { data: rows, error: null }
 }
 
 function isNomeDuplicado(nome, usuarios, ignoredId = '') {
@@ -416,7 +402,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
   const isNameValid = trimmedName.length >= 4
-  const isPasswordValid = password.length >= 8
+  const isPasswordValid = password.length >= 12
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
@@ -476,13 +462,13 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 className={password && !isPasswordValid ? 'is-invalid' : ''}
                 value={password}
                 onChange={(event) => onChange({ senha: event.target.value })}
-                minLength={8}
+                minLength={12}
                 type="password"
                 autoComplete="new-password"
                 required
               />
               {password && !isPasswordValid && (
-                <strong className="field-error">A senha deve ter pelo menos 8 caracteres.</strong>
+                <strong className="field-error">A senha deve ter pelo menos 12 caracteres.</strong>
               )}
             </label>
 
@@ -545,7 +531,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
             </span>
             <span className={isPasswordValid ? 'is-success' : password ? 'is-danger' : ''}>
               <Icon name={isPasswordValid ? 'check' : password ? 'alert' : 'gear'} />
-              {isPasswordValid ? 'Senha válida' : 'Senha mínima de 8 caracteres'}
+              {isPasswordValid ? 'Senha válida' : 'Senha mínima de 12 caracteres'}
             </span>
             <span className={isProfileValid ? 'is-success' : ''}>
               <Icon name={isProfileValid ? 'check' : 'gear'} />
@@ -855,7 +841,7 @@ function EditarUsuarioModal({
             Cancelar
           </button>
           <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>
-            {deleting ? 'Excluindo...' : 'Excluir usuário'}
+            {deleting ? 'Bloqueando...' : 'Bloquear acesso'}
           </button>
         </div>
       </form>
@@ -1322,55 +1308,6 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
   )
 }
 
-function LoginScreen({ error, busy, title = 'Painel Gerencial', onSubmit }) {
-  const [email, setEmail] = useState('')
-  const [senha, setSenha] = useState('')
-  const canSubmit = emailPattern.test(email.trim()) && senha.length > 0 && !busy
-
-  return (
-    <main className="login-shell">
-      <form
-        className="login-panel"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSubmit({ email: email.trim().toLowerCase(), password: senha })
-        }}
-      >
-        <img className="login-logo" src={avineLogo} alt="Avine" />
-        <h1>{title}</h1>
-
-        <label className="login-field">
-          <span>E-mail</span>
-          <input
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            type="email"
-            autoComplete="email"
-            required
-          />
-        </label>
-
-        <label className="login-field">
-          <span>Senha</span>
-          <input
-            value={senha}
-            onChange={(event) => setSenha(event.target.value)}
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-        </label>
-
-        {error && <p className="form-error">{error}</p>}
-
-        <button className="login-submit" type="submit" disabled={!canSubmit}>
-          {busy ? 'Entrando...' : 'Entrar'}
-        </button>
-      </form>
-    </main>
-  )
-}
-
 function GerenciaisScreen({
   currentUser,
   usuarios,
@@ -1438,11 +1375,11 @@ function GerenciaisScreen({
             value={form.senha}
             onChange={(event) => onFormChange({ senha: event.target.value })}
             type="password"
-            minLength={8}
+            minLength={12}
             required
             aria-describedby="gerencial-password-hint"
           />
-          <small id="gerencial-password-hint">Mínimo 8 caracteres.</small>
+          <small id="gerencial-password-hint">Mínimo 12 caracteres.</small>
         </label>
         <button className="create-button" type="submit" disabled={busy}>
           <Icon name="plus" />
@@ -1803,13 +1740,15 @@ function PlaceholderScreen({ title }) {
 
 function App() {
   const navigate = useNavigate()
+  const {
+    session,
+    profile: currentUser,
+    loading: authLoading,
+    signOut,
+    refreshProfile,
+  } = useAuth()
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
-  const [selectedItem, setSelectedItem] = useState('relatorios')
-  const [session, setSession] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [loginBusy, setLoginBusy] = useState(false)
-  const [authError, setAuthError] = useState('')
+  const [selectedItem, setSelectedItem] = useState('lojas')
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1849,88 +1788,15 @@ function App() {
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
   const [profilePhoto, setProfilePhoto] = useState('')
-  async function validateSession(activeSession, options = {}) {
-    const user = activeSession?.user
-
-    if (!user) {
-      setSession(null)
-      setCurrentUser(null)
-      setProfilePhoto('')
-      setAuthLoading(false)
-      return null
-    }
-
-    const { data, error: profileError } = await supabase
-      .from('usuarios')
-      .select(usuarioSelect)
-      .eq('auth_user_id', user.id)
-      .maybeSingle()
-
-    const requiredPerfil = options.requiredPerfil ?? 'Gerencial'
-
-    if (profileError || !data || data.ativo !== true) {
-      await supabase.auth.signOut()
-      setSession(null)
-      setCurrentUser(null)
-      setAuthError(
-        options.permissionMessage ??
-          `Acesso permitido somente para usuários ${requiredPerfil} ativos.`,
-      )
-      setAuthLoading(false)
-      return null
-    }
-
-    if (data.perfil !== requiredPerfil) {
-      if (data.perfil === 'Promotor' || data.perfil === 'Entregador') {
-        setSession(null)
-        setCurrentUser(null)
-        setAuthError('')
-        setAuthLoading(false)
-        navigate(`/acesso/${data.perfil.toLowerCase()}`, { replace: true })
-        return null
-      }
-
-      await supabase.auth.signOut()
-      setSession(null)
-      setCurrentUser(null)
-      setAuthError(
-        options.permissionMessage ??
-          `Acesso permitido somente para usuÃ¡rios ${requiredPerfil} ativos.`,
-      )
-      setAuthLoading(false)
-      return null
-    }
-
-    setSession(activeSession)
-    setCurrentUser(data)
-    if (data.foto_url) {
-      try {
-        setProfilePhoto(await getProfilePhotoSignedUrl(data.foto_url))
-      } catch {
-        setProfilePhoto('')
-      }
-    } else {
-      setProfilePhoto('')
-    }
-    setAuthError('')
-    setAuthLoading(false)
-    return data
-  }
-
   async function loadUsuarios() {
     setLoading(true)
     setError('')
 
-    const { data, error: requestError } = await supabase
-      .from('usuarios')
-      .select(usuarioSelect)
-      .order('nome', { ascending: true })
-
-    if (requestError) {
-      setError(requestError.message)
+    try {
+      setUsuarios(await listManagedUsers())
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar os usuários.')
       setUsuarios([])
-    } else {
-      setUsuarios(data ?? [])
     }
 
     setLoading(false)
@@ -1940,62 +1806,35 @@ function App() {
     setLojasLoading(true)
     setLojasError('')
 
-    const [nfdNotasResult, promotoresResult, vinculosResult] = await Promise.all([
-      fetchAllNfdNotas(
-        'codigo_cliente, nome_abreviado, uf, cidade',
-        (query) => query.order('codigo_cliente', { ascending: true }),
-      ),
+    const [lojasResult, usuariosResult, vinculosResult] = await Promise.all([
       supabase
-        .from('usuarios')
-        .select('id, nome, perfil, estado')
-        .eq('perfil', 'Promotor')
-        .order('nome', { ascending: true }),
+        .from('lojas')
+        .select('id, codigo, nome, uf, cidade, created_at')
+        .order('codigo', { ascending: true }),
+      listManagedUsers()
+        .then((data) => ({ data, error: null }))
+        .catch((error) => ({ data: [], error })),
       supabase
         .from('loja_promotores')
         .select('id, loja_id, promotor_id, posicao')
         .order('posicao', { ascending: true }),
     ])
 
-    const requestError = nfdNotasResult.error || promotoresResult.error || vinculosResult.error
+    const requestError = lojasResult.error || usuariosResult.error || vinculosResult.error
 
     if (requestError) {
-      setLojasError(requestError.message)
+      setLojasError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar as lojas.')
       setLojas([])
       setPromotores([])
       setLojaPromotores([])
     } else {
-      const lojasPorCodigo = new Map()
-
-      for (const nota of nfdNotasResult.data ?? []) {
-        const codigo = String(nota.codigo_cliente ?? '').trim()
-        const nome = String(nota.nome_abreviado ?? '').trim()
-        const uf = normalizaUf(nota.uf)
-        const cidade = String(nota.cidade ?? '').trim()
-
-        if (codigo && nome && uf && cidade && !lojasPorCodigo.has(codigo)) {
-          lojasPorCodigo.set(codigo, { codigo, nome, uf, cidade })
-        }
-      }
-
-      const lojasReais = [...lojasPorCodigo.values()]
-      const { data: lojasSincronizadas, error: lojasSyncError } = lojasReais.length
-        ? await supabase
-            .from('lojas')
-            .upsert(lojasReais, { onConflict: 'codigo' })
-            .select('id, codigo, nome, uf, cidade, created_at')
-            .order('codigo', { ascending: true })
-        : { data: [], error: null }
-
-      if (lojasSyncError) {
-        setLojasError(lojasSyncError.message)
-        setLojas([])
-        setPromotores([])
-        setLojaPromotores([])
-      } else {
-        setLojas(lojasSincronizadas ?? [])
-        setPromotores(promotoresResult.data ?? [])
-        setLojaPromotores(vinculosResult.data ?? [])
-      }
+      setLojas(lojasResult.data ?? [])
+      setPromotores(
+        (usuariosResult.data ?? []).filter(
+          (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,
+        ),
+      )
+      setLojaPromotores(vinculosResult.data ?? [])
     }
 
     setLojasLoading(false)
@@ -2008,36 +1847,47 @@ function App() {
   useEffect(() => {
     let isMounted = true
 
-    async function bootstrapAuth() {
-      const { data } = await supabase.auth.getSession()
-      if (!isMounted) return
-      const usuario = await validateSession(data.session)
-      if (usuario && isMounted) {
-        await loadOperationalData()
+    async function bootstrapGerencial() {
+      if (
+        authLoading ||
+        !session ||
+        currentUser?.perfil !== 'Gerencial' ||
+        currentUser.ativo !== true ||
+        currentUser.acesso_habilitado !== true
+      ) {
+        return
       }
+
+      if (currentUser.foto_url) {
+        try {
+          const signedPhoto = await getProfilePhotoSignedUrl(currentUser.foto_url)
+          if (isMounted) setProfilePhoto(signedPhoto)
+        } catch {
+          if (isMounted) setProfilePhoto('')
+        }
+      } else if (isMounted) {
+        setProfilePhoto('')
+      }
+
+      if (isMounted) await loadOperationalData()
     }
 
-    bootstrapAuth()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!isMounted) return
-      if (!nextSession) {
-        setSession(null)
-        setCurrentUser(null)
-        setProfilePhoto('')
-        setAuthLoading(false)
-      }
-    })
+    void bootstrapGerencial()
 
     return () => {
       isMounted = false
-      subscription.unsubscribe()
     }
-    // Auth bootstrap runs once per route load; auth state changes are handled by the subscription above.
+    // Operational data reloads when the centralized authenticated profile changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [
+    authLoading,
+    currentUser?.acesso_habilitado,
+    currentUser?.ativo,
+    currentUser?.auth_user_id,
+    currentUser?.foto_url,
+    currentUser?.perfil,
+    session?.user?.id,
+  ])
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -2132,7 +1982,7 @@ function App() {
     if (
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
-      payload.password.length < 8 ||
+      payload.password.length < 12 ||
       isNomeDuplicado(payload.nome, usuarios) ||
       !perfis.includes(payload.perfil) ||
       !estados.includes(payload.estado)
@@ -2221,14 +2071,17 @@ function App() {
     setUpdatingId(usuario.id)
     setError('')
 
-    const { error: updateError } = await supabase
-      .from('usuarios')
-      .update({ fotos_habilitadas: nextValue })
-      .eq('id', usuario.id)
-
-    if (updateError) {
-      setError(updateError.message)
-    } else {
+    try {
+      await updateManagedUser({
+        usuario_id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        perfil: usuario.perfil,
+        estado: usuario.estado,
+        fotos_habilitadas: nextValue,
+        ativo: usuario.ativo,
+        acesso_habilitado: usuario.acesso_habilitado,
+      })
       setUsuarios((current) =>
         current
           .map((item) => (item.id === usuario.id ? { ...item, fotos_habilitadas: nextValue } : item))
@@ -2237,6 +2090,8 @@ function App() {
       setSelectedUsuario((current) =>
         current?.id === usuario.id ? { ...current, fotos_habilitadas: nextValue } : current,
       )
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Não foi possível atualizar o usuário.')
     }
 
     setUpdatingId('')
@@ -2359,18 +2214,16 @@ function App() {
     setSavingEdit(true)
     setEditError('')
 
-    const { error: updateError } = await supabase
-      .from('usuarios')
-      .update(payload)
-      .eq('id', selectedUsuario.id)
-
-    if (updateError) {
+    try {
+      await updateManagedUser({
+        usuario_id: selectedUsuario.id,
+        ...payload,
+        ativo: selectedUsuario.ativo,
+        acesso_habilitado: selectedUsuario.acesso_habilitado,
+      })
+    } catch (updateError) {
       setEditError(
-        updateError.code === '23505'
-          ? updateError.message.includes('usuarios_nome')
-            ? 'Informe o sobrenome para diferenciar este usuário.'
-            : 'Este e-mail já está cadastrado.'
-          : updateError.message,
+        updateError instanceof Error ? updateError.message : 'Não foi possível atualizar o usuário.',
       )
       setSavingEdit(false)
       return
@@ -2385,19 +2238,18 @@ function App() {
   async function handleDeleteUsuario() {
     if (!selectedUsuario) return
 
-    const shouldDelete = window.confirm(`Excluir usuário ${selectedUsuario.nome}?`)
-    if (!shouldDelete) return
+    const shouldBlock = window.confirm(
+      `Bloquear o acesso de ${selectedUsuario.nome}? O perfil operacional será preservado.`,
+    )
+    if (!shouldBlock) return
 
     setDeletingUser(true)
     setEditError('')
 
-    const { error: deleteError } = await supabase
-      .from('usuarios')
-      .delete()
-      .eq('id', selectedUsuario.id)
-
-    if (deleteError) {
-      setEditError(deleteError.message)
+    try {
+      await setManagedUserAccess(selectedUsuario.id, false, false)
+    } catch (blockError) {
+      setEditError(blockError instanceof Error ? blockError.message : 'Não foi possível bloquear o usuário.')
       setDeletingUser(false)
       return
     }
@@ -2408,43 +2260,15 @@ function App() {
     await loadLojas()
   }
 
-  async function handleLogin({ email, password }) {
-    setLoginBusy(true)
-    setAuthError('')
-
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (loginError) {
-      setAuthError('E-mail ou senha inválidos.')
-      setLoginBusy(false)
-      return
-    }
-
-    const usuario = await validateSession(data.session, {
-      permissionMessage: 'Você não tem permissão para acessar o painel gerencial.',
-    })
-
-    if (usuario) {
-      await loadOperationalData()
-    }
-
-    setLoginBusy(false)
-  }
-
   async function handleLogout() {
-    await supabase.auth.signOut()
-    setSession(null)
-    setCurrentUser(null)
+    await signOut()
     setProfilePhoto('')
-    setSelectedItem('relatorios')
+    setSelectedItem('lojas')
     setUsuarios([])
     setLojas([])
     setPromotores([])
     setLojaPromotores([])
-    setAuthError('')
+    navigate('/', { replace: true })
   }
 
   async function handleCreateGerencial(event) {
@@ -2459,7 +2283,7 @@ function App() {
     if (
       payload.nome.length < 4 ||
       !emailPattern.test(payload.email) ||
-      payload.password.length < 8
+      payload.password.length < 12
     ) {
       setGerencialError('Revise nome, email e senha antes de criar.')
       return
@@ -2499,13 +2323,13 @@ function App() {
 
   async function handleSaveGerencial() {
     const payload = {
-      p_usuario_id: gerencialEditId,
-      p_nome: normalizaTexto(gerencialEditForm.nome),
-      p_email: gerencialEditForm.email.trim().toLowerCase(),
-      p_ativo: gerencialEditForm.ativo,
+      usuario_id: gerencialEditId,
+      nome: normalizaTexto(gerencialEditForm.nome),
+      email: gerencialEditForm.email.trim().toLowerCase(),
+      ativo: gerencialEditForm.ativo,
     }
 
-    if (!payload.p_usuario_id || payload.p_nome.length < 4 || !emailPattern.test(payload.p_email)) {
+    if (!payload.usuario_id || payload.nome.length < 4 || !emailPattern.test(payload.email)) {
       setGerencialError('Revise nome e email antes de salvar.')
       return
     }
@@ -2513,16 +2337,33 @@ function App() {
     setGerencialBusy(true)
     setGerencialError('')
 
-    const { data, error: rpcError } = await supabase.rpc('update_gerencial_user', payload)
-
-    if (rpcError) {
-      setGerencialError(rpcError.message)
+    const target = usuarios.find((usuario) => usuario.id === gerencialEditId)
+    if (!target) {
+      setGerencialError('Gerencial não encontrado.')
       setGerencialBusy(false)
       return
     }
 
-    if (data?.auth_user_id === currentUser?.auth_user_id) {
-      setCurrentUser(data)
+    let data
+    try {
+      data = await updateManagedUser({
+        usuario_id: target.id,
+        nome: payload.nome,
+        email: payload.email,
+        perfil: 'Gerencial',
+        estado: target.estado,
+        fotos_habilitadas: target.fotos_habilitadas,
+        ativo: payload.ativo,
+        acesso_habilitado: payload.ativo,
+      })
+    } catch (updateError) {
+      setGerencialError(updateError instanceof Error ? updateError.message : 'Não foi possível editar o Gerencial.')
+      setGerencialBusy(false)
+      return
+    }
+
+    if (data.auth_user_id === currentUser?.auth_user_id) {
+      await refreshProfile()
     }
 
     cancelEditGerencial()
@@ -2575,15 +2416,7 @@ function App() {
       throw updateError
     }
 
-    setCurrentUser((current) =>
-      current
-        ? {
-            ...current,
-            nome: normalizedName,
-            foto_url: uploadedPhoto?.path ?? current.foto_url,
-          }
-        : current,
-    )
+    await refreshProfile()
 
     if (uploadedPhoto) {
       setProfilePhoto(uploadedPhoto.signedUrl)
@@ -2616,14 +2449,7 @@ function App() {
   }
 
   if (!session || !currentUser) {
-    return (
-      <LoginScreen
-        busy={loginBusy}
-        error={authError}
-        title="Painel Gerencial"
-        onSubmit={handleLogin}
-      />
-    )
+    return <Navigate to="/" replace />
   }
 
   return (
@@ -2867,4 +2693,3 @@ function App() {
 }
 
 export default App
-

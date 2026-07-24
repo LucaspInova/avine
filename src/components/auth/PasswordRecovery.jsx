@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import avineLogo from '../../assets/foto_logoavine.png'
-import aviaryImage from '../../assets/avine-egg-factory.png'
+import aviaryImageAvif from '../../assets/avine-egg-factory.avif'
+import aviaryImageWebp from '../../assets/avine-egg-factory.webp'
 import { supabase } from '../../lib/supabaseClient'
 import './AvineLogin.css'
 import './PasswordRecovery.css'
@@ -51,7 +52,10 @@ function RecoveryBrand() {
       </div>
       <div className="avine-login-aviary" aria-hidden="true">
         <div className="avine-login-aviary-yellow" />
-        <img src={aviaryImage} alt="" />
+        <picture>
+          <source srcSet={aviaryImageAvif} type="image/avif" />
+          <img src={aviaryImageWebp} alt="" width="1200" height="628" />
+        </picture>
       </div>
     </section>
   )
@@ -263,8 +267,8 @@ function ResetPasswordScreen() {
     return () => window.clearTimeout(redirectTimer)
   }, [navigate, success])
 
-  const passwordError = submitted && password.length < 8
-    ? 'A senha deve ter pelo menos 8 caracteres.'
+  const passwordError = submitted && password.length < 12
+    ? 'A senha deve ter pelo menos 12 caracteres.'
     : ''
   const confirmationError = submitted && password !== confirmation
     ? 'As senhas não coincidem.'
@@ -275,7 +279,7 @@ function ResetPasswordScreen() {
     setSubmitted(true)
     setError('')
 
-    if (password.length < 8 || password !== confirmation || busy) return
+    if (password.length < 12 || password !== confirmation || busy) return
 
     setBusy(true)
     try {
@@ -376,6 +380,7 @@ function ResetPasswordScreen() {
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 autoComplete="new-password"
+                minLength={12}
                 placeholder="Digite sua nova senha"
                 aria-invalid={Boolean(passwordError)}
                 aria-describedby={passwordError ? 'new-password-error' : undefined}
@@ -396,6 +401,7 @@ function ResetPasswordScreen() {
                 onChange={(event) => setConfirmation(event.target.value)}
                 type="password"
                 autoComplete="new-password"
+                minLength={12}
                 placeholder="Digite a senha novamente"
                 aria-invalid={Boolean(confirmationError)}
                 aria-describedby={confirmationError ? 'confirm-password-error' : undefined}

@@ -188,6 +188,23 @@
   margin: auto;
 }
 
+.mobile-user-menu-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1.5px solid #ffffff;
+  border-radius: 50%;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.mobile-user-menu-icon {
+  width: 23px;
+  height: 23px;
+}
+
 .mobile-text-button {
   justify-self: end;
   font-weight: 800;
@@ -575,6 +592,7 @@
   width: 100%;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
+  margin-top: 32px;
   gap: 18px;
 }
 

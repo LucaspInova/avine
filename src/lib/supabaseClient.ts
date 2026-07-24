@@ -8,14 +8,15 @@ const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.',
-  )
-}
+export const supabaseConfigError =
+  !supabaseUrl || !supabaseKey
+    ? 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.'
+    : null
 
 const AUTH_PERSISTENCE_KEY = 'avine-auth-persistence'
-const authStorageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+const authStorageKey = supabaseUrl
+  ? `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+  : 'avine-auth-token'
 
 function getBrowserStorage(kind: 'local' | 'session'): Storage | null {
   if (typeof window === 'undefined') return null
@@ -68,9 +69,13 @@ export function setAuthPersistence(keepSession: boolean) {
   }
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    storage: authStorage,
+export const supabase = createClient<Database>(
+  supabaseUrl || 'http://127.0.0.1:54321',
+  supabaseKey || 'sb_publishable_missing_configuration',
+  {
+    auth: {
+      persistSession: true,
+      storage: authStorage,
+    },
   },
-})
+)

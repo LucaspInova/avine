@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,8 +80,8 @@ Deno.serve(async (request) => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return jsonResponse(400, { error: 'Informe um e-mail valido.' })
   }
-  if (password.length < 8) {
-    return jsonResponse(400, { error: 'A senha deve ter pelo menos 8 caracteres.' })
+  if (password.length < 12) {
+    return jsonResponse(400, { error: 'A senha deve ter pelo menos 12 caracteres.' })
   }
   if (!perfisPermitidos.includes(perfil)) {
     return jsonResponse(400, { error: 'Perfil de acesso invalido.' })
@@ -95,21 +95,31 @@ Deno.serve(async (request) => {
     auth: { persistSession: false },
   })
 
-  const { data: isGerencial, error: permissionError } = await callerClient.rpc(
-    'is_current_user_gerencial_ativo',
-  )
-
-  if (permissionError) {
-    return jsonResponse(403, { error: permissionError.message })
-  }
-
-  if (isGerencial !== true) {
-    return jsonResponse(403, { error: 'Apenas Gerenciais ativos podem criar Gerenciais.' })
-  }
-
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  const {
+    data: { user: caller },
+    error: callerError,
+  } = await callerClient.auth.getUser()
+
+  if (callerError || !caller) {
+    return jsonResponse(401, { error: 'Sessao invalida. Entre novamente.' })
+  }
+
+  const { data: callerProfile, error: permissionError } = await adminClient
+    .from('usuarios')
+    .select('id')
+    .eq('auth_user_id', caller.id)
+    .eq('perfil', 'Gerencial')
+    .eq('ativo', true)
+    .eq('acesso_habilitado', true)
+    .maybeSingle()
+
+  if (permissionError || !callerProfile) {
+    return jsonResponse(403, { error: 'Apenas Gerenciais ativos podem criar Gerenciais.' })
+  }
 
   const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
     email,
@@ -127,37 +137,23 @@ Deno.serve(async (request) => {
     })
   }
 
-  let usuario
-  let profileError
-
-  if (perfil === 'Gerencial') {
-    const result = await callerClient.rpc('create_gerencial_user', {
-      p_auth_user_id: authData.user.id,
-      p_nome: nome,
-      p_email: email,
-    })
-    usuario = result.data
-    profileError = result.error
-  } else {
-    const result = await adminClient
-      .from('usuarios')
-      .upsert(
-        {
-          auth_user_id: authData.user.id,
-          nome,
-          email,
-          perfil,
-          estado,
-          fotos_habilitadas: fotosHabilitadas,
-          ativo: true,
-        },
-        { onConflict: 'email' },
-      )
-      .select()
-      .single()
-    usuario = result.data
-    profileError = result.error
-  }
+  const { data: usuario, error: profileError } = await adminClient
+    .from('usuarios')
+    .upsert(
+      {
+        auth_user_id: authData.user.id,
+        nome,
+        email,
+        perfil,
+        estado,
+        fotos_habilitadas: fotosHabilitadas,
+        ativo: true,
+        acesso_habilitado: true,
+      },
+      { onConflict: 'email' },
+    )
+    .select()
+    .single()
 
   if (profileError) {
     await adminClient.auth.admin.deleteUser(authData.user.id)

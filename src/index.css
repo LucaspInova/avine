@@ -34,3 +34,28 @@ textarea {
 #root {
   min-height: 100vh;
 }
+
+.configuration-error {
+  display: grid;
+  place-content: center;
+  min-height: 100vh;
+  padding: 32px;
+  text-align: center;
+}
+
+.configuration-error h1 {
+  margin: 0 0 12px;
+}
+
+.configuration-error p {
+  max-width: 560px;
+  margin: 4px auto;
+}
+
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: #155b38;
+  font-weight: 700;
+}

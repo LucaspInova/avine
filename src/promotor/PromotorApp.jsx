@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider.jsx'
 import { supabase } from '../lib/supabaseClient'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
 import avineLogo from '../assets/foto_logoavine.png'
+import {
+  clearPromotorNavigation,
+  readPromotorNavigation,
+  savePromotorNavigation,
+} from './navigationState'
 import './PromotorApp.css'
 
 const statusTabs = [
@@ -20,6 +26,19 @@ const initialFstdForm = {
   notaVenda: '',
   lotes: '',
   fotos: [],
+}
+
+const FSTD_ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const FSTD_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+function validateFstdPhoto(file) {
+  if (!FSTD_ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Envie fotos nos formatos JPG, PNG ou WebP.')
+  }
+
+  if (file.size > FSTD_MAX_FILE_SIZE_BYTES) {
+    throw new Error('Cada foto pode ter no máximo 10 MB.')
+  }
 }
 
 function normalizeQuantity(value) {
@@ -155,28 +174,20 @@ function getProductImageCandidates(value) {
   const url = String(value ?? '').trim()
   if (!url) return []
 
-  // `toProductImageUrl` already returns this canonical Drive URL. Do not
-  // parse it again or it gets mistaken for a file whose id is "thumbnail".
-  if (/^https?:\/\/drive\.google\.com\/thumbnail\?id=[^&#]+/i.test(url)) {
-    return [url]
-  }
+  const id = url.match(/[?&]id=([^&#]+)/i)?.[1]
+    || url.match(/(?:drive|docs)\.google\.com\/(?:file|document)\/d\/([^/?#=]+)/i)?.[1]
+    || url.match(/googleusercontent\.com\/d\/([^/?#=]+)/i)?.[1]
 
-  const driveMatch = url.match(/(?:drive|docs)\.google\.com\/(?:file|document)\/d\/([^/?#]+)/i)
-    || url.match(/googleusercontent\.com\/d\/([^/?#]+)/i)
-    || url.match(/[?&]id=([^&#]+)/i)
+  if (!id) return [url]
 
-  if (!driveMatch) return [url]
-
-  const id = driveMatch[1]
-  return [
+  const driveCandidates = [
     `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
     `https://drive.google.com/uc?export=view&id=${id}`,
     `https://lh3.googleusercontent.com/d/${id}=w1000`,
   ]
-}
 
-function toProductImageUrl(value) {
-  return getProductImageCandidates(value)[0] ?? ''
+  const isDrivePreviewPage = /(?:drive|docs)\.google\.com\/(?:file|document)\/d\//i.test(url)
+  return [...new Set(isDrivePreviewPage ? driveCandidates : [url, ...driveCandidates])]
 }
 
 function getNfdProducts(nfd, productsCatalog = []) {
@@ -196,7 +207,7 @@ function getNfdProducts(nfd, productsCatalog = []) {
         produto_id: catalog?.produto_id ?? null,
         nome: catalog?.nome ?? detail?.descricao_produto ?? codigo,
         descricao: detail?.descricao_produto ?? catalog?.nome ?? null,
-        imagem_url: toProductImageUrl(catalog?.imagem_url),
+        imagem_url: catalog?.imagem_url ?? '',
         quantidade_faturada_galinha: Number(detail?.quantidade_galinha ?? 0),
         quantidade_faturada_codorna: Number(detail?.quantidade_codorna ?? 0),
       }
@@ -204,7 +215,6 @@ function getNfdProducts(nfd, productsCatalog = []) {
     .filter(Boolean)
 }
 
-const PROMOTOR_NAVIGATION_KEY = 'fstd-promotor-navigation'
 const PROMOTOR_UNKNOWN_NFD_KEY = 'fstd-promotor-unknown-nfds'
 
 function getNfdKey(nfd) {
@@ -232,32 +242,6 @@ function saveUnknownNfdComments(profileId, comments) {
   }
 }
 
-function readPromotorNavigation() {
-  try {
-    const value = window.sessionStorage.getItem(PROMOTOR_NAVIGATION_KEY)
-    return value ? JSON.parse(value) : null
-  } catch {
-    return null
-  }
-}
-
-function savePromotorNavigation(value) {
-  try {
-    window.sessionStorage.setItem(PROMOTOR_NAVIGATION_KEY, JSON.stringify(value))
-  } catch {
-    // A navegação externa continua funcionando mesmo sem armazenamento de sessão.
-  }
-}
-
-/*
-function clearPromotorNavigation() {
-  try {
-    window.sessionStorage.removeItem(PROMOTOR_NAVIGATION_KEY)
-  } catch {
-    // Ignora falhas de armazenamento durante o logout.
-  }
-}
-*/
 async function copyToClipboard(value) {
   if (!value) return false
 
@@ -308,33 +292,9 @@ function filterBySearch(items, search, fields) {
   )
 }
 
-async function getSession() {
-  const { data, error } = await supabase.auth.getSession()
-  if (error) throw error
-  return data.session
-}
-
-async function getPromotorProfile(userId) {
-  const { data, error } = await supabase
-    .from('usuarios')
-    .select('id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo')
-    .eq('auth_user_id', userId)
-    .maybeSingle()
-
-  if (error) throw error
-  return data
-}
-
 function AppHeader({ title, onBack, onLogout, onMenu }) {
   return (
     <header className="mobile-header">
-      <div className="mobile-status">
-        <span>11:12</span>
-        <span className="mobile-notch" />
-        <span className="mobile-signal" aria-hidden="true">
-          {!onMenu && '▮▮▮'}
-        </span>
-      </div>
       <div className="mobile-titlebar">
         {onBack ? (
           <button className="mobile-icon-button" type="button" onClick={onBack} aria-label="Voltar">
@@ -345,9 +305,10 @@ function AppHeader({ title, onBack, onLogout, onMenu }) {
         )}
         <strong>{title}</strong>
         {onMenu ? (
-          <button className="mobile-icon-button" type="button" onClick={onMenu} aria-label="Mais opções" title="Mais opções">
-            <svg className="mobile-menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+          <button className="mobile-user-menu-button" type="button" onClick={onMenu} aria-label="Abrir perfil e opções" title="Perfil e opções">
+            <svg className="mobile-user-menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.3" />
+              <path strokeLinecap="round" d="M5.5 19c.8-3.2 3.1-5 6.5-5s5.7 1.8 6.5 5" />
             </svg>
           </button>
         ) : onLogout ? (
@@ -548,16 +509,6 @@ function ProfileScreen({ profile, onBack, onLogout, onUploadPhoto, photoBusy }) 
         </div>
 
         <div className="profile-divider" />
-
-        <div className="profile-section-heading">
-          <span className="profile-section-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-              <circle cx="12" cy="8" r="3.2" />
-              <path strokeLinecap="round" d="M5.5 19.2c.8-3 3.1-4.6 6.5-4.6s5.7 1.6 6.5 4.6" />
-            </svg>
-          </span>
-          <h2 className="profile-section-title">Informações do usuário</h2>
-        </div>
 
         <div className="profile-info-grid">
           <div className="profile-info-card">
@@ -1137,13 +1088,22 @@ function getFstdDivisionDefaults(product) {
     }]
   }
 
-  return [{ motivoId: '', faturado: '', retorno: '0' }]
+  const totalBilled = Number(product.quantidade_faturada_galinha ?? 0)
+    + Number(product.quantidade_faturada_codorna ?? 0)
+
+  return [{ motivoId: '', faturado: String(Math.max(0, totalBilled)), retorno: '0' }]
 }
 
 function getFstdStoredPhotoPaths(product) {
   return Array.isArray(product.persisted?.fotos)
     ? product.persisted.fotos.filter((path) => typeof path === 'string' && path.trim())
     : []
+}
+
+function getEditableObservation(value) {
+  return String(value ?? '')
+    .replace(/^(?:Observações:\s*)+/i, '')
+    .trim()
 }
 
 function FstdStoredPhotos({ paths, removable = false, onRemove }) {
@@ -1189,7 +1149,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
     faturadoGalinha: String(product.persisted?.quantidade_faturada_galinha ?? product.quantidade_faturada_galinha ?? 0),
     faturadoCodorna: String(product.persisted?.quantidade_faturada_codorna ?? product.quantidade_faturada_codorna ?? 0),
     fotosExistentes: isEditing ? getFstdStoredPhotoPaths(product) : [],
-    lotes: isEditing ? product.persisted?.observacao ?? '' : '',
+    lotes: isEditing ? getEditableObservation(product.persisted?.observacao) : '',
   }))
   const photoPreviews = useMemo(
     () => form.fotos.map((file) => ({ file, url: URL.createObjectURL(file) })),
@@ -1201,6 +1161,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
   const totalDivisionBilled = form.divisoes.reduce((total, division) => total + normalizeQuantity(division.faturado), 0)
   const totalReturn = form.divisoes.reduce((total, division) => total + normalizeNonNegativeQuantity(division.retorno), 0)
   const remainingBilled = Math.max(0, totalBilled - totalDivisionBilled)
+  const showGeneral = totalDivisionBilled !== totalBilled
   const divisionsAreValid = form.divisoes.every(
     (division) => Boolean(division.motivoId)
       && normalizeQuantity(division.faturado) > 0
@@ -1264,11 +1225,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
     event.preventDefault()
     if (!canSubmit) return
 
-    const observacao = [
-      form.notaVenda.trim() ? `Nota de venda: ${form.notaVenda.trim()}` : '',
-      form.lotes.trim() ? `Observações: ${form.lotes.trim()}` : '',
-      form.fotos.length > 0 ? `Fotos selecionadas: ${form.fotos.map((file) => file.name).join(', ')}` : '',
-    ].filter(Boolean).join('\n')
+    const observacao = form.lotes.trim()
 
     await onSubmit({
       product,
@@ -1362,34 +1319,33 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
             ))}
           </FieldCard>
 
-          <FieldCard icon="chart" title="Geral">
-            <label className="mobile-field">
-              <span>Faturado geral <small>Da nota</small></span>
-              <input disabled value={`${totalBilled} ovos`} />
-            </label>
-            {totalDivisionBilled > 0 && remainingBilled > 0 && (
-              <button className="fstd-add-reason" onClick={addDivision} type="button">
-                + Adicionar outro motivo
-              </button>
-            )}
-            <p className="fstd-quantity-breakdown">
-              Galinha: {form.faturadoGalinha} · Codorna: {form.faturadoCodorna}
-            </p>
-            <p className="fstd-quantity-breakdown">
-              Faturado por motivos: {totalDivisionBilled} de {totalBilled} ovos
-            </p>
-            <p className="fstd-return-total">
-              Retorno informado: {totalReturn} ovos
-            </p>
-            {totalDivisionBilled > totalBilled && <strong className="fstd-quantity-error">A soma dos faturados por motivo não pode passar do faturado geral.</strong>}
-            {totalDivisionBilled > 0 && totalDivisionBilled < totalBilled && (
-              <small className="fstd-quantity-hint">Distribua mais {remainingBilled} ovos nos faturados dos motivos para poder enviar.</small>
-            )}
-            {totalReturn > totalBilled && <strong className="fstd-quantity-error">A quantidade não pode passar do faturado.</strong>}
-            {totalDivisionBilled < 0 && totalReturn > 0 && totalReturn < totalBilled && (
-              <small className="fstd-quantity-hint">Informe o restante ou adicione outro motivo para completar {totalBilled} ovos.</small>
-            )}
-          </FieldCard>
+          {showGeneral && (
+            <FieldCard icon="chart" title="Geral">
+              <label className="mobile-field">
+                <span>Faturado geral <small>Da nota</small></span>
+                <input disabled value={`${totalBilled} ovos`} />
+              </label>
+              {totalDivisionBilled > 0 && remainingBilled > 0 && (
+                <button className="fstd-add-reason" onClick={addDivision} type="button">
+                  + Adicionar outro motivo
+                </button>
+              )}
+              <p className="fstd-quantity-breakdown">
+                Galinha: {form.faturadoGalinha} · Codorna: {form.faturadoCodorna}
+              </p>
+              <p className="fstd-quantity-breakdown">
+                Faturado por motivos: {totalDivisionBilled} de {totalBilled} ovos
+              </p>
+              <p className="fstd-return-total">
+                Retorno informado: {totalReturn} ovos
+              </p>
+              {totalDivisionBilled > totalBilled && <strong className="fstd-quantity-error">A soma dos faturados por motivo não pode passar do faturado geral.</strong>}
+              {totalDivisionBilled > 0 && totalDivisionBilled < totalBilled && (
+                <small className="fstd-quantity-hint">Distribua mais {remainingBilled} ovos nos faturados dos motivos para poder enviar.</small>
+              )}
+              {totalReturn > totalBilled && <strong className="fstd-quantity-error">A quantidade não pode passar do faturado.</strong>}
+            </FieldCard>
+          )}
 
           <FieldCard title="Fotos">
             <label className="photo-button">
@@ -1639,7 +1595,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, o
 
 function PromotorWorkspace({ profile, onLogout }) {
   const queryClient = useQueryClient()
-  const [savedNavigation] = useState(() => readPromotorNavigation())
+  const [savedNavigation] = useState(() => readPromotorNavigation(profile.id))
   const [selectedStore, setSelectedStore] = useState(() => savedNavigation?.selectedStore ?? null)
   const [selectedNfd, setSelectedNfd] = useState(() => savedNavigation?.selectedNfd ?? null)
   const [fstdTarget, setFstdTarget] = useState(() => savedNavigation?.fstdTarget)
@@ -1650,7 +1606,7 @@ function PromotorWorkspace({ profile, onLogout }) {
   const [isProfileOpen, setProfileOpen] = useState(false)
 
   useEffect(() => {
-    savePromotorNavigation({
+    savePromotorNavigation(profile.id, {
       selectedStore,
       selectedNfd,
       fstdTarget,
@@ -1658,7 +1614,7 @@ function PromotorWorkspace({ profile, onLogout }) {
       nfdSearch,
       statusFilter,
     })
-  }, [fstdTarget, nfdSearch, selectedNfd, selectedStore, statusFilter, storeSearch])
+  }, [fstdTarget, nfdSearch, profile.id, selectedNfd, selectedStore, statusFilter, storeSearch])
 
   const storesQuery = useQuery({
     queryKey: ['promotor', 'lojas', profile.id],
@@ -1845,19 +1801,9 @@ function PromotorWorkspace({ profile, onLogout }) {
       let processoId = currentFstdTarget?.fstd_process_id
 
       if (!processoId) {
-        const produtos = (currentFstdTarget?.produtos ?? []).map((item) => ({
-          codigo_produto: item.codigo_produto,
-          nome: item.nome,
-          descricao: item.descricao,
-          imagem_url: toProductImageUrl(item.imagem_url),
-          quantidade_faturada_galinha: item.quantidade_faturada_galinha,
-          quantidade_faturada_codorna: item.quantidade_faturada_codorna,
-        }))
-        const { data, error } = await supabase.rpc('iniciar_fstd_produtos', {
+        const { data, error } = await supabase.rpc('iniciar_fstd_produtos_v2', {
           p_loja_id: selectedStore.id,
           p_nfd_chave_acesso: String(currentFstdTarget.chave_acesso),
-          p_nfd_numero: String(getNfdNumber(currentFstdTarget)),
-          p_produtos: produtos,
         })
         if (error) throw error
         processoId = data
@@ -1878,6 +1824,8 @@ function PromotorWorkspace({ profile, onLogout }) {
       const uploadedPaths = []
       try {
         if (fotos.length > 0) {
+          for (const file of fotos) validateFstdPhoto(file)
+
           const { data: authData, error: authError } = await supabase.auth.getUser()
           if (authError) throw authError
           if (!authData.user) throw new Error('Sessão expirada. Entre novamente para enviar as fotos.')
@@ -2052,7 +2000,7 @@ function PromotorWorkspace({ profile, onLogout }) {
         unknownError={desconhecerMutation.error?.message}
         onBack={() => setSelectedNfd(null)}
         onOpenInvoice={() => {
-          savePromotorNavigation({
+          savePromotorNavigation(profile.id, {
             selectedStore,
             selectedNfd,
             fstdTarget,
@@ -2123,62 +2071,24 @@ function PromotorWorkspace({ profile, onLogout }) {
 function PromotorApp() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [session, setSession] = useState(null)
-  const sessionRef = useRef(null)
-  const [authLoading, setAuthLoading] = useState(true)
-
-  const profileQuery = useQuery({
-    enabled: Boolean(session?.user?.id),
-    queryKey: ['promotor', 'profile', session?.user?.id],
-    queryFn: () => getPromotorProfile(session.user.id),
-  })
-
-  useEffect(() => {
-    let mounted = true
-
-    getSession()
-      .then((currentSession) => {
-        if (mounted) {
-          sessionRef.current = currentSession
-          setSession(currentSession)
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (mounted) setAuthLoading(false)
-      })
-
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      const previousUserId = sessionRef.current?.user?.id
-      const nextUserId = nextSession?.user?.id
-      const userChanged = previousUserId !== nextUserId
-
-      sessionRef.current = nextSession
-      setSession(nextSession)
-
-      // Token refreshes happen when returning to a background tab. Keep the
-      // existing profile/data cache in that case to avoid a loading flash.
-      if (!nextSession || userChanged) queryClient.clear()
-    })
-
-    return () => {
-      mounted = false
-      data.subscription.unsubscribe()
-    }
-  }, [queryClient])
-
-  const profile = profileQuery.data
-  const isAllowed = profile?.perfil === 'Promotor' && profile?.ativo
+  const {
+    session,
+    profile,
+    loading: authLoading,
+    signOut,
+  } = useAuth()
+  const isAllowed = profile?.perfil === 'Promotor'
+    && profile?.ativo
+    && profile?.acesso_habilitado
 
   async function handleLogout() {
-    await supabase.auth.signOut()
-    setSession(null)
-    sessionRef.current = null
+    if (profile?.id) clearPromotorNavigation(profile.id)
+    await signOut()
     queryClient.clear()
     navigate('/', { replace: true })
   }
 
-  if (authLoading || (session && profileQuery.isLoading)) {
+  if (authLoading) {
     return (
       <main className="promotor-loading">
         <span>Carregando FSTD Digital...</span>

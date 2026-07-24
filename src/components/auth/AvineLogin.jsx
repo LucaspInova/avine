@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import avineLogo from '../../assets/foto_logoavine.png'
-import aviaryImage from '../../assets/avine-egg-factory.png'
+import aviaryImageAvif from '../../assets/avine-egg-factory.avif'
+import aviaryImageWebp from '../../assets/avine-egg-factory.webp'
 import './AvineLogin.css'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -108,7 +109,10 @@ function AvineLogin({ error = '', busy = false, onSubmit }) {
         </div>
         <div className="avine-login-aviary" aria-hidden="true">
           <div className="avine-login-aviary-yellow" />
-          <img src={aviaryImage} alt="" />
+          <picture>
+            <source srcSet={aviaryImageAvif} type="image/avif" />
+            <img src={aviaryImageWebp} alt="" width="1200" height="628" />
+          </picture>
         </div>
       </section>
 

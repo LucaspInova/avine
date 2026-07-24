@@ -1,155 +1,94 @@
 # Supabase
 
-O Supabase é a fonte operacional principal do FSTD Avine. Sheets, JotForm e Looker Studio devem ser tratados como integrações/importações, não como banco permanente do app.
+O projeto remoto Avine e tratado como producao. Alteracoes de schema devem ser
+feitas por migrations, testadas localmente e nunca por reset do banco remoto.
 
-## Schema Atual
+## Modelo operacional
 
-### `usuarios`
+- `usuarios`: perfil operacional. `ativo` controla o cadastro e
+  `acesso_habilitado` controla se o perfil pode autenticar no aplicativo.
+- `lojas` e `loja_promotores`: lojas e atribuicoes de Promotores.
+- `nfd_itens`: fonte sincronizada de notas e produtos.
+- `produtos` e `produtos_expandidos`: catalogo vinculado aos codigos da NFD.
+- `fstd_processos`, `fstd_produtos` e `fstd_produto_motivos`: fluxo FSTD atual.
+- `nfd_desconhecimentos`: declaracoes de NFD nao reconhecida.
+- `motivos_devolucao`: catalogo administravel de motivos.
+- `nfd_logs`: log interno da sincronizacao.
 
-Cadastro operacional compartilhado por Gerencial, Promotor e Entregador.
+`fstds` pertence ao dominio anterior e o cliente nao recebe grants para usa-la.
+`solicitar_fstd` e seus overloads antigos ja foram removidos depois da
+verificacao de chamadas; a remocao fisica da tabela fica para uma entrega
+posterior.
 
-Campos principais: `id`, `auth_user_id`, `email`, `nome`, `perfil`, `estado`, `fotos_habilitadas`, `foto_url`, `ativo`, `created_at`.
+## Autenticacao e usuarios
 
-Perfis válidos:
+Contas nao sao criadas em migrations. O frontend Gerencial usa a Edge Function
+`manage-users`, que:
 
-- `Gerencial`
-- `Promotor`
-- `Entregador`
+1. valida o JWT do chamador;
+2. confirma um perfil Gerencial ativo e com acesso habilitado;
+3. cria/atualiza a conta pela Admin API;
+4. sincroniza o perfil operacional;
+5. bloqueia a conta no Auth quando o acesso e desabilitado.
 
-### `lojas`
+`create-gerencial-user` permanece temporariamente para compatibilidade com o
+frontend publicado anteriormente. Novos clientes nao devem usa-la.
 
-Cadastro de lojas/PDVs exibido no gerencial.
+## Fluxo Promotor
 
-Campos principais: `id`, `codigo`, `nome`, `uf`, `cidade`, `created_at`.
+As quatro operacoes transacionais atuais sao:
 
-### `loja_promotores`
+- `iniciar_fstd_produtos_v2(uuid, text)`;
+- `concluir_fstd_produto(uuid, jsonb, text, jsonb)`;
+- `editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb)`;
+- `finalizar_fstd_produtos(uuid)`.
 
-Vínculo entre lojas e promotores.
+Elas usam `SECURITY DEFINER`, `search_path = ''`, referencias qualificadas e
+validacao explicita de `auth.uid()`. A RPC v2 deriva numero, produtos e
+quantidades de `nfd_itens`, serializa concorrencia por NFD e valida a atribuicao
+da loja.
 
-- `loja_id`
-- `promotor_id`
-- `posicao` com valores 1, 2 ou 3
+`iniciar_fstd_produtos(uuid, text, text, jsonb)` e um wrapper temporario. Os
+campos controlados pelo cliente sao ignorados, portanto uma versao antiga do
+frontend nao consegue forjar produtos ou quantidades.
 
-### Auth Gerencial
+## RLS, grants e Storage
 
-- `usuarios.auth_user_id` faz referência a `auth.users`.
-- `public.is_current_user_gerencial_ativo()` identifica usuários gerenciais ativos.
-- Edge Function `create-gerencial-user` cria usuário de Auth e chama RPC segura para registrar o perfil gerencial.
+- `anon` nao tem acesso a tabelas, sequencias ou RPCs operacionais.
+- `authenticated` recebe somente os grants usados pelo app.
+- o helper recursivo de autorizacao fica em `app_private`, fora da Data API;
+- views expostas usam `security_invoker = true`;
+- o bucket `fstd-fotos` e privado;
+- Promotores escrevem e excluem apenas na propria pasta;
+- Promotores leem suas fotos e Gerenciais ativos leem todas as evidencias.
 
-## Schema FSTD Adicionado
+`nfd_logs` tem RLS habilitado sem policy de cliente por decisao intencional. A
+tabela e acessada somente pela sincronizacao com service role; o aviso
+`rls_enabled_no_policy` do advisor e esperado.
 
-### `motivos_devolucao`
+Os defaults de objetos criados por `postgres` no schema `public` revogam
+privilegios de `PUBLIC`, `anon` e `authenticated`. Os defaults pertencentes ao
+papel gerenciado `supabase_admin` exigem privilegio de owner no painel/plataforma
+e devem ser revisados quando esse acesso estiver disponivel.
 
-Lista administrável de motivos usados pelo formulário FSTD.
+## Desenvolvimento e verificacao
 
-### `nfds`
+```bash
+npx supabase@2.109.1 start
+npx supabase@2.109.1 db reset
+npx supabase@2.109.1 test db
+npx supabase@2.109.1 db lint --level error
+npx supabase@2.109.1 gen types typescript --local > /tmp/database.types.ts
+diff --strip-trailing-cr /tmp/database.types.ts src/types/database.types.ts
+```
 
-Notas fiscais de devolução importadas.
+O CI executa esses comandos com PostgreSQL 17 e Node 22. O teste pgTAP cobre
+RLS, IDOR, adulteracao de NFD/produto, quantidades, fotos, finalizacao e
+integridade.
 
-Status operacional e calculado pela view `nfds_com_status`.
+## Referencias
 
-### `fstds`
-
-Solicitações FSTD vinculadas a loja, promotor, motivo e opcionalmente a uma NFD.
-
-Status:
-
-- `solicitada`
-- `validada`
-- `cancelada`
-- `recolhida`
-
-### `fstd_itens`
-
-Itens por produto:
-
-- `GAL`
-- `COD`
-- `SIU`
-
-### `fstd_fotos`
-
-Metadados de fotos anexadas. O arquivo deve ficar em Supabase Storage; esta tabela guarda o `storage_path`.
-
-### `recolhimentos`
-
-Fila logística derivada de cada FSTD.
-
-Status:
-
-- `solicitado`
-- `roteirizado`
-- `recolhido`
-- `cancelado`
-
-### `nfd_desconhecimentos`
-
-Histórico das movimentações enviadas pelo promotor no botão **Desconheço NFD**.
-
-O fluxo grava uma linha por envio com:
-
-- `promotor_id` e `loja_id`, protegidos por RLS;
-- `nfd_referencia` no formato usado pelo app (`codigo_cliente:nota_fiscal`);
-- `nfd_chave_acesso`, `nfd_numero`, `loja_codigo` e `comentario`;
-- `created_at` para auditoria do momento do envio.
-
-Promotores só podem inserir e consultar seus próprios registros em lojas atribuídas. Usuários gerenciais ativos podem consultar o histórico.
-
-## View `nfds_com_status`
-
-Classifica NFDs para o gerencial:
-
-- `finalizada`: existe FSTD ativa para a NFD.
-- `avulsa`: NFD marcada com `origem = 'avulsa'`.
-- `atrasada`: sem FSTD ativa e emissão anterior a 21 dias.
-- `outros`: demais NFDs.
-
-A view usa `security_invoker = true` para respeitar RLS das tabelas base.
-
-## RPC `solicitar_fstd(...)`
-
-Usada pelo fluxo FSTD para registrar uma devolução.
-
-Argumentos:
-
-- `p_loja_id`
-- `p_motivo_id`
-- `p_nfd_id`
-- `p_quantidade_gal`
-- `p_quantidade_cod`
-- `p_quantidade_siu`
-- `p_fotos`
-- `p_observacao`
-
-Comportamento:
-
-1. Identifica o promotor autenticado por `auth.uid()`.
-2. Confirma que a loja está atribuída ao promotor.
-3. Valida motivo ativo e NFD da mesma loja.
-4. Garante pelo menos uma quantidade positiva.
-5. Cria FSTD, itens, fotos e recolhimento na mesma transação.
-
-## RLS e Data API
-
-Regras práticas adotadas:
-
-- RLS habilitado em toda tabela exposta no schema `public`.
-- `anon` sem acesso às tabelas operacionais.
-- `authenticated` recebe grants explícitos para tabelas e view usadas pelo app.
-- Gerencial ativo administra cadastros e dados operacionais.
-- Promotor acessa apenas seu próprio usuário, suas lojas vinculadas e NFDs/FSTDs dessas lojas.
-- Functions expostas recebem `GRANT EXECUTE` explícito.
-
-Referências oficiais:
-
-- Securing your API: https://supabase.com/docs/guides/api/securing-your-api
-- Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Changelog Data API/grants: https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically
-
-## Próximas Validações
-
-- Aplicar migrations em banco local/remoto.
-- Rodar advisors de segurança/performance.
-- Gerar `src/types/database.types.ts` a partir do banco aplicado.
-- Testar login Gerencial e Promotor com RLS real.
-- Criar bucket e policies de Storage para fotos FSTD.
+- [Seguranca da Data API](https://supabase.com/docs/guides/api/securing-your-api)
+- [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Testes locais com pgTAP](https://supabase.com/docs/guides/local-development/testing/overview)
+- [Protecao de senhas](https://supabase.com/docs/guides/auth/password-security)
