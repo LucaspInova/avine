@@ -15,6 +15,7 @@ import {
   validateProfilePhoto,
 } from './lib/profilePhoto'
 import avineLogo from './assets/foto_logoavine.png'
+import profileUserIcon from './assets/ui-icons/do-utilizador.png'
 import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -316,16 +317,6 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
   const profileName = currentUser?.nome ?? 'Usuário'
   const profileRole = currentUser?.perfil ?? 'Gerencial'
   const profileState = currentUser?.estado || 'Não informado'
-  const initials = currentUser?.nome
-    ? currentUser.nome
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join('')
-        .toUpperCase()
-    : 'AV'
-
   useEffect(() => {
     if (!profileMenuOpen) return undefined
 
@@ -396,7 +387,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
           onClick={() => setProfileMenuOpen((open) => !open)}
         >
           <span className="user-orb">
-            {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+            {profilePhoto ? <img src={profilePhoto} alt="" /> : <img className="user-placeholder-icon" src={profileUserIcon} alt="" />}
           </span>
           <span className="profile-summary">
             <strong className="profile-name">{profileName}</strong>

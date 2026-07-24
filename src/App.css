@@ -2442,6 +2442,10 @@ select:focus-visible {
   object-fit: cover;
 }
 
+.user-orb img.user-placeholder-icon {
+  object-fit: contain;
+}
+
 .profile-menu {
   position: absolute;
   left: 0;

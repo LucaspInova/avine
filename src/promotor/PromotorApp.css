@@ -263,6 +263,10 @@
   object-fit: cover;
 }
 
+.mobile-profile-avatar img.profile-placeholder-icon {
+  object-fit: contain;
+}
+
 .mobile-profile-trigger-copy {
   display: grid;
   min-width: 0;
@@ -1075,6 +1079,18 @@
   color: #e2ad00;
 }
 
+.document-glyph.is-avulsa {
+  color: #e2ad00;
+}
+
+.document-glyph.is-avulsa-erro {
+  color: #f20f18;
+}
+
+.document-glyph.is-avulsa-finalizada {
+  color: #2f80ed;
+}
+
 .document-glyph.is-sent {
   color: #3c8a3a;
 }
@@ -1159,6 +1175,10 @@
   gap: 8px;
 }
 
+.nfd-actions.is-avulsa {
+  grid-template-columns: 1fr;
+}
+
 .nfd-actions button {
   display: grid;
   place-items: center;
@@ -1184,6 +1204,256 @@
   width: 22px;
   height: 22px;
   display: block;
+}
+
+.avulsa-flow-page {
+  min-height: 100vh;
+  background: #f8f8f8;
+}
+
+.avulsa-flow-topbar {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 54px;
+  padding: 0 12px;
+  color: #fff;
+  background: #2f672c;
+}
+
+.avulsa-flow-topbar button {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 2rem;
+  line-height: 1;
+  text-align: left;
+}
+
+.avulsa-flow-topbar strong {
+  text-align: center;
+}
+
+.avulsa-flow-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 18px;
+  color: #fff;
+  background: #122c11;
+}
+
+.avulsa-flow-hero .document-glyph {
+  flex: 0 0 auto;
+  color: #e2ad00;
+}
+
+.avulsa-flow-hero h1,
+.avulsa-flow-hero p {
+  margin: 0;
+}
+
+.avulsa-flow-hero h1 {
+  font-size: 1.05rem;
+}
+
+.avulsa-flow-hero p {
+  margin-top: 4px;
+  color: #d3d7d2;
+  font-size: 0.8rem;
+}
+
+.avulsa-flow-card {
+  display: grid;
+  gap: 16px;
+  margin: 20px 16px;
+  padding: 18px 16px 20px;
+  border: 1px solid #e1e6df;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.avulsa-flow-facts {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #edf0ec;
+}
+
+.avulsa-flow-facts div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.avulsa-flow-facts span {
+  color: #8b918b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.avulsa-flow-facts strong {
+  color: #3e443f;
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.avulsa-flow-field {
+  display: grid;
+  gap: 7px;
+}
+
+.avulsa-flow-field > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #3f4540;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.avulsa-flow-field small {
+  color: #9a9e9a;
+  font-weight: 500;
+}
+
+.avulsa-flow-field input {
+  min-height: 42px;
+  border: 1px solid #d9ded9;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fff;
+  color: #444;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.avulsa-value-input input {
+  padding-right: 56px;
+}
+
+.avulsa-value-input em {
+  right: 17px;
+  color: #777d78;
+  font-weight: 800;
+}
+
+.avulsa-primary-button {
+  min-height: 44px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: #326f2f;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.avulsa-primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.avulsa-picker-intro {
+  padding: 22px 18px 8px;
+}
+
+.avulsa-picker-intro h1,
+.avulsa-picker-intro p {
+  margin: 0;
+}
+
+.avulsa-picker-intro h1 {
+  color: #2f382f;
+  font-size: 1.1rem;
+}
+
+.avulsa-picker-intro p {
+  margin-top: 5px;
+  color: #777d78;
+  font-size: 0.82rem;
+}
+
+.avulsa-picker-form {
+  display: grid;
+  gap: 14px;
+  margin: 0 16px 24px;
+}
+
+.avulsa-picker-search {
+  background: #e9ede8;
+}
+
+.avulsa-product-picker-list {
+  display: grid;
+  max-height: 408px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e1e6df;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.avulsa-product-option {
+  display: grid;
+  grid-template-columns: 20px 44px minmax(0, 1fr) 20px;
+  gap: 10px;
+  align-items: center;
+  min-height: 68px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf0ec;
+  cursor: pointer;
+}
+
+.avulsa-product-option:last-child {
+  border-bottom: 0;
+}
+
+.avulsa-product-option.is-selected {
+  background: #fffbea;
+}
+
+.avulsa-product-option input {
+  width: 17px;
+  height: 17px;
+  accent-color: #d29d00;
+}
+
+.avulsa-product-option .fstd-product-image {
+  width: 42px;
+  height: 42px;
+  border-color: #e3c869;
+  border-radius: 8px;
+}
+
+.avulsa-product-option > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.avulsa-product-option strong {
+  overflow: hidden;
+  color: #313631;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avulsa-product-option small {
+  color: #8b918b;
+  font-size: 0.74rem;
+}
+
+.avulsa-product-option i {
+  color: #c89400;
+  font-size: 1.1rem;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
 }
 
 .copy-feedback {
@@ -1265,6 +1535,71 @@
   border: 2px solid currentColor;
   border-radius: 50%;
   font-size: 0.78rem;
+}
+
+.nfd-conference-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.nfd-conference-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgb(0 0 0 / 42%);
+  padding: 0;
+}
+
+.nfd-conference-dialog {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: min(100%, 360px);
+  gap: 12px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 22%);
+  padding: 24px 20px 20px;
+  text-align: center;
+}
+
+.nfd-conference-dialog .document-glyph {
+  width: 40px;
+  height: 40px;
+}
+
+.nfd-conference-dialog h2,
+.nfd-conference-dialog p {
+  margin: 0;
+}
+
+.nfd-conference-dialog h2 {
+  color: #383b39;
+  font-size: 1.05rem;
+}
+
+.nfd-conference-dialog p {
+  color: #666b66;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.nfd-conference-dialog > button {
+  min-width: 120px;
+  min-height: 40px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: #2f672c;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
 }
 
 .unknown-nfd-layer {
@@ -1416,6 +1751,10 @@
 
 .fstd-app {
   background: #2f672c;
+}
+
+.fstd-app.avulsa-flow-page {
+  background: #f8f8f8;
 }
 
 .fstd-mobile-form {
@@ -1695,8 +2034,46 @@
   opacity: 0.55;
 }
 
+.fstd-avulsa-actions {
+  display: grid;
+  gap: 10px;
+  margin: 18px 16px 24px;
+}
+
+.fstd-add-products-button {
+  min-height: 44px;
+  border: 1px solid #2f672c;
+  border-radius: 8px;
+  background: #fff;
+  color: #2f672c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.fstd-add-products-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fstd-avulsa-actions .fstd-finalize-button {
+  width: 100%;
+  margin: 0;
+}
+
 .fstd-view-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   background: #377936;
+}
+
+.fstd-view-button img {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .fstd-document-layer {
@@ -1945,6 +2322,13 @@
   color: #a33f3f;
 }
 
+.fstd-avulsa-hint {
+  margin: 0;
+  color: #8a6d3b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .mobile-field span {
   display: flex;
   align-items: center;
@@ -2009,6 +2393,10 @@
 .fstd-list-page {
   min-height: 100vh;
   background: #f7f7f7;
+}
+
+.fstd-list-page.is-avulsa {
+  background: #f8f8f8;
 }
 
 .fstd-list-page .fstd-product-list {
@@ -2120,6 +2508,15 @@
 .fstd-product-page .fstd-card:nth-child(1) h2,
 .fstd-product-page .fstd-card:nth-child(2) h2 {
   display: none;
+}
+
+.fstd-product-page.is-avulsa .fstd-card:nth-child(2) h2 {
+  display: flex;
+  color: #2e2e2e;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: left;
+  text-transform: none;
 }
 
 .fstd-product-page .fstd-card:nth-child(3) h2,

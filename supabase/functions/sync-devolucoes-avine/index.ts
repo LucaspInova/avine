@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2.108.2";
 
 const API_BASE_URL =
   "https://datalake.avine.com.br/api/v1/devolucoes";
@@ -793,6 +793,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    const {
+      data: conferenciaData,
+      error: conferenciaError,
+    } = await supabase.rpc("conferir_fstd_avulsas");
+
+    if (conferenciaError) {
+      throw new Error(
+        `Não foi possível conferir as FSTDs avulsas: ${conferenciaError.message}`,
+      );
+    }
+
     const invalidDetails =
       summarizeInvalidItems(
         invalidItems,
@@ -842,6 +853,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         uniqueItems.length,
       registros_processados: processedCount,
       lotes_processados: batches.length,
+      conferencia_fstd_avulsas: conferenciaData,
       erros_amostra: summarizeInvalidItems(
         invalidItems,
         INVALID_ITEMS_RESPONSE_LIMIT,

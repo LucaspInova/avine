@@ -438,6 +438,13 @@ export type Database = {
           nfd_numero: string
           loja_id: string
           promotor_id: string
+          is_avulsa: boolean
+          nfd_data_emissao: string | null
+          nfd_valor: number | null
+          conferencia_status: 'pendente' | 'conferida' | 'divergente'
+          conferencia_detalhes: Json
+          conferencia_em: string | null
+          api_nfd_chave_acesso: string | null
           status: 'em_andamento' | 'concluida' | 'cancelada'
           finalizada_em: string | null
           created_at: string
@@ -449,6 +456,13 @@ export type Database = {
           nfd_numero: string
           loja_id: string
           promotor_id: string
+          is_avulsa?: boolean
+          nfd_data_emissao?: string | null
+          nfd_valor?: number | null
+          conferencia_status?: 'pendente' | 'conferida' | 'divergente'
+          conferencia_detalhes?: Json
+          conferencia_em?: string | null
+          api_nfd_chave_acesso?: string | null
           status?: 'em_andamento' | 'concluida' | 'cancelada'
           finalizada_em?: string | null
           created_at?: string
@@ -460,6 +474,13 @@ export type Database = {
           nfd_numero?: string
           loja_id?: string
           promotor_id?: string
+          is_avulsa?: boolean
+          nfd_data_emissao?: string | null
+          nfd_valor?: number | null
+          conferencia_status?: 'pendente' | 'conferida' | 'divergente'
+          conferencia_detalhes?: Json
+          conferencia_em?: string | null
+          api_nfd_chave_acesso?: string | null
           status?: 'em_andamento' | 'concluida' | 'cancelada'
           finalizada_em?: string | null
           created_at?: string
@@ -694,10 +715,35 @@ export type Database = {
         }
         Returns: string
       }
+      iniciar_fstd_avulsa: {
+        Args: {
+          p_loja_id: string
+          p_nfd_numero: string
+          p_nfd_valor: number
+          p_nfd_data_emissao: string
+          p_produtos: Json
+        }
+        Returns: string
+      }
+      conferir_fstd_avulsas: {
+        Args: Record<string, never>
+        Returns: Json
+      }
       concluir_fstd_produto: {
         Args: {
           p_produto_id: string
           p_divisoes: Json
+          p_observacao?: string | null
+          p_fotos?: Json
+        }
+        Returns: Database['public']['Tables']['fstd_produtos']['Row']
+      }
+      concluir_fstd_produto_avulso: {
+        Args: {
+          p_produto_id: string
+          p_divisoes: Json
+          p_quantidade_faturada_galinha: number
+          p_quantidade_faturada_codorna: number
           p_observacao?: string | null
           p_fotos?: Json
         }

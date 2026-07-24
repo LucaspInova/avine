@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabaseClient'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
 import avineLogo from '../assets/foto_logoavine.png'
+import profileUserIcon from '../assets/ui-icons/do-utilizador.png'
+import pdfIcon from '../assets/ui-icons/arquivo-pdf.png'
 import {
   clearPromotorNavigation,
   readPromotorNavigation,
@@ -17,7 +19,7 @@ const statusTabs = [
   { id: 'atrasada', label: 'Atrasadas' },
   { id: 'finalizada', label: 'Finalizadas' },
   { id: 'avulsa', label: 'Avulsas' },
-  { id: 'outros', label: 'Outros' },
+  { id: 'outros', label: 'Desconhecido' },
 ]
 
 const initialFstdForm = {
@@ -97,6 +99,14 @@ function getDaysSinceIssue(date) {
 }
 
 function getNfdVisualStatus(nfd, unknownComments = {}) {
+  if (nfd?.is_avulsa) {
+    if (nfd.conferencia_status === 'divergente') return 'avulsa-erro'
+    if (nfd.fstd_process_status === 'concluida') {
+      return nfd.conferencia_status === 'conferida' ? 'sent' : 'avulsa-finalizada'
+    }
+    return 'avulsa'
+  }
+
   if (unknownComments[getNfdKey(nfd)]) return 'unknown'
 
   if (nfd?.data_envio || (nfd?.fstd_status && nfd.fstd_status !== 'cancelada')) {
@@ -110,6 +120,7 @@ function getNfdTabStatus(nfd, unknownComments) {
   const visualStatus = getNfdVisualStatus(nfd, unknownComments)
   if (visualStatus === 'sent') return 'finalizada'
   if (visualStatus === 'overdue') return 'atrasada'
+  if (visualStatus === 'avulsa' || visualStatus === 'avulsa-finalizada' || visualStatus === 'avulsa-erro') return 'avulsa'
   return 'outros'
 }
 
@@ -168,7 +179,7 @@ function getNfdReturnRates(nfd) {
 }
 
 function formatReturnPercentage(value) {
-  return value.toFixed(2).replace('.', ',')
+  return String(Math.round(Number(value) || 0))
 }
 
 function getProductImageCandidates(value) {
@@ -214,6 +225,47 @@ function getNfdProducts(nfd, productsCatalog = []) {
       }
     })
     .filter(Boolean)
+}
+
+function getManualNfdKey(storeId, nfdNumber) {
+  const normalizedNumber = String(nfdNumber ?? '').trim().replace(/^0+/, '') || '0'
+  return `manual:${storeId ?? ''}:${normalizedNumber}`
+}
+
+function getLocalIsoDate() {
+  const today = new Date()
+  const offset = today.getTimezoneOffset() * 60000
+  return new Date(today.getTime() - offset).toISOString().slice(0, 10)
+}
+
+function getProductBilledQuantity(product, kind) {
+  const persistedValue = Number(product?.persisted?.[`quantidade_faturada_${kind}`] ?? 0)
+  const sourceValue = Number(product?.[`quantidade_faturada_${kind}`] ?? 0)
+
+  return persistedValue > 0 || sourceValue <= 0 ? persistedValue : sourceValue
+}
+
+function mergeNfdProducts(importedProducts, processProducts) {
+  const productsByCode = new Map(
+    importedProducts.map((product) => [String(product.codigo_produto).trim().toUpperCase(), product]),
+  )
+
+  for (const product of processProducts ?? []) {
+    const code = String(product.codigo_produto ?? '').trim().toUpperCase()
+    if (code && !productsByCode.has(code)) {
+      productsByCode.set(code, {
+        codigo_produto: code,
+        produto_id: product.produto_id ?? null,
+        nome: product.nome ?? code,
+        descricao: product.descricao ?? product.nome ?? null,
+        imagem_url: product.imagem_url ?? '',
+        quantidade_faturada_galinha: Number(product.quantidade_faturada_galinha ?? 0),
+        quantidade_faturada_codorna: Number(product.quantidade_faturada_codorna ?? 0),
+      })
+    }
+  }
+
+  return [...productsByCode.values()]
 }
 
 const PROMOTOR_UNKNOWN_NFD_KEY = 'fstd-promotor-unknown-nfds'
@@ -293,18 +345,6 @@ function filterBySearch(items, search, fields) {
   )
 }
 
-function getProfileInitials(profile) {
-  const initials = profile?.nome
-    ?.split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-
-  return initials || 'PR'
-}
-
 function MobileProfileMenu({ profile, profilePhoto, onLogout, onUploadPhoto, photoBusy }) {
   const [photoError, setPhotoError] = useState('')
 
@@ -333,7 +373,7 @@ function MobileProfileMenu({ profile, profilePhoto, onLogout, onUploadPhoto, pho
             type="file"
           />
           <span className="mobile-profile-avatar">
-            {profilePhoto ? <img src={profilePhoto} alt="Foto do perfil" /> : getProfileInitials(profile)}
+            {profilePhoto ? <img src={profilePhoto} alt="Foto do perfil" /> : <img className="profile-placeholder-icon" src={profileUserIcon} alt="" />}
           </span>
           <span className="mobile-profile-photo-badge" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -429,7 +469,7 @@ function AppHeader({
               title="Perfil e opções"
             >
               <span className="mobile-profile-avatar">
-                {profilePhoto ? <img src={profilePhoto} alt="" /> : getProfileInitials(profile)}
+                {profilePhoto ? <img src={profilePhoto} alt="" /> : <img className="profile-placeholder-icon" src={profileUserIcon} alt="" />}
               </span>
               <span className="mobile-profile-trigger-copy">
                 <strong>{profile?.nome ?? 'Usuário'}</strong>
@@ -517,6 +557,46 @@ function StoreIcon({ status }) {
 }
 
 function InvoiceIcon({ status }) {
+  const iconVariant = status === 'sent'
+    ? 'finalized'
+    : status === 'avulsa' || status === 'avulsa-finalizada' || status === 'avulsa-erro'
+      ? 'avulsa'
+      : status === 'on-time' || status === 'unknown'
+        ? 'unknown'
+        : null
+
+  if (iconVariant) {
+    const paths = {
+      finalized: {
+        main: 'M9 1.5H5.625c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5Zm6.61 10.936a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 14.47a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z',
+        corner: 'M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z',
+      },
+      avulsa: {
+        main: 'M5.625 1.5H9a3.75 3.75 0 0 1 3.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 0 1 3.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 0 1-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875ZM12.75 12a.75.75 0 0 0-1.5 0v2.25H9a.75.75 0 0 0 0 1.5h2.25V18a.75.75 0 0 0 1.5 0v-2.25H15a.75.75 0 0 0 0-1.5h-2.25V12Z',
+        corner: 'M14.25 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 16.5 7.5h-1.875a.375.375 0 0 1-.375-.375V5.25Z',
+      },
+      unknown: {
+        main: 'M5.625 1.5H9a3.75 3.75 0 0 1 3.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 0 1 3.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 0 1-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875Zm6 16.5c.66 0 1.277-.19 1.797-.518l1.048 1.048a.75.75 0 0 0 1.06-1.06l-1.047-1.048A3.375 3.375 0 1 0 11.625 18Z',
+        corner: 'M14.25 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 16.5 7.5h-1.875a.375.375 0 0 1-.375-.375V5.25Z',
+        marker: 'M11.625 16.5a1.875 1.875 0 1 0 0-3.75 1.875 1.875 0 0 0 0 3.75Z',
+      },
+    }[iconVariant]
+
+    return (
+      <svg
+        className={`document-glyph is-${status}`}
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        {paths.marker && <path d={paths.marker} />}
+        <path fillRule="evenodd" d={paths.main} clipRule="evenodd" />
+        <path d={paths.corner} />
+      </svg>
+    )
+  }
+
   return (
     <svg
       className={`document-glyph is-${status}`}
@@ -768,8 +848,9 @@ function StoresScreen({
             const storeNfds = nfds.filter((nfd) => nfd.loja_id === store.id)
             const overdueNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'atrasada').length
             const otherNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'outros').length
-            const pendingNotes = overdueNotes + otherNotes
-            const storeIconStatus = overdueNotes > 0 ? 'overdue' : otherNotes > 0 ? 'other' : 'clear'
+            const avulsaNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'avulsa').length
+            const pendingNotes = overdueNotes + otherNotes + avulsaNotes
+            const storeIconStatus = overdueNotes > 0 ? 'overdue' : otherNotes > 0 || avulsaNotes > 0 ? 'other' : 'clear'
 
             return (
               <button
@@ -802,7 +883,7 @@ function StoreDetailScreen({
   onStatusFilter,
   onBack,
   onOpenNfd,
-  onOpenFstd,
+  onOpenAvulsa,
 }) {
   const visibleNfds = filterBySearch(
     nfds.filter((nfd) => nfd.status_nfd === statusFilter),
@@ -860,10 +941,197 @@ function StoreDetailScreen({
           </>
         )}
 
-        <button className="avulsa-button" type="button" onClick={() => onOpenFstd(null)}>
+        <button className="avulsa-button" type="button" onClick={onOpenAvulsa}>
           + FSTD Avulsa
         </button>
       </section>
+    </main>
+  )
+}
+
+function FstdAvulsaFlow({
+  store,
+  productsCatalog,
+  catalogLoading,
+  busy,
+  error,
+  initialStep = 'nfd',
+  initialNfdForm,
+  excludedProductCodes = [],
+  isAddingProducts = false,
+  onBack,
+  onCreate,
+}) {
+  const [step, setStep] = useState(initialStep)
+  const [nfdForm, setNfdForm] = useState(() => initialNfdForm ?? ({
+    numero: '',
+    valor: '',
+    dataEmissao: getLocalIsoDate(),
+  }))
+  const [search, setSearch] = useState('')
+  const [selectedCodes, setSelectedCodes] = useState([])
+  const excludedCodes = new Set(excludedProductCodes.map((code) => String(code).trim().toUpperCase()))
+  const availableProducts = productsCatalog.filter(
+    (product) => !excludedCodes.has(String(product.codigo_produto).trim().toUpperCase()),
+  )
+  const visibleProducts = filterBySearch(availableProducts, search, ['codigo_produto', 'nome', 'categoria'])
+  const canSelectProducts = selectedCodes.length > 0 && !busy
+
+  function toggleProduct(code) {
+    setSelectedCodes((current) => current.includes(code)
+      ? current.filter((item) => item !== code)
+      : [...current, code])
+  }
+
+  async function handleSubmitProducts(event) {
+    event.preventDefault()
+    if (!canSelectProducts) return
+
+    await onCreate({
+      ...nfdForm,
+      produtos: availableProducts
+        .filter((product) => selectedCodes.includes(product.codigo_produto))
+        .map((product) => ({
+          codigo_produto: product.codigo_produto,
+          nome: product.nome,
+          imagem_url: product.imagem_url,
+        })),
+    })
+  }
+
+  if (step === 'nfd') {
+    const canContinue = Boolean(
+      nfdForm.numero.trim()
+        && nfdForm.valor.trim()
+        && Number(nfdForm.valor) >= 0
+        && !busy,
+    )
+
+    return (
+      <main className="promotor-app fstd-app avulsa-flow-page">
+        <header className="avulsa-flow-topbar">
+          <button type="button" onClick={onBack}>‹</button>
+          <strong>FSTD Avulsa</strong>
+          <span />
+        </header>
+
+        <section className="avulsa-flow-hero">
+          <InvoiceIcon status="avulsa" />
+          <div>
+            <h1>NFD avulsa</h1>
+            <p>Preencha os dados da nota para continuar.</p>
+          </div>
+        </section>
+
+        <form
+          className="avulsa-flow-card"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (canContinue) setStep('products')
+          }}
+        >
+          <div className="avulsa-flow-facts">
+            <div>
+              <span>Loja</span>
+              <strong>{getStoreTitle(store)}</strong>
+            </div>
+            <div>
+              <span>Código Loja</span>
+              <strong>{getStoreCode(store)}</strong>
+            </div>
+            <div>
+              <span>Data de emissão</span>
+              <strong>{formatDate(nfdForm.dataEmissao)}</strong>
+            </div>
+          </div>
+
+          <label className="avulsa-flow-field">
+            <span>Código da NFD <small>Necessário</small></span>
+            <input
+              autoComplete="off"
+              inputMode="numeric"
+              onChange={(event) => setNfdForm((current) => ({ ...current, numero: event.target.value }))}
+              placeholder="Informe o código da NFD"
+              value={nfdForm.numero}
+            />
+          </label>
+
+          <label className="avulsa-flow-field">
+            <span>Valor <small>Necessário</small></span>
+            <div className="unit-input avulsa-value-input">
+              <input
+                inputMode="decimal"
+                min="0"
+                onChange={(event) => setNfdForm((current) => ({ ...current, valor: event.target.value }))}
+                placeholder="0,00"
+                step="0.01"
+                type="number"
+                value={nfdForm.valor}
+              />
+              <em>R$</em>
+            </div>
+          </label>
+
+          {error && <strong className="promotor-error">{error}</strong>}
+
+          <button className="avulsa-primary-button" disabled={!canContinue} type="submit">
+            Adicionar produto
+          </button>
+        </form>
+      </main>
+    )
+  }
+
+  return (
+    <main className="promotor-app fstd-app avulsa-flow-page">
+      <header className="avulsa-flow-topbar">
+        <button type="button" onClick={() => (isAddingProducts ? onBack() : setStep('nfd'))}>‹</button>
+        <strong>{isAddingProducts ? 'Adicionar mais produtos' : 'Adicionar produto'}</strong>
+        <span />
+      </header>
+
+      <section className="avulsa-picker-intro">
+        <h1>Produtos da nota</h1>
+        <p>Selecione os produtos que aparecem na NFD avulsa.</p>
+      </section>
+
+      <form className="avulsa-picker-form" onSubmit={handleSubmitProducts}>
+        <label className="mobile-search avulsa-picker-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Procurar produto"
+            type="search"
+            value={search}
+          />
+        </label>
+
+        {catalogLoading && <p className="fstd-empty">Carregando produtos...</p>}
+        {!catalogLoading && visibleProducts.length === 0 && <p className="fstd-empty">Nenhum produto encontrado.</p>}
+
+        <div className="avulsa-product-picker-list">
+          {visibleProducts.map((product) => {
+            const selected = selectedCodes.includes(product.codigo_produto)
+            return (
+              <label className={`avulsa-product-option${selected ? ' is-selected' : ''}`} key={product.codigo_produto}>
+                <input checked={selected} onChange={() => toggleProduct(product.codigo_produto)} type="checkbox" />
+                <ProductImage alt={product.nome} src={product.imagem_url} />
+                <span>
+                  <strong>{product.nome}</strong>
+                  <small>{product.codigo_produto}</small>
+                </span>
+                <i aria-hidden="true">{selected ? '✓' : ''}</i>
+              </label>
+            )
+          })}
+        </div>
+
+        {error && <strong className="promotor-error">{error}</strong>}
+
+        <button className="avulsa-primary-button" disabled={!canSelectProducts} type="submit">
+          {busy ? 'Adicionando...' : 'Adicionar produto'}
+        </button>
+      </form>
     </main>
   )
 }
@@ -909,13 +1177,31 @@ function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubm
   )
 }
 
+function NfdConferenceErrorPopup({ nfd, onClose }) {
+  if (!nfd) return null
+
+  return (
+    <div className="nfd-conference-layer">
+      <button className="nfd-conference-backdrop" type="button" aria-label="Fechar alerta" onClick={onClose} />
+      <section className="nfd-conference-dialog" role="alertdialog" aria-modal="true" aria-labelledby="nfd-conference-title">
+        <InvoiceIcon status="avulsa-erro" />
+        <h2 id="nfd-conference-title">Erro na NFD</h2>
+        <p>A NFD “{getNfdNumber(nfd)}” deu erro, entre em contato com o suporte.</p>
+        <button type="button" onClick={onClose}>Entendi</button>
+      </section>
+    </div>
+  )
+}
+
 function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMarkUnknown, unknownBusy, unknownError }) {
   const [invoiceCopied, setInvoiceCopied] = useState(false)
   const [isUnknownOpen, setUnknownOpen] = useState(false)
   const [unknownComment, setUnknownComment] = useState('')
   const visualStatus = nfd.visual_status ?? getNfdVisualStatus(nfd)
   const returnRates = getNfdReturnRates(nfd)
-  const isFinalized = visualStatus === 'sent' || nfd.status_nfd === 'finalizada'
+  const isFinalized = visualStatus === 'sent'
+    || visualStatus === 'avulsa-finalizada'
+    || nfd.status_nfd === 'finalizada'
 
   function handleOpenInvoice() {
     onOpenInvoice()
@@ -969,18 +1255,22 @@ function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMark
           </div>
         </dl>
 
-        <div className="nfd-actions">
-          <button
-            type="button"
-            onClick={handleOpenInvoice}
-          >
-            <NfdActionIcon name="invoice" />
-            Nota Fiscal
-          </button>
-          <button className="unknown-nfd-button" type="button" onClick={() => setUnknownOpen(true)}>
-            <NfdActionIcon name="unknown" />
-            Desconheço NFD
-          </button>
+        <div className={`nfd-actions${nfd.is_avulsa ? ' is-avulsa' : ''}`}>
+          {!nfd.is_avulsa && (
+            <button
+              type="button"
+              onClick={handleOpenInvoice}
+            >
+              <NfdActionIcon name="invoice" />
+              Nota Fiscal
+            </button>
+          )}
+          {!nfd.is_avulsa && (
+            <button className="unknown-nfd-button" type="button" onClick={() => setUnknownOpen(true)}>
+              <NfdActionIcon name="unknown" />
+              Desconheço NFD
+            </button>
+          )}
           <button type="button" onClick={() => onOpenFstd(nfd)}>
             <NfdActionIcon name="fstd" />
             FSTD
@@ -1325,12 +1615,13 @@ function FstdStoredPhotos({ paths, removable = false, onRemove }) {
 }
 
 function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
+  const isAvulsa = Boolean(product.is_avulsa)
   const isEditing = product.persisted?.status === 'concluido'
   const [form, setForm] = useState(() => ({
     ...initialFstdForm,
     divisoes: getFstdDivisionDefaults(product),
-    faturadoGalinha: String(product.persisted?.quantidade_faturada_galinha ?? product.quantidade_faturada_galinha ?? 0),
-    faturadoCodorna: String(product.persisted?.quantidade_faturada_codorna ?? product.quantidade_faturada_codorna ?? 0),
+    faturadoGalinha: String(getProductBilledQuantity(product, 'galinha')),
+    faturadoCodorna: String(getProductBilledQuantity(product, 'codorna')),
     fotosExistentes: isEditing ? getFstdStoredPhotoPaths(product) : [],
     lotes: isEditing ? getEditableObservation(product.persisted?.observacao) : '',
   }))
@@ -1338,13 +1629,17 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
     () => form.fotos.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [form.fotos],
   )
-  const billedGalinha = Number(product.persisted?.quantidade_faturada_galinha ?? product.quantidade_faturada_galinha ?? 0)
-  const billedCodorna = Number(product.persisted?.quantidade_faturada_codorna ?? product.quantidade_faturada_codorna ?? 0)
+  const billedGalinha = isAvulsa
+    ? normalizeQuantity(form.faturadoGalinha)
+    : getProductBilledQuantity(product, 'galinha')
+  const billedCodorna = isAvulsa
+    ? normalizeQuantity(form.faturadoCodorna)
+    : getProductBilledQuantity(product, 'codorna')
   const totalBilled = billedGalinha + billedCodorna
   const totalDivisionBilled = form.divisoes.reduce((total, division) => total + normalizeQuantity(division.faturado), 0)
   const totalReturn = form.divisoes.reduce((total, division) => total + normalizeNonNegativeQuantity(division.retorno), 0)
   const remainingBilled = Math.max(0, totalBilled - totalDivisionBilled)
-  const showGeneral = totalDivisionBilled !== totalBilled
+  const showGeneral = isAvulsa || totalDivisionBilled !== totalBilled
   const divisionsAreValid = form.divisoes.every(
     (division) => Boolean(division.motivoId)
       && normalizeQuantity(division.faturado) > 0
@@ -1364,6 +1659,18 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
 
   function updateForm(patch) {
     setForm((current) => ({ ...current, ...patch }))
+  }
+
+  function updateAvulsaBilled(field, value) {
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+      if (current.divisoes.length === 1) {
+        const galinha = field === 'faturadoGalinha' ? normalizeQuantity(value) : normalizeQuantity(current.faturadoGalinha)
+        const codorna = field === 'faturadoCodorna' ? normalizeQuantity(value) : normalizeQuantity(current.faturadoCodorna)
+        next.divisoes = [{ ...current.divisoes[0], faturado: String(galinha + codorna || '') }]
+      }
+      return next
+    })
   }
 
   function updateDivision(index, patch) {
@@ -1426,7 +1733,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
   }
 
   return (
-    <main className="promotor-app fstd-app fstd-product-page">
+    <main className={`promotor-app fstd-app fstd-product-page${isAvulsa ? ' is-avulsa' : ''}`}>
       <form className="fstd-mobile-form fstd-product-form" onSubmit={handleSubmit}>
         <header className="fstd-topbar">
           <button type="button" onClick={onBack}>‹</button>
@@ -1504,10 +1811,42 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
 
           {showGeneral && (
             <FieldCard icon="chart" title="Geral">
-              <label className="mobile-field">
-                <span>Faturado geral <small>Da nota</small></span>
-                <input disabled value={`${totalBilled} ovos`} />
-              </label>
+              {isAvulsa ? (
+                <>
+                  <p className="fstd-avulsa-hint">Informe aqui a quantidade faturada na NFD física.</p>
+                  <label className="mobile-field">
+                    <span>Faturado Galinha</span>
+                    <div className="unit-input">
+                      <input
+                        min="0"
+                        inputMode="numeric"
+                        onChange={(event) => updateAvulsaBilled('faturadoGalinha', event.target.value)}
+                        type="number"
+                        value={form.faturadoGalinha}
+                      />
+                      <em>ovos</em>
+                    </div>
+                  </label>
+                  <label className="mobile-field">
+                    <span>Faturado Codorna</span>
+                    <div className="unit-input">
+                      <input
+                        min="0"
+                        inputMode="numeric"
+                        onChange={(event) => updateAvulsaBilled('faturadoCodorna', event.target.value)}
+                        type="number"
+                        value={form.faturadoCodorna}
+                      />
+                      <em>ovos</em>
+                    </div>
+                  </label>
+                </>
+              ) : (
+                <label className="mobile-field">
+                  <span>Faturado geral <small>Da nota</small></span>
+                  <input disabled value={`${totalBilled} ovos`} />
+                </label>
+              )}
               {totalDivisionBilled > 0 && remainingBilled > 0 && (
                 <button className="fstd-add-reason" onClick={addDivision} type="button">
                   + Adicionar outro motivo
@@ -1687,7 +2026,7 @@ function FstdDocumentPreview({ document, onClose }) {
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onSubmitProduct, onFinalize, onViewDocument }) {
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
   const [selectedProductCode, setSelectedProductCode] = useState(null)
   const [selectedProductMode, setSelectedProductMode] = useState(null)
   const [documentPreview, setDocumentPreview] = useState(null)
@@ -1696,9 +2035,11 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
   const products = (nfd?.produtos ?? []).map((product) => ({
     ...product,
     persisted: persistedByCode.get(product.codigo_produto),
+    is_avulsa: Boolean(nfd?.is_avulsa),
   }))
   const allCompleted = products.length > 0 && products.every((product) => product.persisted?.status === 'concluido')
   const processFinalized = process?.status === 'concluida'
+  const isAvulsa = Boolean(nfd?.is_avulsa)
   const selectedProduct = products.find((product) => product.codigo_produto === selectedProductCode)
 
   if (selectedProduct && selectedProductMode === 'view') {
@@ -1754,7 +2095,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
 
   return (
     <>
-      <main className="promotor-app fstd-app fstd-list-page">
+      <main className={`promotor-app fstd-app fstd-list-page${isAvulsa ? ' is-avulsa' : ''}`}>
       <header className="fstd-list-topbar">
         <button type="button" onClick={onBack}>‹</button>
         <strong>FSTD</strong>
@@ -1788,8 +2129,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
               <span className="fstd-product-row-copy">
                 <strong>{product.nome}</strong>
             <small>
-              Fat: {Number(product.persisted?.quantidade_faturada_galinha ?? product.quantidade_faturada_galinha ?? 0)
-                + Number(product.persisted?.quantidade_faturada_codorna ?? product.quantidade_faturada_codorna ?? 0)} ovos
+              Fat: {getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')} ovos
               {' · '}Ret: {completed ? product.persisted.quantidade_retorno : '?'}
             </small>
               </span>
@@ -1800,16 +2140,33 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
       </div>
 
       {(error || documentError) && <strong className="promotor-error fstd-list-error">{error || documentError}</strong>}
-      {allCompleted && (
-        processFinalized ? (
-          <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
-            {documentBusy ? 'Abrindo...' : 'Ver FSTD'}
+      {allCompleted && processFinalized && !isAvulsa && (
+        <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
+          <span>{documentBusy ? 'Abrindo...' : 'Ver FSTD'}</span>
+          <img src={pdfIcon} alt="" aria-hidden="true" />
+        </button>
+      )}
+      {isAvulsa && !processFinalized && (
+        <div className="fstd-avulsa-actions">
+          <button className="fstd-add-products-button" onClick={onAddProducts} type="button">
+            + Adicionar mais produtos
           </button>
-        ) : (
-          <button className="fstd-finalize-button" disabled={finalizeBusy} onClick={onFinalize} type="button">
-            {finalizeBusy ? 'Finalizando...' : 'Finalizar'}
-          </button>
-        )
+          {products.length > 0 && (
+            <button
+              className="fstd-finalize-button fstd-avulsa-finalize-button"
+              disabled={!allCompleted || finalizeBusy}
+              onClick={onFinalize}
+              type="button"
+            >
+              {finalizeBusy ? 'Finalizando...' : 'Finalizar FSTD avulsa'}
+            </button>
+          )}
+        </div>
+      )}
+      {!isAvulsa && allCompleted && !processFinalized && (
+        <button className="fstd-finalize-button" disabled={finalizeBusy} onClick={onFinalize} type="button">
+          {finalizeBusy ? 'Finalizando...' : 'Finalizar'}
+        </button>
       )}
       </main>
       <FstdDocumentPreview document={documentPreview} onClose={() => setDocumentPreview(null)} />
@@ -1823,6 +2180,9 @@ function PromotorWorkspace({ profile, onLogout }) {
   const [selectedStore, setSelectedStore] = useState(() => savedNavigation?.selectedStore ?? null)
   const [selectedNfd, setSelectedNfd] = useState(() => savedNavigation?.selectedNfd ?? null)
   const [fstdTarget, setFstdTarget] = useState(() => savedNavigation?.fstdTarget)
+  const [isAvulsaOpen, setAvulsaOpen] = useState(false)
+  const [avulsaAddProductsTarget, setAvulsaAddProductsTarget] = useState(null)
+  const [conferenceAlertDismissed, setConferenceAlertDismissed] = useState(false)
   const [storeSearch, setStoreSearch] = useState(() => savedNavigation?.storeSearch ?? '')
   const [nfdSearch, setNfdSearch] = useState(() => savedNavigation?.nfdSearch ?? '')
   const [statusFilter, setStatusFilter] = useState(() => savedNavigation?.statusFilter ?? 'atrasada')
@@ -1938,7 +2298,7 @@ function PromotorWorkspace({ profile, onLogout }) {
     queryFn: async () => {
       const { data: processos, error: processosError } = await supabase
         .from('fstd_processos')
-        .select('id, nfd_chave_acesso, nfd_numero, status, finalizada_em')
+        .select('id, nfd_chave_acesso, nfd_numero, loja_id, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em')
         .order('created_at', { ascending: false })
 
       if (processosError) throw processosError
@@ -1962,7 +2322,7 @@ function PromotorWorkspace({ profile, onLogout }) {
 
       if (divisoesError) throw divisoesError
 
-      return processos.map((processo) => ({
+    return processos.map((processo) => ({
         ...processo,
         produtos: (produtos ?? [])
           .filter((produto) => produto.processo_id === processo.id)
@@ -2002,7 +2362,7 @@ function PromotorWorkspace({ profile, onLogout }) {
     },
   })
 
-  const stores = storesQuery.data ?? []
+  const stores = useMemo(() => storesQuery.data ?? [], [storesQuery.data])
   const databaseUnknownNfdComments = useMemo(() => {
     const comments = {}
 
@@ -2017,32 +2377,173 @@ function PromotorWorkspace({ profile, onLogout }) {
     [databaseUnknownNfdComments, unknownNfdComments],
   )
   const fstdProcessosByNfd = useMemo(
-    () => new Map((fstdProcessosQuery.data ?? []).map((processo) => [String(processo.nfd_chave_acesso), processo])),
+    () => {
+      const processesByKey = new Map()
+
+      for (const processo of fstdProcessosQuery.data ?? []) {
+        processesByKey.set(String(processo.nfd_chave_acesso), processo)
+        if (processo.is_avulsa) {
+          processesByKey.set(getManualNfdKey(processo.loja_id, processo.nfd_numero), processo)
+        }
+      }
+
+      return processesByKey
+    },
     [fstdProcessosQuery.data],
   )
   const nfds = useMemo(
-    () => (nfdsQuery.data ?? []).map((nfd) => {
-      const processo = fstdProcessosByNfd.get(String(nfd.chave_acesso))
-      const visualStatus = processo?.status === 'concluida'
-        ? 'sent'
-        : getNfdVisualStatus(nfd, allUnknownNfdComments)
+    () => {
+      const importedNfds = (nfdsQuery.data ?? []).map((nfd) => {
+        const processo = fstdProcessosByNfd.get(String(nfd.chave_acesso))
+          ?? fstdProcessosByNfd.get(getManualNfdKey(nfd.loja_id, nfd.numero))
+        const isAvulsa = Boolean(processo?.is_avulsa)
+        const visualStatus = isAvulsa
+          ? getNfdVisualStatus({
+            is_avulsa: true,
+            fstd_process_status: processo?.status,
+            conferencia_status: processo?.conferencia_status,
+          })
+          : processo?.status === 'concluida'
+            ? 'sent'
+            : getNfdVisualStatus(nfd, allUnknownNfdComments)
+        const importedProducts = getNfdProducts(nfd, produtosCatalogQuery.data ?? [])
 
-      return {
-        ...nfd,
-        produtos: getNfdProducts(nfd, produtosCatalogQuery.data ?? []),
-        fstd_process_id: processo?.id ?? null,
-        fstd_process_status: processo?.status ?? null,
-        fstd_process: processo ?? null,
-        visual_status: visualStatus,
-        status_nfd: visualStatus === 'sent' ? 'finalizada' : getNfdTabStatus(nfd, allUnknownNfdComments),
-      }
-    }),
-    [allUnknownNfdComments, fstdProcessosByNfd, nfdsQuery.data, produtosCatalogQuery.data],
+        return {
+          ...nfd,
+          is_avulsa: isAvulsa,
+          produtos: mergeNfdProducts(importedProducts, processo?.produtos),
+          fstd_process_id: processo?.id ?? null,
+          fstd_process_status: processo?.status ?? null,
+          conferencia_status: processo?.conferencia_status ?? 'pendente',
+          conferencia_detalhes: processo?.conferencia_detalhes ?? {},
+          conferencia_em: processo?.conferencia_em ?? null,
+          api_nfd_chave_acesso: processo?.api_nfd_chave_acesso ?? null,
+          fstd_process: processo ?? null,
+          visual_status: visualStatus,
+          status_nfd: visualStatus === 'sent'
+            ? 'finalizada'
+            : isAvulsa
+              ? 'avulsa'
+              : getNfdTabStatus(nfd, allUnknownNfdComments),
+        }
+      })
+      const importedManualKeys = new Set(
+        importedNfds.map((nfd) => getManualNfdKey(nfd.loja_id, nfd.numero)),
+      )
+      const manualNfds = (fstdProcessosQuery.data ?? [])
+        .filter((processo) => processo.is_avulsa && !importedManualKeys.has(getManualNfdKey(processo.loja_id, processo.nfd_numero)))
+        .map((processo) => {
+          const store = stores.find((item) => item.id === processo.loja_id)
+          const products = mergeNfdProducts([], processo.produtos)
+          const billedGalinha = products.reduce((total, product) => total + Number(product.quantidade_faturada_galinha ?? 0), 0)
+          const billedCodorna = products.reduce((total, product) => total + Number(product.quantidade_faturada_codorna ?? 0), 0)
+          const visualStatus = getNfdVisualStatus({
+            is_avulsa: true,
+            fstd_process_status: processo.status,
+            conferencia_status: processo.conferencia_status,
+          })
+
+          return {
+            id: processo.nfd_chave_acesso,
+            chave_acesso: processo.nfd_chave_acesso,
+            nota_fiscal: processo.nfd_numero,
+            numero: processo.nfd_numero,
+            data_emissao: processo.nfd_data_emissao,
+            codigo_cliente: store?.codigo ?? null,
+            loja_id: processo.loja_id,
+            loja_codigo: store?.codigo ?? null,
+            loja_nome: store?.nome ?? null,
+            nome_abreviado: store?.nome ?? null,
+            valor_total: processo.nfd_valor,
+            quantidade_galinha: billedGalinha,
+            quantidade_codorna: billedCodorna,
+            produtos: products,
+            is_avulsa: true,
+            fstd_process_id: processo.id,
+            fstd_process_status: processo.status,
+            conferencia_status: processo.conferencia_status ?? 'pendente',
+            conferencia_detalhes: processo.conferencia_detalhes ?? {},
+            conferencia_em: processo.conferencia_em ?? null,
+            api_nfd_chave_acesso: processo.api_nfd_chave_acesso ?? null,
+            fstd_process: processo,
+            visual_status: visualStatus,
+            status_nfd: visualStatus === 'sent' ? 'finalizada' : 'avulsa',
+          }
+        })
+
+      return [...importedNfds, ...manualNfds]
+    },
+    [allUnknownNfdComments, fstdProcessosByNfd, fstdProcessosQuery.data, nfdsQuery.data, produtosCatalogQuery.data, stores],
   )
   const selectedStoreNfds = selectedStore ? nfds.filter((nfd) => nfd.loja_id === selectedStore.id) : []
   const currentFstdTarget = fstdTarget
     ? nfds.find((nfd) => String(nfd.chave_acesso) === String(fstdTarget.chave_acesso)) ?? fstdTarget
     : undefined
+
+  const conferenceAlertNfd = conferenceAlertDismissed
+    ? null
+    : nfds.find((nfd) => nfd.is_avulsa && nfd.conferencia_status === 'divergente')
+  const conferenceAlert = (
+    <NfdConferenceErrorPopup
+      nfd={conferenceAlertNfd}
+      onClose={() => setConferenceAlertDismissed(true)}
+    />
+  )
+
+  const avulsaMutation = useMutation({
+    mutationFn: async ({ numero, valor, dataEmissao, produtos }) => {
+      const { data: processoId, error: processoError } = await supabase.rpc('iniciar_fstd_avulsa', {
+        p_loja_id: selectedStore.id,
+        p_nfd_numero: numero.trim(),
+        p_nfd_valor: Number(valor),
+        p_nfd_data_emissao: dataEmissao,
+        p_produtos: produtos.map((product) => ({ codigo_produto: product.codigo_produto })),
+      })
+      if (processoError) throw processoError
+
+      const { data: processo, error: processoReadError } = await supabase
+        .from('fstd_processos')
+        .select('id, nfd_chave_acesso, nfd_numero, loja_id, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em')
+        .eq('id', processoId)
+        .single()
+      if (processoReadError) throw processoReadError
+
+      const { data: produtosSalvos, error: produtosReadError } = await supabase
+        .from('fstd_produtos')
+        .select('id, processo_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
+        .eq('processo_id', processoId)
+      if (produtosReadError) throw produtosReadError
+
+      return {
+        id: processo.nfd_chave_acesso,
+        chave_acesso: processo.nfd_chave_acesso,
+        nota_fiscal: processo.nfd_numero,
+        numero: processo.nfd_numero,
+        data_emissao: processo.nfd_data_emissao,
+        codigo_cliente: selectedStore.codigo,
+        loja_id: selectedStore.id,
+        loja_codigo: selectedStore.codigo,
+        loja_nome: selectedStore.nome,
+        nome_abreviado: selectedStore.nome,
+        valor_total: processo.nfd_valor,
+        quantidade_galinha: 0,
+        quantidade_codorna: 0,
+        produtos: produtosSalvos ?? [],
+        is_avulsa: true,
+        fstd_process_id: processo.id,
+        fstd_process_status: processo.status,
+        conferencia_status: processo.conferencia_status,
+        conferencia_detalhes: processo.conferencia_detalhes,
+        conferencia_em: processo.conferencia_em,
+        api_nfd_chave_acesso: processo.api_nfd_chave_acesso,
+        fstd_process: { ...processo, produtos: produtosSalvos ?? [] },
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] })
+      await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
+    },
+  })
 
   const fstdProductMutation = useMutation({
     mutationFn: async ({ product, divisoes, observacao, fotos = [], fotosExistentes = [], faturadoGalinha, faturadoCodorna }) => {
@@ -2095,7 +2596,9 @@ function PromotorWorkspace({ profile, onLogout }) {
         const existingPaths = Array.isArray(fotosExistentes) ? fotosExistentes : []
         const rpcName = product.persisted?.status === 'concluido'
           ? 'editar_fstd_produto'
-          : 'concluir_fstd_produto'
+          : product.is_avulsa
+            ? 'concluir_fstd_produto_avulso'
+            : 'concluir_fstd_produto'
         const rpcArgs = {
           p_produto_id: produtoId,
           p_divisoes: (divisoes ?? []).map((division) => ({
@@ -2108,6 +2611,11 @@ function PromotorWorkspace({ profile, onLogout }) {
         }
 
         if (rpcName === 'editar_fstd_produto') {
+          rpcArgs.p_quantidade_faturada_galinha = faturadoGalinha
+          rpcArgs.p_quantidade_faturada_codorna = faturadoCodorna
+        }
+
+        if (rpcName === 'concluir_fstd_produto_avulso') {
           rpcArgs.p_quantidade_faturada_galinha = faturadoGalinha
           rpcArgs.p_quantidade_faturada_codorna = faturadoCodorna
         }
@@ -2151,7 +2659,7 @@ function PromotorWorkspace({ profile, onLogout }) {
       await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
       setFstdTarget(undefined)
       setSelectedNfd(null)
-      setStatusFilter('finalizada')
+      setStatusFilter(currentFstdTarget?.conferencia_status === 'conferida' ? 'finalizada' : 'avulsa')
     },
   })
 
@@ -2290,68 +2798,131 @@ function PromotorWorkspace({ profile, onLogout }) {
 
   if (isProfilePageOpen) {
     return (
-      <ProfileScreen
-        profile={profile}
+      <>
+        <ProfileScreen
+          profile={profile}
           onBack={() => setProfilePageOpen(false)}
-        onLogout={onLogout}
-        onUploadPhoto={handleProfilePhotoUpload}
-        photoBusy={profilePhotoMutation.isPending}
-      />
+          onLogout={onLogout}
+          onUploadPhoto={handleProfilePhotoUpload}
+          photoBusy={profilePhotoMutation.isPending}
+        />
+        {conferenceAlert}
+      </>
+    )
+  }
+
+  if (isAvulsaOpen && selectedStore) {
+    return (
+      <>
+        <FstdAvulsaFlow
+          store={selectedStore}
+          productsCatalog={produtosCatalogQuery.data ?? []}
+          catalogLoading={produtosCatalogQuery.isLoading}
+          busy={avulsaMutation.isPending}
+          error={avulsaMutation.error?.message}
+          onBack={() => setAvulsaOpen(false)}
+          onCreate={async (payload) => {
+            const target = await avulsaMutation.mutateAsync(payload)
+            setAvulsaOpen(false)
+            setFstdTarget(target)
+          }}
+        />
+        {conferenceAlert}
+      </>
+    )
+  }
+
+  if (avulsaAddProductsTarget && selectedStore) {
+    const existingProductCodes = (avulsaAddProductsTarget.fstd_process?.produtos ?? [])
+      .map((product) => product.codigo_produto)
+
+    return (
+      <>
+        <FstdAvulsaFlow
+          store={selectedStore}
+          productsCatalog={produtosCatalogQuery.data ?? []}
+          catalogLoading={produtosCatalogQuery.isLoading}
+          busy={avulsaMutation.isPending}
+          error={avulsaMutation.error?.message}
+          initialStep="products"
+          initialNfdForm={{
+            numero: String(avulsaAddProductsTarget.numero ?? avulsaAddProductsTarget.nota_fiscal ?? ''),
+            valor: String(avulsaAddProductsTarget.valor_total ?? ''),
+            dataEmissao: avulsaAddProductsTarget.data_emissao ?? getLocalIsoDate(),
+          }}
+          excludedProductCodes={existingProductCodes}
+          isAddingProducts
+          onBack={() => setAvulsaAddProductsTarget(null)}
+          onCreate={async (payload) => {
+            const target = await avulsaMutation.mutateAsync(payload)
+            setAvulsaAddProductsTarget(null)
+            setFstdTarget(target)
+          }}
+        />
+        {conferenceAlert}
+      </>
     )
   }
 
   if (currentFstdTarget !== undefined && selectedStore) {
     return (
-      <FstdScreen
-        store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
-        nfd={currentFstdTarget}
-        process={currentFstdTarget.fstd_process ?? null}
-        motivos={motivosQuery.data ?? []}
-        busy={fstdProductMutation.isPending}
-        error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
-        finalizeBusy={finalizarFstdMutation.isPending}
-        documentBusy={fstdDocumentMutation.isPending}
-        documentError={fstdDocumentMutation.error?.message}
-        onBack={() => setFstdTarget(undefined)}
-        onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
-        onFinalize={() => finalizarFstdMutation.mutate()}
-        onViewDocument={() => fstdDocumentMutation.mutateAsync()}
-      />
+      <>
+        <FstdScreen
+          store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
+          nfd={currentFstdTarget}
+          process={currentFstdTarget.fstd_process ?? null}
+          motivos={motivosQuery.data ?? []}
+          busy={fstdProductMutation.isPending}
+          error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
+          finalizeBusy={finalizarFstdMutation.isPending}
+          documentBusy={fstdDocumentMutation.isPending}
+          documentError={fstdDocumentMutation.error?.message}
+          onBack={() => setFstdTarget(undefined)}
+          onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
+          onAddProducts={() => setAvulsaAddProductsTarget(currentFstdTarget)}
+          onFinalize={() => finalizarFstdMutation.mutate()}
+          onViewDocument={() => fstdDocumentMutation.mutateAsync()}
+        />
+        {conferenceAlert}
+      </>
     )
   }
 
   if (selectedNfd && selectedStore) {
     return (
-      <NfdDetailScreen
-        store={selectedStore}
-        nfd={selectedNfd}
-        unknownBusy={desconhecerMutation.isPending}
-        unknownError={desconhecerMutation.error?.message}
-        onBack={() => setSelectedNfd(null)}
-        onOpenInvoice={() => {
-          savePromotorNavigation(profile.id, {
-            selectedStore,
-            selectedNfd,
-            fstdTarget,
-            storeSearch,
-            nfdSearch,
-            statusFilter,
-          })
-          window.open('https://meudanfe.com.br/', '_blank', 'noopener,noreferrer')
-        }}
-        onMarkUnknown={async (nfd, comment) => {
-          await desconhecerMutation.mutateAsync({ nfd, comment })
-          const key = getNfdKey(nfd)
-          setUnknownNfdComments((current) => {
-            const next = { ...current, [key]: comment }
-            saveUnknownNfdComments(profile.id, next)
-            return next
-          })
-          setSelectedNfd(null)
-          setStatusFilter('outros')
-        }}
-        onOpenFstd={setFstdTarget}
-      />
+      <>
+        <NfdDetailScreen
+          store={selectedStore}
+          nfd={selectedNfd}
+          unknownBusy={desconhecerMutation.isPending}
+          unknownError={desconhecerMutation.error?.message}
+          onBack={() => setSelectedNfd(null)}
+          onOpenInvoice={() => {
+            savePromotorNavigation(profile.id, {
+              selectedStore,
+              selectedNfd,
+              fstdTarget,
+              storeSearch,
+              nfdSearch,
+              statusFilter,
+            })
+            window.open('https://meudanfe.com.br/', '_blank', 'noopener,noreferrer')
+          }}
+          onMarkUnknown={async (nfd, comment) => {
+            await desconhecerMutation.mutateAsync({ nfd, comment })
+            const key = getNfdKey(nfd)
+            setUnknownNfdComments((current) => {
+              const next = { ...current, [key]: comment }
+              saveUnknownNfdComments(profile.id, next)
+              return next
+            })
+            setSelectedNfd(null)
+            setStatusFilter('outros')
+          }}
+          onOpenFstd={setFstdTarget}
+        />
+        {conferenceAlert}
+      </>
     )
   }
 
@@ -2372,8 +2943,13 @@ function PromotorWorkspace({ profile, onLogout }) {
             setStatusFilter('atrasada')
           }}
           onOpenNfd={setSelectedNfd}
-          onOpenFstd={setFstdTarget}
+          onOpenAvulsa={() => {
+            setSelectedNfd(null)
+            setFstdTarget(undefined)
+            setAvulsaOpen(true)
+          }}
         />
+        {conferenceAlert}
       </div>
     )
   }
@@ -2401,6 +2977,7 @@ function PromotorWorkspace({ profile, onLogout }) {
           setStatusFilter('atrasada')
         }}
       />
+      {conferenceAlert}
     </div>
   )
 }
