@@ -569,6 +569,44 @@ export type Database = {
           },
         ]
       }
+      fstd_documentos: {
+        Row: {
+          id: string
+          processo_id: string
+          numero_controle: number
+          pdf_path: string | null
+          pdf_metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          processo_id: string
+          numero_controle?: number
+          pdf_path?: string | null
+          pdf_metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          processo_id?: string
+          numero_controle?: number
+          pdf_path?: string | null
+          pdf_metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'fstd_documentos_processo_id_fkey'
+            columns: ['processo_id']
+            isOneToOne: true
+            referencedRelation: 'fstd_processos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       lojas_com_promotores: {
@@ -681,6 +719,20 @@ export type Database = {
           p_processo_id: string
         }
         Returns: Database['public']['Tables']['fstd_processos']['Row']
+      }
+      get_or_create_fstd_document: {
+        Args: {
+          p_processo_id: string
+        }
+        Returns: Database['public']['Tables']['fstd_documentos']['Row']
+      }
+      set_fstd_document_pdf: {
+        Args: {
+          p_document_id: string
+          p_pdf_path: string
+          p_pdf_metadata?: Json
+        }
+        Returns: Database['public']['Tables']['fstd_documentos']['Row']
       }
     }
     Enums: {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider.jsx'
 import { supabase } from './lib/supabaseClient'
@@ -311,7 +311,11 @@ function Icon({ name, className = '' }) {
 }
 
 function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
-  const firstName = currentUser?.nome?.split(/\s+/).filter(Boolean)[0] ?? 'Avine'
+  const profileMenuRef = useRef(null)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const profileName = currentUser?.nome ?? 'Usuário'
+  const profileRole = currentUser?.perfil ?? 'Gerencial'
+  const profileState = currentUser?.estado || 'Não informado'
   const initials = currentUser?.nome
     ? currentUser.nome
         .split(/\s+/)
@@ -321,6 +325,28 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
         .join('')
         .toUpperCase()
     : 'AV'
+
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined
+
+    function handlePointerDown(event) {
+      if (!profileMenuRef.current?.contains(event.target)) {
+        setProfileMenuOpen(false)
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setProfileMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [profileMenuOpen])
 
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
@@ -360,17 +386,57 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
         ))}
       </nav>
 
-      <div className="sidebar-user">
-        <button className="profile-trigger" type="button" aria-haspopup="menu">
+      <div className="sidebar-user" ref={profileMenuRef}>
+        <button
+          className={`profile-trigger ${profileMenuOpen ? 'is-open' : ''}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={profileMenuOpen}
+          aria-label="Abrir perfil"
+          onClick={() => setProfileMenuOpen((open) => !open)}
+        >
           <span className="user-orb">
             {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
           </span>
-          <span className="profile-first-name">{firstName}</span>
+          <span className="profile-summary">
+            <strong className="profile-name">{profileName}</strong>
+            <span className="profile-role">{profileRole}</span>
+          </span>
+          <span className="profile-chevron" aria-hidden="true" />
         </button>
-        <div className="profile-menu" role="menu">
-          <button type="button" role="menuitem" onClick={() => onSelect('perfil')}>Ver perfil</button>
-          <button type="button" role="menuitem" onClick={onLogout}>Sair</button>
-        </div>
+        {profileMenuOpen && (
+          <div className="profile-menu" role="menu" aria-label="Informações do perfil">
+            <div className="profile-menu-info">
+              <strong>{profileName}</strong>
+              <span>{currentUser?.email ?? 'E-mail não informado'}</span>
+            </div>
+
+            <dl className="profile-menu-details">
+              <div>
+                <dt>Função</dt>
+                <dd>{profileRole}</dd>
+              </div>
+              <div>
+                <dt>Estado</dt>
+                <dd>{profileState}</dd>
+              </div>
+            </dl>
+
+            <div className="profile-menu-divider" />
+            <button
+              className="profile-logout-button"
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setProfileMenuOpen(false)
+                onLogout()
+              }}
+            >
+              <Icon name="logout" />
+              <span>Sair</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )

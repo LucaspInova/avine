@@ -11,6 +11,8 @@ feitas por migrations, testadas localmente e nunca por reset do banco remoto.
 - `nfd_itens`: fonte sincronizada de notas e produtos.
 - `produtos` e `produtos_expandidos`: catalogo vinculado aos codigos da NFD.
 - `fstd_processos`, `fstd_produtos` e `fstd_produto_motivos`: fluxo FSTD atual.
+- `fstd_documentos`: número de controle curto e imutável, snapshot dos produtos
+  e caminho do PDF persistido por FSTD.
 - `nfd_desconhecimentos`: declaracoes de NFD nao reconhecida.
 - `motivos_devolucao`: catalogo administravel de motivos.
 - `nfd_logs`: log interno da sincronizacao.
@@ -42,6 +44,8 @@ As quatro operacoes transacionais atuais sao:
 - `concluir_fstd_produto(uuid, jsonb, text, jsonb)`;
 - `editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb)`;
 - `finalizar_fstd_produtos(uuid)`.
+- `get_or_create_fstd_document(uuid)` e `set_fstd_document_pdf(uuid, text, jsonb)`
+  criam/recuperam o documento PDF sem recalcular o número de controle.
 
 Elas usam `SECURITY DEFINER`, `search_path = ''`, referencias qualificadas e
 validacao explicita de `auth.uid()`. A RPC v2 deriva numero, produtos e
@@ -59,6 +63,8 @@ frontend nao consegue forjar produtos ou quantidades.
 - o helper recursivo de autorizacao fica em `app_private`, fora da Data API;
 - views expostas usam `security_invoker = true`;
 - o bucket `fstd-fotos` e privado;
+- o bucket `fstd-pdfs` e privado; o PDF e gerado no primeiro acesso a uma FSTD
+  concluida, salvo uma vez e aberto depois por URL assinada;
 - Promotores escrevem e excluem apenas na propria pasta;
 - Promotores leem suas fotos e Gerenciais ativos leem todas as evidencias.
 

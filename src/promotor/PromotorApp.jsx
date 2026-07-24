@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
 import { supabase } from '../lib/supabaseClient'
+import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
 import avineLogo from '../assets/foto_logoavine.png'
 import {
@@ -292,10 +293,122 @@ function filterBySearch(items, search, fields) {
   )
 }
 
-function AppHeader({ title, onBack, onLogout, onMenu }) {
+function getProfileInitials(profile) {
+  const initials = profile?.nome
+    ?.split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+
+  return initials || 'PR'
+}
+
+function MobileProfileMenu({ profile, profilePhoto, onLogout, onUploadPhoto, photoBusy }) {
+  const [photoError, setPhotoError] = useState('')
+
+  async function handlePhotoChange(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !onUploadPhoto) return
+
+    setPhotoError('')
+
+    try {
+      await onUploadPhoto(file)
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Não foi possível atualizar a foto.')
+    }
+  }
+
+  return (
+    <div className="mobile-profile-menu" role="menu" aria-label="Informações do perfil">
+      <div className="mobile-profile-menu-info">
+        <label className={`mobile-profile-photo-picker${photoBusy ? ' is-uploading' : ''}`} title="Adicionar foto de perfil">
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            disabled={photoBusy}
+            onChange={handlePhotoChange}
+            type="file"
+          />
+          <span className="mobile-profile-avatar">
+            {profilePhoto ? <img src={profilePhoto} alt="Foto do perfil" /> : getProfileInitials(profile)}
+          </span>
+          <span className="mobile-profile-photo-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7.5A1.5 1.5 0 0 1 5.5 6h2l1-1.5h7L16.5 6h2A1.5 1.5 0 0 1 20 7.5v10A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-10Z" />
+              <circle cx="12" cy="12.5" r="3.2" />
+            </svg>
+          </span>
+        </label>
+        <div className="mobile-profile-menu-copy">
+          <strong>{profile?.nome ?? 'Usuário'}</strong>
+          <span>{profile?.email ?? 'E-mail não informado'}</span>
+        </div>
+      </div>
+      {photoError && <span className="mobile-profile-photo-error">{photoError}</span>}
+
+      <dl className="mobile-profile-menu-details">
+        <div>
+          <dt>Função</dt>
+          <dd>{profile?.perfil ?? 'Promotor'}</dd>
+        </div>
+        <div>
+          <dt>Estado</dt>
+          <dd>{profile?.estado || 'Não informado'}</dd>
+        </div>
+      </dl>
+
+      <div className="mobile-profile-menu-divider" />
+      <button className="mobile-profile-logout" type="button" role="menuitem" onClick={onLogout}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H10" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 8l4 4-4 4M17 12H9" />
+        </svg>
+        <span>Sair</span>
+      </button>
+    </div>
+  )
+}
+
+function AppHeader({
+  title,
+  onBack,
+  onLogout,
+  onMenu,
+  onUploadPhoto,
+  photoBusy,
+  profile,
+  profilePhoto,
+  profileMenuOpen,
+  onCloseProfileMenu,
+}) {
+  const profileControlRef = useRef(null)
+
+  useEffect(() => {
+    if (!profileMenuOpen || !onCloseProfileMenu) return undefined
+
+    function handlePointerDown(event) {
+      if (!profileControlRef.current?.contains(event.target)) onCloseProfileMenu()
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onCloseProfileMenu()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onCloseProfileMenu, profileMenuOpen])
+
   return (
     <header className="mobile-header">
-      <div className="mobile-titlebar">
+      <div className={`mobile-titlebar ${onBack ? 'has-back' : 'no-back'}`}>
         {onBack ? (
           <button className="mobile-icon-button" type="button" onClick={onBack} aria-label="Voltar">
             ‹
@@ -305,12 +418,36 @@ function AppHeader({ title, onBack, onLogout, onMenu }) {
         )}
         <strong>{title}</strong>
         {onMenu ? (
-          <button className="mobile-user-menu-button" type="button" onClick={onMenu} aria-label="Abrir perfil e opções" title="Perfil e opções">
-            <svg className="mobile-user-menu-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-              <circle cx="12" cy="8" r="3.3" />
-              <path strokeLinecap="round" d="M5.5 19c.8-3.2 3.1-5 6.5-5s5.7 1.8 6.5 5" />
-            </svg>
-          </button>
+          <div className="mobile-profile-control" ref={profileControlRef}>
+            <button
+              className={`mobile-profile-trigger ${profileMenuOpen ? 'is-open' : ''}`}
+              type="button"
+              onClick={onMenu}
+              aria-expanded={profileMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Abrir perfil e opções"
+              title="Perfil e opções"
+            >
+              <span className="mobile-profile-avatar">
+                {profilePhoto ? <img src={profilePhoto} alt="" /> : getProfileInitials(profile)}
+              </span>
+              <span className="mobile-profile-trigger-copy">
+                <strong>{profile?.nome ?? 'Usuário'}</strong>
+                <small>{profile?.perfil ?? 'Promotor'}</small>
+              </span>
+              <span className="mobile-profile-chevron" aria-hidden="true" />
+            </button>
+
+            {profileMenuOpen && (
+              <MobileProfileMenu
+                onLogout={onLogout}
+                onUploadPhoto={onUploadPhoto}
+                photoBusy={photoBusy}
+                profile={profile}
+                profilePhoto={profilePhoto}
+              />
+            )}
+          </div>
         ) : onLogout ? (
           <button className="mobile-icon-button mobile-logout-button" type="button" onClick={onLogout} aria-label="Sair" title="Sair">
             <svg
@@ -584,13 +721,38 @@ function ProfileScreen({ profile, onBack, onLogout, onUploadPhoto, photoBusy }) 
   )
 }
 
-function StoresScreen({ stores, nfds, loading, search, onSearch, onMenu, onOpenStore }) {
+function StoresScreen({
+  stores,
+  nfds,
+  loading,
+  search,
+  onSearch,
+  onMenu,
+  onCloseProfileMenu,
+  onLogout,
+  onUploadPhoto,
+  photoBusy,
+  profile,
+  profileMenuOpen,
+  profilePhoto,
+  onOpenStore,
+}) {
   const query = search.trim().toLowerCase()
   const filteredStores = filterBySearch(stores, query, ['nome', 'codigo', 'cidade', 'uf'])
 
   return (
     <main className="promotor-app">
-      <AppHeader title="Lojas" onMenu={onMenu} />
+      <AppHeader
+        title="Lojas"
+        onMenu={onMenu}
+        onCloseProfileMenu={onCloseProfileMenu}
+        onLogout={onLogout}
+        onUploadPhoto={onUploadPhoto}
+        photoBusy={photoBusy}
+        profile={profile}
+        profileMenuOpen={profileMenuOpen}
+        profilePhoto={profilePhoto}
+      />
 
       <section className="mobile-card stores-card">
         <SearchField value={search} onChange={onSearch} />
@@ -912,7 +1074,6 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
     const observacao = [
       form.notaVenda.trim() ? `Nota de venda: ${form.notaVenda.trim()}` : '',
       form.lotes.trim() ? `Lotes: ${form.lotes.trim()}` : '',
-      form.fotos.length > 0 ? `Fotos selecionadas: ${form.fotos.map((file) => file.name).join(', ')}` : '',
     ].filter(Boolean).join('\n')
 
     onSubmit({
@@ -1100,10 +1261,32 @@ function getFstdStoredPhotoPaths(product) {
     : []
 }
 
-function getEditableObservation(value) {
+function cleanLegacyPhotoObservation(value) {
   return String(value ?? '')
-    .replace(/^(?:Observações:\s*)+/i, '')
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*Fotos selecionadas\s*:/i.test(line))
+    .join('\n')
     .trim()
+}
+
+async function getFstdPhotoUrls(process) {
+  const paths = [...new Set((process?.produtos ?? []).flatMap((product) => (
+    Array.isArray(product.fotos) ? product.fotos : []
+  )))]
+
+  return Promise.all(paths.map(async (path) => {
+    if (/^https?:\/\//i.test(path)) return { path, url: path }
+
+    const { data, error } = await supabase.storage
+      .from('fstd-fotos')
+      .createSignedUrl(path, 3600)
+
+    return { path, url: error ? '' : data?.signedUrl ?? '' }
+  }))
+}
+
+function getEditableObservation(value) {
+  return cleanLegacyPhotoObservation(String(value ?? '').replace(/^(?:Observações:\s*)+/i, ''))
 }
 
 function FstdStoredPhotos({ paths, removable = false, onRemove }) {
@@ -1478,9 +1661,36 @@ function FstdProductSummary({ store, nfd, product, motivos, canEdit, error, onBa
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, onBack, onSubmitProduct, onFinalize }) {
+function FstdDocumentPreview({ document, onClose }) {
+  if (!document) return null
+
+  return (
+    <div className="fstd-document-layer" role="dialog" aria-modal="true" aria-label="Pré-visualização do FSTD">
+      <button className="fstd-document-backdrop" onClick={onClose} type="button" aria-label="Fechar pré-visualização" />
+      <section className="fstd-document-dialog">
+        <header className="fstd-document-header">
+          <div>
+            <strong>FSTD {document.controlNumber}</strong>
+            <span>Pré-visualização do PDF</span>
+          </div>
+          <button onClick={onClose} type="button" aria-label="Fechar">×</button>
+        </header>
+        <iframe className="fstd-document-frame" src={document.url} title={`FSTD ${document.controlNumber}`} />
+        <footer className="fstd-document-footer">
+          <a href={document.url} download={`FSTD-${document.controlNumber}.pdf`} rel="noreferrer" target="_blank">
+            Baixar PDF
+          </a>
+          <button onClick={onClose} type="button">Fechar</button>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onSubmitProduct, onFinalize, onViewDocument }) {
   const [selectedProductCode, setSelectedProductCode] = useState(null)
   const [selectedProductMode, setSelectedProductMode] = useState(null)
+  const [documentPreview, setDocumentPreview] = useState(null)
   const processProducts = process?.produtos ?? []
   const persistedByCode = new Map(processProducts.map((product) => [product.codigo_produto, product]))
   const products = (nfd?.produtos ?? []).map((product) => ({
@@ -1537,8 +1747,14 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, o
     )
   }
 
+  async function handleViewDocument() {
+    const preview = await onViewDocument()
+    if (preview) setDocumentPreview(preview)
+  }
+
   return (
-    <main className="promotor-app fstd-app fstd-list-page">
+    <>
+      <main className="promotor-app fstd-app fstd-list-page">
       <header className="fstd-list-topbar">
         <button type="button" onClick={onBack}>‹</button>
         <strong>FSTD</strong>
@@ -1583,13 +1799,21 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, o
         })}
       </div>
 
-      {error && <strong className="promotor-error fstd-list-error">{error}</strong>}
+      {(error || documentError) && <strong className="promotor-error fstd-list-error">{error || documentError}</strong>}
       {allCompleted && (
-        <button className="fstd-finalize-button" disabled={finalizeBusy} onClick={onFinalize} type="button">
-          {finalizeBusy ? 'Finalizando...' : 'Finalizar'}
-        </button>
+        processFinalized ? (
+          <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
+            {documentBusy ? 'Abrindo...' : 'Ver FSTD'}
+          </button>
+        ) : (
+          <button className="fstd-finalize-button" disabled={finalizeBusy} onClick={onFinalize} type="button">
+            {finalizeBusy ? 'Finalizando...' : 'Finalizar'}
+          </button>
+        )
       )}
-    </main>
+      </main>
+      <FstdDocumentPreview document={documentPreview} onClose={() => setDocumentPreview(null)} />
+    </>
   )
 }
 
@@ -1603,7 +1827,31 @@ function PromotorWorkspace({ profile, onLogout }) {
   const [nfdSearch, setNfdSearch] = useState(() => savedNavigation?.nfdSearch ?? '')
   const [statusFilter, setStatusFilter] = useState(() => savedNavigation?.statusFilter ?? 'atrasada')
   const [unknownNfdComments, setUnknownNfdComments] = useState(() => readUnknownNfdComments(profile.id))
-  const [isProfileOpen, setProfileOpen] = useState(false)
+  const [isProfilePageOpen, setProfilePageOpen] = useState(false)
+  const [isProfileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [profilePhoto, setProfilePhoto] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    if (!profile?.foto_url) {
+      return () => {
+        active = false
+      }
+    }
+
+    getProfilePhotoSignedUrl(profile.foto_url)
+      .then((url) => {
+        if (active) setProfilePhoto(url)
+      })
+      .catch(() => {
+        if (active) setProfilePhoto('')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [profile?.foto_url])
 
   useEffect(() => {
     savePromotorNavigation(profile.id, {
@@ -1699,7 +1947,7 @@ function PromotorWorkspace({ profile, onLogout }) {
       const processIds = processos.map((processo) => processo.id)
       const { data: produtos, error: produtosError } = await supabase
         .from('fstd_produtos')
-        .select('id, processo_id, codigo_produto, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
+        .select('id, processo_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
         .in('processo_id', processIds)
 
       if (produtosError) throw produtosError
@@ -1855,7 +2103,7 @@ function PromotorWorkspace({ profile, onLogout }) {
             quantidade_faturada: division.faturado,
             quantidade_retorno: division.retorno,
           })),
-          p_observacao: observacao,
+          p_observacao: cleanLegacyPhotoObservation(observacao) || null,
           p_fotos: [...existingPaths, ...uploadedPaths],
         }
 
@@ -1907,6 +2155,78 @@ function PromotorWorkspace({ profile, onLogout }) {
     },
   })
 
+  const fstdDocumentMutation = useMutation({
+    mutationFn: async () => {
+      const processoId = currentFstdTarget?.fstd_process_id
+      if (!processoId || currentFstdTarget?.fstd_process?.status !== 'concluida') {
+        throw new Error('Finalize a FSTD antes de gerar o documento.')
+      }
+
+      const { data: documentData, error: documentError } = await supabase.rpc('get_or_create_fstd_document', {
+        p_processo_id: processoId,
+      })
+      if (documentError) throw documentError
+
+      let document = Array.isArray(documentData) ? documentData[0] : documentData
+      if (!document) throw new Error('Não foi possível localizar o documento FSTD.')
+
+      const pdfNeedsRefresh = !document.pdf_path
+        || Number(document.pdf_metadata?.template_version ?? 0) !== FSTD_PDF_TEMPLATE_VERSION
+
+      if (pdfNeedsRefresh) {
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError) throw authError
+        if (!authData.user) throw new Error('Sessão expirada. Entre novamente para visualizar o FSTD.')
+
+        const photoUrls = await getFstdPhotoUrls(currentFstdTarget.fstd_process)
+        const pdfBlob = await generateFstdPdf({
+          document,
+          process: currentFstdTarget.fstd_process,
+          nfd: currentFstdTarget,
+          store: selectedStore,
+          responsible: profile.nome,
+          motivos: motivosQuery.data ?? [],
+          photoUrls,
+        })
+        const pdfPath = `${authData.user.id}/${processoId}/${document.numero_controle}.pdf`
+        const { error: uploadError } = await supabase.storage
+          .from('fstd-pdfs')
+          .upload(pdfPath, pdfBlob, { contentType: 'application/pdf', upsert: true })
+
+        if (uploadError && !/already exists|duplicate/i.test(uploadError.message ?? '')) {
+          throw uploadError
+        }
+
+        const { data: savedDocument, error: saveError } = await supabase.rpc('set_fstd_document_pdf', {
+          p_document_id: document.id,
+          p_pdf_path: pdfPath,
+          p_pdf_metadata: {
+            template_version: FSTD_PDF_TEMPLATE_VERSION,
+            processo_id: processoId,
+            nfd_chave_acesso: currentFstdTarget.chave_acesso,
+            nfd_numero: currentFstdTarget.nota_fiscal,
+            loja: selectedStore,
+            produtos: currentFstdTarget.fstd_process?.produtos ?? [],
+          },
+        })
+        if (saveError) throw saveError
+        document = Array.isArray(savedDocument) ? savedDocument[0] : savedDocument
+      }
+
+      if (!document?.pdf_path) throw new Error('O PDF FSTD não foi salvo no Storage.')
+
+      const { data: signedUrl, error: signedUrlError } = await supabase.storage
+        .from('fstd-pdfs')
+        .createSignedUrl(document.pdf_path, 60 * 60)
+      if (signedUrlError) throw signedUrlError
+
+      return {
+        controlNumber: document.numero_controle,
+        url: signedUrl.signedUrl,
+      }
+    },
+  })
+
   const desconhecerMutation = useMutation({
     mutationFn: async ({ nfd, comment }) => {
       if (!nfd.loja_id) throw new Error('Não foi possível identificar a loja desta NFD.')
@@ -1955,6 +2275,12 @@ function PromotorWorkspace({ profile, onLogout }) {
     },
   })
 
+  async function handleProfilePhotoUpload(file) {
+    const uploaded = await profilePhotoMutation.mutateAsync(file)
+    setProfilePhoto(uploaded.signedUrl)
+    return uploaded
+  }
+
   const pageError = storesQuery.error?.message
     || nfdsQuery.error?.message
     || produtosCatalogQuery.error?.message
@@ -1962,13 +2288,13 @@ function PromotorWorkspace({ profile, onLogout }) {
     || desconhecimentosQuery.error?.message
     || motivosQuery.error?.message
 
-  if (isProfileOpen) {
+  if (isProfilePageOpen) {
     return (
       <ProfileScreen
         profile={profile}
-        onBack={() => setProfileOpen(false)}
+          onBack={() => setProfilePageOpen(false)}
         onLogout={onLogout}
-        onUploadPhoto={(file) => profilePhotoMutation.mutateAsync(file)}
+        onUploadPhoto={handleProfilePhotoUpload}
         photoBusy={profilePhotoMutation.isPending}
       />
     )
@@ -1984,9 +2310,12 @@ function PromotorWorkspace({ profile, onLogout }) {
         busy={fstdProductMutation.isPending}
         error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
         finalizeBusy={finalizarFstdMutation.isPending}
+        documentBusy={fstdDocumentMutation.isPending}
+        documentError={fstdDocumentMutation.error?.message}
         onBack={() => setFstdTarget(undefined)}
         onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
         onFinalize={() => finalizarFstdMutation.mutate()}
+        onViewDocument={() => fstdDocumentMutation.mutateAsync()}
       />
     )
   }
@@ -2058,8 +2387,16 @@ function PromotorWorkspace({ profile, onLogout }) {
         loading={storesQuery.isLoading || nfdsQuery.isLoading}
         search={storeSearch}
         onSearch={setStoreSearch}
-        onMenu={() => setProfileOpen(true)}
+        onMenu={() => setProfileMenuOpen((open) => !open)}
+        onCloseProfileMenu={() => setProfileMenuOpen(false)}
+        onLogout={onLogout}
+        onUploadPhoto={handleProfilePhotoUpload}
+        photoBusy={profilePhotoMutation.isPending}
+        profile={profile}
+        profileMenuOpen={isProfileMenuOpen}
+        profilePhoto={profilePhoto}
         onOpenStore={(store) => {
+          setProfileMenuOpen(false)
           setSelectedStore(store)
           setStatusFilter('atrasada')
         }}
