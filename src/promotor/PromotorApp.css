@@ -1173,7 +1173,7 @@
   display: flex;
   align-items: stretch;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 
@@ -1184,7 +1184,8 @@
 .nfd-actions button {
   display: grid;
   place-items: center;
-  width: 115px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 50px;
   border: 0;
   border-radius: 8px;

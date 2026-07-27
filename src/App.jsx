@@ -14,19 +14,36 @@ import {
   uploadProfilePhoto,
   validateProfilePhoto,
 } from './lib/profilePhoto'
+import { sortStoresByCode } from './lib/storeSorting'
 import avineLogo from './assets/foto_logoavine.png'
 import profileUserIcon from './assets/ui-icons/do-utilizador.png'
 import LogoutConfirmDialog from './components/LogoutConfirmDialog.jsx'
 import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
+const estadosLojas = [...estados, 'TO']
 const perfis = ['Promotor', 'Entregador']
+const perfisFiltro = ['Gerencial', ...perfis]
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
 ]
+
+const gerencialScreenIds = ['usuarios', 'lojas']
+const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
+
+function getInitialGerencialScreen() {
+  if (typeof window === 'undefined') return 'lojas'
+
+  try {
+    const savedScreen = window.localStorage.getItem(gerencialScreenStorageKey)
+    return gerencialScreenIds.includes(savedScreen) ? savedScreen : 'lojas'
+  } catch {
+    return 'lojas'
+  }
+}
 
 const initialUserForm = {
   email: '',
@@ -634,7 +651,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
   const cidade = normalizaTexto(form.cidade)
   const isCodigoValid = codigo.length > 0 && !isCodigoDuplicado(codigo, lojas)
   const isNomeValid = nome.length > 0
-  const isUfValid = estados.includes(form.uf)
+  const isUfValid = estadosLojas.includes(form.uf)
   const isCidadeValid = cidade.length > 0
   const canSubmit = isCodigoValid && isNomeValid && isUfValid && isCidadeValid && !busy
 
@@ -677,7 +694,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
             <fieldset>
               <legend>UF Estado</legend>
               <div className="chip-group state-chips">
-                {estados.map((estado) => (
+                {estadosLojas.map((estado) => (
                   <button
                     key={estado}
                     className={`choice-chip ${form.uf === estado ? 'is-selected' : ''}`}
@@ -803,10 +820,11 @@ function EditarUsuarioModal({
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isNameValid = trimmedName.length >= 4
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
+  const isPasswordValid = !form.senha || form.senha.length >= 12
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
-    isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy && !deleting
+    isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy && !deleting && isPasswordValid
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -853,6 +871,25 @@ function EditarUsuarioModal({
             />
             {trimmedEmail && !isEmailValid && (
               <strong className="field-error">Insira um endereço de e-mail válido.</strong>
+            )}
+          </label>
+
+          <label className="edit-field">
+            <span>
+              Nova senha
+              <small>Opcional</small>
+            </span>
+            <input
+              className={form.senha && !isPasswordValid ? 'is-invalid' : ''}
+              value={form.senha}
+              onChange={(event) => onChange({ senha: event.target.value })}
+              minLength={12}
+              type="password"
+              autoComplete="new-password"
+              placeholder="Deixe vazio para manter"
+            />
+            {form.senha && !isPasswordValid && (
+              <strong className="field-error">A nova senha deve ter pelo menos 12 caracteres.</strong>
             )}
           </label>
 
@@ -922,11 +959,11 @@ function EditarUsuarioModal({
   )
 }
 
-function UserFilterPopover({ selected, onToggle, onClear, onClose }) {
+function UserFilterPopover({ selectedEstados, selectedPerfis, onToggleEstado, onTogglePerfil, onClear, onClose }) {
   return (
     <div className="filter-popover">
       <div className="filter-title">
-        <strong>Estado</strong>
+        <strong>Filtrar por Estado</strong>
         <span className="filter-chevron" />
       </div>
 
@@ -934,7 +971,29 @@ function UserFilterPopover({ selected, onToggle, onClear, onClose }) {
         {estados.map((estado) => (
           <label key={estado} className="filter-option">
             <span>{estado}</span>
-            <input checked={selected.includes(estado)} onChange={() => onToggle(estado)} type="checkbox" />
+            <input
+              checked={selectedEstados.includes(estado)}
+              onChange={() => onToggleEstado(estado)}
+              type="checkbox"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="filter-title profile-filter-title">
+        <strong>Filtrar por Perfil</strong>
+        <span className="filter-chevron" />
+      </div>
+
+      <div className="filter-options profile-filter-options">
+        {perfisFiltro.map((perfil) => (
+          <label key={perfil} className="filter-option">
+            <span>{perfil}</span>
+            <input
+              checked={selectedPerfis.includes(perfil)}
+              onChange={() => onTogglePerfil(perfil)}
+              type="checkbox"
+            />
           </label>
         ))}
       </div>
@@ -969,7 +1028,7 @@ function StoreFilterPopover({
             <span className="filter-chevron" />
           </div>
           <div className="filter-options">
-            {estados.map((estado) => (
+            {estadosLojas.map((estado) => (
               <label key={estado} className="filter-option">
                 <span>{estado}</span>
                 <input checked={selectedUfs.includes(estado)} onChange={() => onToggleUf(estado)} type="checkbox" />
@@ -1821,7 +1880,7 @@ function App() {
     refreshProfile,
   } = useAuth()
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
-  const [selectedItem, setSelectedItem] = useState('lojas')
+  const [selectedItem, setSelectedItem] = useState(getInitialGerencialScreen)
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1832,6 +1891,7 @@ function App() {
   const [isCadastroOpen, setCadastroOpen] = useState(false)
   const [isFilterOpen, setFilterOpen] = useState(false)
   const [selectedEstados, setSelectedEstados] = useState([])
+  const [selectedPerfis, setSelectedPerfis] = useState([])
   const [form, setForm] = useState(initialUserForm)
   const [selectedUsuario, setSelectedUsuario] = useState(null)
   const [editForm, setEditForm] = useState(initialUserForm)
@@ -1861,6 +1921,17 @@ function App() {
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
   const [profilePhoto, setProfilePhoto] = useState('')
+
+  useEffect(() => {
+    if (currentUser?.perfil !== 'Gerencial') return
+
+    try {
+      window.localStorage.setItem(gerencialScreenStorageKey, selectedItem)
+    } catch {
+      // A navegaÃ§Ã£o continua funcionando mesmo sem persistÃªncia local.
+    }
+  }, [currentUser?.perfil, selectedItem])
+
   async function loadUsuarios() {
     setLoading(true)
     setError('')
@@ -1875,15 +1946,33 @@ function App() {
     setLoading(false)
   }
 
+  async function listAllLojas() {
+    const pageSize = 1000
+    const allLojas = []
+
+    for (let page = 0; ; page += 1) {
+      const from = page * pageSize
+      const { data, error } = await supabase
+        .from('lojas')
+        .select('id, codigo, nome, uf, cidade, created_at')
+        .order('codigo', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (error) throw error
+
+      allLojas.push(...(data ?? []))
+      if ((data ?? []).length < pageSize) return allLojas
+    }
+  }
+
   async function loadLojas() {
     setLojasLoading(true)
     setLojasError('')
 
     const [lojasResult, usuariosResult, vinculosResult] = await Promise.all([
-      supabase
-        .from('lojas')
-        .select('id, codigo, nome, uf, cidade, created_at')
-        .order('codigo', { ascending: true }),
+      listAllLojas()
+        .then((data) => ({ data, error: null }))
+        .catch((error) => ({ data: [], error })),
       listManagedUsers()
         .then((data) => ({ data, error: null }))
         .catch((error) => ({ data: [], error })),
@@ -1901,7 +1990,7 @@ function App() {
       setPromotores([])
       setLojaPromotores([])
     } else {
-      setLojas(lojasResult.data ?? [])
+      setLojas(sortStoresByCode(lojasResult.data))
       setPromotores(
         (usuariosResult.data ?? []).filter(
           (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,
@@ -1969,10 +2058,11 @@ function App() {
       const searchText = `${usuario.nome} ${usuario.email} ${usuario.estado} ${usuario.perfil}`.toLowerCase()
       const matchesSearch = !query || searchText.includes(query)
       const matchesEstado = selectedEstados.length === 0 || selectedEstados.includes(usuario.estado)
+      const matchesPerfil = selectedPerfis.length === 0 || selectedPerfis.includes(usuario.perfil)
 
-      return matchesSearch && matchesEstado
+      return matchesSearch && matchesEstado && matchesPerfil
     })
-  }, [search, selectedEstados, usuarios])
+  }, [search, selectedEstados, selectedPerfis, usuarios])
 
   const vinculosPorLoja = useMemo(() => {
     return lojaPromotores.reduce((acc, vinculo) => {
@@ -1982,7 +2072,10 @@ function App() {
     }, {})
   }, [lojaPromotores])
 
-  const activeFilterLabel = selectedEstados.length ? `${selectedEstados.length} UF` : 'Filtrar'
+  const activeFilterParts = []
+  if (selectedEstados.length) activeFilterParts.push(`${selectedEstados.length} UF`)
+  if (selectedPerfis.length) activeFilterParts.push(`${selectedPerfis.length} perfil${selectedPerfis.length > 1 ? 'is' : ''}`)
+  const activeFilterLabel = activeFilterParts.length ? activeFilterParts.join(' · ') : 'Filtrar'
   const isPerfil = selectedItem === 'perfil'
   const isLojas = selectedItem === 'lojas'
   const isUsuarios = selectedItem === 'usuarios'
@@ -2111,7 +2204,7 @@ function App() {
       !payload.codigo ||
       isCodigoDuplicado(payload.codigo, lojas) ||
       !payload.nome ||
-      !estados.includes(payload.uf) ||
+      !estadosLojas.includes(payload.uf) ||
       !payload.cidade
     ) {
       setLojaFormError(
@@ -2267,6 +2360,7 @@ function App() {
       perfil: editForm.perfil,
       estado: editForm.estado,
       fotos_habilitadas: editForm.fotos_habilitadas,
+      ...(editForm.senha ? { password: editForm.senha } : {}),
     }
 
     if (
@@ -2447,6 +2541,12 @@ function App() {
   function toggleEstado(estado) {
     setSelectedEstados((current) =>
       current.includes(estado) ? current.filter((item) => item !== estado) : [...current, estado],
+    )
+  }
+
+  function togglePerfil(perfil) {
+    setSelectedPerfis((current) =>
+      current.includes(perfil) ? current.filter((item) => item !== perfil) : [...current, perfil],
     )
   }
 
@@ -2632,9 +2732,14 @@ function App() {
 
                   {isFilterOpen && (
                     <UserFilterPopover
-                      selected={selectedEstados}
-                      onToggle={toggleEstado}
-                      onClear={() => setSelectedEstados([])}
+                      selectedEstados={selectedEstados}
+                      selectedPerfis={selectedPerfis}
+                      onToggleEstado={toggleEstado}
+                      onTogglePerfil={togglePerfil}
+                      onClear={() => {
+                        setSelectedEstados([])
+                        setSelectedPerfis([])
+                      }}
                       onClose={() => setFilterOpen(false)}
                     />
                   )}

@@ -31,9 +31,9 @@
 
 .avine-login-logo {
   display: block;
-  width: clamp(210px, 20vw, 300px);
-  height: 132px;
-  margin-bottom: clamp(24px, 4vh, 46px);
+  width: min(460px, 100%);
+  height: 250px;
+  margin-bottom: clamp(4px, 1vh, 12px);
   object-fit: contain;
   object-position: center;
 }
@@ -64,7 +64,7 @@
 
 .avine-login-curve-top {
   position: absolute;
-  top: -360px;
+  top: -410px;
   left: -255px;
   width: 780px;
   height: 500px;
@@ -478,9 +478,9 @@
   }
 
   .avine-login-logo {
-    width: 208px;
-    height: 95px;
-    margin: 0 auto 23px;
+    width: 300px;
+    height: 160px;
+    margin: 0 auto 12px;
   }
 
   .avine-login-brand h1 {

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider.jsx'
 import { supabase } from '../lib/supabaseClient'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
+import { sortStoresByCode } from '../lib/storeSorting'
 import LogoutConfirmDialog from '../components/LogoutConfirmDialog.jsx'
 import avineLogo from '../assets/foto_logoavine.png'
 import profileUserIcon from '../assets/ui-icons/do-utilizador.png'
@@ -2258,7 +2259,7 @@ function PromotorWorkspace({ profile, onLogout }) {
         .order('nome', { ascending: true })
 
       if (error) throw error
-      return data ?? []
+      return sortStoresByCode(data)
     },
   })
 

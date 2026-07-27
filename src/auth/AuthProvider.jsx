@@ -51,7 +51,6 @@ export function AuthProvider({ children }) {
       return null
     }
 
-    setLoading(true)
     const { data, error: profileError } = await supabase
       .from('usuarios')
       .select(profileSelect)
