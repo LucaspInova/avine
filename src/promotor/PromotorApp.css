@@ -2345,6 +2345,11 @@
   font-weight: 500;
 }
 
+.required-label {
+  color: #b8322c !important;
+  font-weight: 800 !important;
+}
+
 .mobile-field input:disabled {
   background: #ffffff;
   color: #9a9e9a;
@@ -2952,6 +2957,14 @@ button.fstd-summary-product {
   flex: 0 0 auto;
 }
 
+.fstd-product-page .fstd-form-body > .fstd-card h2 .fstd-required-label {
+  margin-left: auto;
+  color: #b8322c;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .fstd-product-page .fstd-form-body > .fstd-card:first-child h2 {
   display: none !important;
 }
@@ -3007,6 +3020,78 @@ button.fstd-summary-product {
 .fstd-product-page .fstd-quantity-hint,
 .fstd-product-page .fstd-quantity-error {
   font-size: 0.88rem;
+}
+
+.fstd-product-page .fstd-quantity-gap {
+  display: grid;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.fstd-product-page .fstd-quantity-gap > span {
+  color: #697168;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.fstd-product-page .fstd-quantity-gap > strong {
+  color: #176b31;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.fstd-product-page .fstd-quantity-gap > strong small {
+  color: #176b31;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.fstd-product-page .fstd-form-body > .fstd-billing-card {
+  gap: 10px;
+  padding: 15px 18px;
+}
+
+.fstd-product-page .fstd-billing-card .fstd-quantity-gap {
+  gap: 3px;
+  padding: 0;
+}
+
+.fstd-product-page .fstd-billing-card.is-warning {
+  border-color: #e3a3a3;
+  background: #fff8f8;
+  box-shadow: 0 3px 14px rgb(184 50 44 / 12%);
+}
+
+.fstd-product-page .fstd-billing-card.is-warning h2 .fstd-section-icon,
+.fstd-product-page .fstd-billing-card.is-warning .fstd-quantity-gap > strong,
+.fstd-product-page .fstd-billing-card.is-warning .fstd-quantity-gap > strong small {
+  color: #b8322c;
+}
+
+.fstd-product-page .fstd-billing-card.is-warning .fstd-quantity-gap > strong {
+  font-size: 2rem;
+}
+
+.fstd-product-page .fstd-billing-card.is-warning .fstd-quantity-gap > small {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #fde2e2;
+  color: #b8322c;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.fstd-product-page .fstd-billing-card.is-complete {
+  border-color: #a7d2b1;
+  background: #f7fcf8;
+}
+
+.fstd-product-page .fstd-billing-card.is-complete .fstd-quantity-gap > small {
+  color: #697168;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .fstd-product-page .fstd-add-reason {

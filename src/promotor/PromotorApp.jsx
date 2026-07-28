@@ -137,19 +137,20 @@ function getBilledCod(nfd) {
 function getNfdReturnRates(nfd) {
   const billedGal = getBilledGal(nfd)
   const billedCod = getBilledCod(nfd)
-  const billedProductsByCode = new Map(
-    (nfd?.produtos ?? []).map((product) => [
-      String(product.codigo_produto ?? '').trim().toUpperCase(),
-      product,
-    ]),
-  )
+  const billedProductsByKey = new Map()
+  const billedProductsByCode = new Map()
+  for (const product of nfd?.produtos ?? []) {
+    billedProductsByKey.set(getProductGroupKey(product), product)
+    for (const code of product.codigos_produto ?? [product.codigo_produto]) {
+      billedProductsByCode.set(normalizeProductCode(code), product)
+    }
+  }
   let returnedGal = 0
   let returnedCod = 0
 
   for (const returnedProduct of nfd?.fstd_process?.produtos ?? []) {
-    const billedProduct = billedProductsByCode.get(
-      String(returnedProduct.codigo_produto ?? '').trim().toUpperCase(),
-    )
+    const billedProduct = billedProductsByKey.get(getProductGroupKey(returnedProduct))
+      ?? billedProductsByCode.get(normalizeProductCode(returnedProduct.codigo_produto))
     const productBilledGal = Number(
       returnedProduct.quantidade_faturada_galinha ?? billedProduct?.quantidade_faturada_galinha ?? 0,
     )
@@ -184,49 +185,110 @@ function formatReturnPercentage(value) {
   return String(Math.round(Number(value) || 0))
 }
 
+function normalizeProductCode(value) {
+  return String(value ?? '')
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .toUpperCase()
+}
+
+function getProductGroupKey(product) {
+  const productId = String(product?.produto_id ?? '').trim()
+  if (productId) return `produto:${productId}`
+
+  const codes = Array.isArray(product?.codigos_produto)
+    ? product.codigos_produto
+    : [product?.codigo_produto]
+  const code = normalizeProductCode(codes.find(Boolean))
+  return code ? `codigo:${code}` : ''
+}
+
+function getCatalogProductKey(product) {
+  return getProductGroupKey(product)
+}
+
+function groupCatalogProducts(products) {
+  const productsByKey = new Map()
+
+  for (const product of products ?? []) {
+    const code = normalizeProductCode(product.codigo_produto)
+    const key = getCatalogProductKey({ ...product, codigo_produto: code })
+    if (!key || !code) continue
+
+    const current = productsByKey.get(key)
+    if (current) {
+      if (!current.codigos_produto.includes(code)) current.codigos_produto.push(code)
+      current.codigos_busca = current.codigos_produto.join(' ')
+      continue
+    }
+
+    productsByKey.set(key, {
+      ...product,
+      produto_id: product.produto_id ?? null,
+      codigo_produto: code,
+      codigos_produto: [code],
+      codigos_busca: code,
+    })
+  }
+
+  return [...productsByKey.values()]
+}
+
 function getProductImageCandidates(value) {
   const url = String(value ?? '').trim()
   if (!url) return []
 
-  const id = url.match(/[?&]id=([^&#]+)/i)?.[1]
+  const rawId = url.match(/[?&]id=([^&#]+)/i)?.[1]
     || url.match(/(?:drive|docs)\.google\.com\/(?:file|document)\/d\/([^/?#=]+)/i)?.[1]
     || url.match(/googleusercontent\.com\/d\/([^/?#=]+)/i)?.[1]
+  const id = rawId ? decodeURIComponent(rawId) : ''
 
   if (!id) return [url]
 
   const driveCandidates = [
-    `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
-    `https://drive.google.com/uc?export=view&id=${id}`,
     `https://lh3.googleusercontent.com/d/${id}=w1000`,
+    `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
+    `https://drive.usercontent.google.com/download?id=${id}&export=view`,
+    `https://drive.google.com/uc?export=view&id=${id}`,
   ]
 
-  const isDrivePreviewPage = /(?:drive|docs)\.google\.com\/(?:file|document)\/d\//i.test(url)
-  return [...new Set(isDrivePreviewPage ? driveCandidates : [url, ...driveCandidates])]
+  return [...new Set([...driveCandidates, url])]
 }
 
 function getNfdProducts(nfd, productsCatalog = []) {
   const catalogByCode = new Map(
-    productsCatalog.map((product) => [String(product.codigo_produto ?? '').trim().toUpperCase(), product]),
+    productsCatalog.map((product) => [normalizeProductCode(product.codigo_produto), product]),
   )
   const details = Array.isArray(nfd?.detalhes) ? nfd.detalhes : []
 
-  return details
-    .map((detail) => {
-      const codigo = String(detail?.codigo_produto ?? '').trim().toUpperCase()
-      const catalog = catalogByCode.get(codigo)
-      if (!codigo) return null
+  const productsByKey = new Map()
+  for (const detail of details) {
+    const codigo = normalizeProductCode(detail?.codigo_produto)
+    const catalog = catalogByCode.get(codigo)
+    if (!codigo) continue
 
-      return {
-        codigo_produto: codigo,
-        produto_id: catalog?.produto_id ?? null,
-        nome: catalog?.nome ?? detail?.descricao_produto ?? codigo,
-        descricao: detail?.descricao_produto ?? catalog?.nome ?? null,
-        imagem_url: catalog?.imagem_url ?? '',
-        quantidade_faturada_galinha: Number(detail?.quantidade_galinha ?? 0),
-        quantidade_faturada_codorna: Number(detail?.quantidade_codorna ?? 0),
-      }
-    })
-    .filter(Boolean)
+    const product = {
+      codigo_produto: codigo,
+      produto_id: catalog?.produto_id ?? null,
+      nome: catalog?.nome ?? detail?.descricao_produto ?? codigo,
+      descricao: detail?.descricao_produto ?? catalog?.nome ?? null,
+      imagem_url: catalog?.imagem_url ?? '',
+      quantidade_faturada_galinha: Number(detail?.quantidade_galinha ?? 0),
+      quantidade_faturada_codorna: Number(detail?.quantidade_codorna ?? 0),
+    }
+    const key = getProductGroupKey(product)
+    const current = productsByKey.get(key)
+
+    if (current) {
+      if (!current.codigos_produto.includes(codigo)) current.codigos_produto.push(codigo)
+      current.quantidade_faturada_galinha += product.quantidade_faturada_galinha
+      current.quantidade_faturada_codorna += product.quantidade_faturada_codorna
+    } else {
+      productsByKey.set(key, { ...product, codigos_produto: [codigo] })
+    }
+  }
+
+  return [...productsByKey.values()]
 }
 
 function getManualNfdKey(storeId, nfdNumber) {
@@ -249,18 +311,32 @@ function getProductBilledQuantity(product, kind) {
 
 function mergeNfdProducts(importedProducts, processProducts) {
   const productsByCode = new Map(
-    importedProducts.map((product) => [String(product.codigo_produto).trim().toUpperCase(), product]),
+    importedProducts.map((product) => [getProductGroupKey(product), product]),
   )
 
   for (const product of processProducts ?? []) {
-    const code = String(product.codigo_produto ?? '').trim().toUpperCase()
-    if (code && !productsByCode.has(code)) {
-      productsByCode.set(code, {
+    const code = normalizeProductCode(product.codigo_produto)
+    const key = getProductGroupKey(product)
+    const importedProduct = productsByCode.get(key)
+
+    if (importedProduct) {
+      productsByCode.set(key, {
+        ...importedProduct,
+        produto_id: importedProduct.produto_id ?? product.produto_id ?? null,
+        codigos_produto: [...new Set([
+          ...(importedProduct.codigos_produto ?? [importedProduct.codigo_produto]),
+          ...(code ? [code] : []),
+        ])],
+        imagem_url: importedProduct.imagem_url || product.imagem_url || '',
+      })
+    } else if (code) {
+      productsByCode.set(key, {
         codigo_produto: code,
         produto_id: product.produto_id ?? null,
         nome: product.nome ?? code,
         descricao: product.descricao ?? product.nome ?? null,
         imagem_url: product.imagem_url ?? '',
+        codigos_produto: [code],
         quantidade_faturada_galinha: Number(product.quantidade_faturada_galinha ?? 0),
         quantidade_faturada_codorna: Number(product.quantidade_faturada_codorna ?? 0),
       })
@@ -982,7 +1058,7 @@ function FstdAvulsaFlow({
   error,
   initialStep = 'nfd',
   initialNfdForm,
-  excludedProductCodes = [],
+  excludedProductKeys = [],
   isAddingProducts = false,
   onBack,
   onCreate,
@@ -994,18 +1070,19 @@ function FstdAvulsaFlow({
     dataEmissao: getLocalIsoDate(),
   }))
   const [search, setSearch] = useState('')
-  const [selectedCodes, setSelectedCodes] = useState([])
-  const excludedCodes = new Set(excludedProductCodes.map((code) => String(code).trim().toUpperCase()))
-  const availableProducts = productsCatalog.filter(
-    (product) => !excludedCodes.has(String(product.codigo_produto).trim().toUpperCase()),
+  const [selectedProductKeys, setSelectedProductKeys] = useState([])
+  const groupedProducts = useMemo(() => groupCatalogProducts(productsCatalog), [productsCatalog])
+  const excludedKeys = new Set(excludedProductKeys)
+  const availableProducts = groupedProducts.filter(
+    (product) => !excludedKeys.has(getCatalogProductKey(product)),
   )
-  const visibleProducts = filterBySearch(availableProducts, search, ['codigo_produto', 'nome', 'categoria'])
-  const canSelectProducts = selectedCodes.length > 0 && !busy
+  const visibleProducts = filterBySearch(availableProducts, search, ['codigo_produto', 'nome', 'categoria', 'codigos_busca'])
+  const canSelectProducts = selectedProductKeys.length > 0 && !busy
 
-  function toggleProduct(code) {
-    setSelectedCodes((current) => current.includes(code)
-      ? current.filter((item) => item !== code)
-      : [...current, code])
+  function toggleProduct(productKey) {
+    setSelectedProductKeys((current) => current.includes(productKey)
+      ? current.filter((item) => item !== productKey)
+      : [...current, productKey])
   }
 
   async function handleSubmitProducts(event) {
@@ -1015,12 +1092,12 @@ function FstdAvulsaFlow({
     await onCreate({
       ...nfdForm,
       produtos: availableProducts
-        .filter((product) => selectedCodes.includes(product.codigo_produto))
-        .map((product) => ({
-          codigo_produto: product.codigo_produto,
+        .filter((product) => selectedProductKeys.includes(getCatalogProductKey(product)))
+        .flatMap((product) => product.codigos_produto.map((codigo) => ({
+          codigo_produto: codigo,
           nome: product.nome,
           imagem_url: product.imagem_url,
-        })),
+        }))),
     })
   }
 
@@ -1071,7 +1148,7 @@ function FstdAvulsaFlow({
           </div>
 
           <label className="avulsa-flow-field">
-            <span>Código da NFD <small>Necessário</small></span>
+            <span>Código da NFD <small className="required-label">Obrigatório</small></span>
             <input
               autoComplete="off"
               inputMode="numeric"
@@ -1082,7 +1159,7 @@ function FstdAvulsaFlow({
           </label>
 
           <label className="avulsa-flow-field">
-            <span>Valor <small>Necessário</small></span>
+            <span>Valor <small className="required-label">Obrigatório</small></span>
             <div className="unit-input avulsa-value-input">
               <input
                 inputMode="decimal"
@@ -1136,14 +1213,14 @@ function FstdAvulsaFlow({
 
         <div className="avulsa-product-picker-list">
           {visibleProducts.map((product) => {
-            const selected = selectedCodes.includes(product.codigo_produto)
+            const productKey = getCatalogProductKey(product)
+            const selected = selectedProductKeys.includes(productKey)
             return (
-              <label className={`avulsa-product-option${selected ? ' is-selected' : ''}`} key={product.codigo_produto}>
-                <input checked={selected} onChange={() => toggleProduct(product.codigo_produto)} type="checkbox" />
+              <label className={`avulsa-product-option${selected ? ' is-selected' : ''}`} key={productKey}>
+                <input checked={selected} onChange={() => toggleProduct(productKey)} type="checkbox" />
                 <ProductImage alt={product.nome} src={product.imagem_url} />
                 <span>
                   <strong>{product.nome}</strong>
-                  <small>{product.codigo_produto}</small>
                 </span>
                 <i aria-hidden="true">{selected ? '✓' : ''}</i>
               </label>
@@ -1180,7 +1257,7 @@ function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubm
         <p className="unknown-nfd-warning">Não reconheço a procedência desta NFD.</p>
 
         <label className="unknown-nfd-comment">
-          <span>Comentário <small>Necessário</small></span>
+          <span>Comentário <small className="required-label">Obrigatório</small></span>
           <textarea
             value={comment}
             onChange={(event) => onChange(event.target.value)}
@@ -1359,12 +1436,13 @@ function FstdSectionIcon({ type }) {
   )
 }
 
-function FieldCard({ title, icon, children }) {
+function FieldCard({ title, icon, required = false, className = '', children }) {
   return (
-    <section className="fstd-card">
+    <section className={`fstd-card${className ? ` ${className}` : ''}`}>
       <h2>
         {icon && <FstdSectionIcon type={icon} />}
         <span>{title}</span>
+        {required && <small aria-label="Obrigatório" className="fstd-required-label">*</small>}
       </h2>
       {children}
     </section>
@@ -1428,7 +1506,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
             <label className="mobile-field">
               <span>
                 Motivo
-                <small>Necessário</small>
+                <small className="required-label">Obrigatório</small>
               </span>
               <select
                 value={form.motivoId}
@@ -1452,7 +1530,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
             <label className="mobile-field">
               <span>
                 Retorno
-                <small>Necessário</small>
+                <small className="required-label">Obrigatório</small>
               </span>
               <div className="unit-input">
                 <input
@@ -1475,7 +1553,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
             <label className="mobile-field">
               <span>
                 Retorno
-                <small>Necessário</small>
+                <small className="required-label">Obrigatório</small>
               </span>
               <div className="unit-input">
                 <input
@@ -1490,7 +1568,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
             </label>
           </FieldCard>
 
-          <FieldCard title="Fotos">
+          <FieldCard required title="Fotos">
             <label className="photo-button">
               <input
                 accept="image/jpeg,image/png,image/webp"
@@ -1524,8 +1602,9 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
 
 function ProductImage({ src, alt, className = '' }) {
   const [imageState, setImageState] = useState({ src: '', index: 0 })
-  const imageCandidates = getProductImageCandidates(src)
-  const candidateIndex = imageState.src === src ? imageState.index : 0
+  const normalizedSrc = String(src ?? '').trim()
+  const imageCandidates = getProductImageCandidates(normalizedSrc)
+  const candidateIndex = imageState.src === normalizedSrc ? imageState.index : 0
 
   if (imageCandidates.length === 0 || candidateIndex >= imageCandidates.length) {
     return <div className={`fstd-product-image fstd-product-image-placeholder ${className}`}>Sem imagem</div>
@@ -1535,10 +1614,13 @@ function ProductImage({ src, alt, className = '' }) {
     <img
       alt={alt}
       className={`fstd-product-image ${className}`}
+      decoding="async"
+      key={`${normalizedSrc}-${candidateIndex}`}
       onError={() => setImageState((current) => ({
-        src,
-        index: (current.src === src ? current.index : 0) + 1,
+        src: normalizedSrc,
+        index: (current.src === normalizedSrc ? current.index : 0) + 1,
       }))}
+      referrerPolicy="no-referrer"
       src={imageCandidates[candidateIndex]}
     />
   )
@@ -1551,7 +1633,7 @@ function getFstdDivisionDefaults(product) {
       .map((division) => ({
         motivoId: division.motivo_id,
         faturado: String(normalizeQuantity(division.quantidade_faturada ?? division.quantidade)),
-        retorno: String(normalizeNonNegativeQuantity(division.quantidade)),
+        retorno: '',
       }))
     : []
 
@@ -1561,14 +1643,14 @@ function getFstdDivisionDefaults(product) {
     return [{
       motivoId: product.persisted.motivo_id,
       faturado: String(product.persisted.quantidade_faturada_galinha + product.persisted.quantidade_faturada_codorna),
-      retorno: String(normalizeNonNegativeQuantity(product.persisted.quantidade_retorno)),
+      retorno: '',
     }]
   }
 
   const totalBilled = Number(product.quantidade_faturada_galinha ?? 0)
     + Number(product.quantidade_faturada_codorna ?? 0)
 
-  return [{ motivoId: '', faturado: String(Math.max(0, totalBilled)), retorno: '0' }]
+  return [{ motivoId: '', faturado: String(Math.max(0, totalBilled)), retorno: '' }]
 }
 
 function getFstdStoredPhotoPaths(product) {
@@ -1662,10 +1744,19 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
     ? normalizeQuantity(form.faturadoCodorna)
     : getProductBilledQuantity(product, 'codorna')
   const totalBilled = billedGalinha + billedCodorna
+  const totalDatabaseBilled = isAvulsa
+    ? totalBilled
+    : Number(product.quantidade_faturada_galinha ?? 0) + Number(product.quantidade_faturada_codorna ?? 0)
   const totalDivisionBilled = form.divisoes.reduce((total, division) => total + normalizeQuantity(division.faturado), 0)
   const totalReturn = form.divisoes.reduce((total, division) => total + normalizeNonNegativeQuantity(division.retorno), 0)
   const remainingBilled = Math.max(0, totalBilled - totalDivisionBilled)
-  const showGeneral = isAvulsa || totalDivisionBilled !== totalBilled
+  const remainingDatabaseBilled = Math.max(0, totalDatabaseBilled - totalDivisionBilled)
+  const showGeneral = true
+  const hasPhotos = form.fotos.length > 0 || form.fotosExistentes.length > 0
+  const avulsaQuantitiesAreFilled = !isAvulsa || (
+    String(form.faturadoGalinha).trim() !== ''
+      && String(form.faturadoCodorna).trim() !== ''
+  )
   const divisionsAreValid = form.divisoes.every(
     (division) => Boolean(division.motivoId)
       && normalizeQuantity(division.faturado) > 0
@@ -1674,8 +1765,10 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
   )
   const canSubmit = Boolean(
     totalBilled > 0
+      && avulsaQuantitiesAreFilled
       && divisionsAreValid
       && totalDivisionBilled === totalBilled
+      && hasPhotos
       && !busy,
   )
 
@@ -1712,7 +1805,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
     if (remainingBilled <= 0) return
     setForm((current) => ({
       ...current,
-      divisoes: [...current.divisoes, { motivoId: '', faturado: '', retorno: '0' }],
+      divisoes: [...current.divisoes, { motivoId: '', faturado: '', retorno: '' }],
     }))
   }
 
@@ -1783,9 +1876,9 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                 <label className="mobile-field">
                   <span>
                     {index === 0 ? 'Motivo' : `Outro motivo ${index + 1}`}
-                    <small>Necessário</small>
+                    <small aria-label="Obrigatório" className="required-label">*</small>
                   </span>
-                  <select value={division.motivoId} onChange={(event) => updateDivision(index, { motivoId: event.target.value })}>
+                  <select required value={division.motivoId} onChange={(event) => updateDivision(index, { motivoId: event.target.value })}>
                     <option value="">Selecione</option>
                     {motivos.filter((motivo) => motivo.ativo || motivo.id === division.motivoId).map((motivo) => (
                       <option
@@ -1799,13 +1892,14 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                   </select>
                 </label>
                 <label className="mobile-field">
-                  <span>Faturado</span>
+                  <span>Faturado <small aria-label="Obrigatório" className="required-label">*</small></span>
                   <div className="unit-input">
                     <input
                       max={Math.max(0, totalBilled - (totalDivisionBilled - normalizeQuantity(division.faturado)))}
                       min="1"
                       inputMode="numeric"
                       onChange={(event) => updateDivision(index, { faturado: event.target.value })}
+                      required
                       type="number"
                       value={division.faturado}
                     />
@@ -1813,13 +1907,14 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                   </div>
                 </label>
                 <label className="mobile-field">
-                  <span>Retorno</span>
+                  <span>Retorno <small aria-label="Obrigatório" className="required-label">*</small></span>
                   <div className="unit-input">
                     <input
                       max={normalizeQuantity(division.faturado)}
                       min="0"
                       inputMode="numeric"
                       onChange={(event) => updateDivision(index, { retorno: event.target.value })}
+                      required
                       type="number"
                       value={division.retorno}
                     />
@@ -1833,10 +1928,27 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                 )}
               </div>
             ))}
+            {!isAvulsa && totalDivisionBilled > 0 && remainingBilled > 0 && (
+              <button className="fstd-add-reason" onClick={addDivision} type="button">
+                + Adicionar outro motivo
+              </button>
+            )}
+            {totalDivisionBilled > totalBilled && (
+              <strong className="fstd-quantity-error">A soma dos faturados por motivo não pode passar do faturado geral.</strong>
+            )}
+            {totalReturn > totalBilled && (
+              <strong className="fstd-quantity-error">A quantidade de retorno não pode passar do faturado.</strong>
+            )}
           </FieldCard>
 
           {showGeneral && (
-            <FieldCard icon="chart" title="Geral">
+            <FieldCard
+              className={!isAvulsa
+                ? `fstd-billing-card${remainingDatabaseBilled > 0 ? ' is-warning' : ' is-complete'}`
+                : ''}
+              icon="chart"
+              title={isAvulsa ? 'Geral' : 'Faturamento'}
+            >
               {isAvulsa ? (
                 <>
                   <p className="fstd-avulsa-hint">Informe aqui a quantidade faturada na NFD física.</p>
@@ -1847,6 +1959,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                         min="0"
                         inputMode="numeric"
                         onChange={(event) => updateAvulsaBilled('faturadoGalinha', event.target.value)}
+                        required
                         type="number"
                         value={form.faturadoGalinha}
                       />
@@ -1860,6 +1973,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                         min="0"
                         inputMode="numeric"
                         onChange={(event) => updateAvulsaBilled('faturadoCodorna', event.target.value)}
+                        required
                         type="number"
                         value={form.faturadoCodorna}
                       />
@@ -1868,39 +1982,21 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
                   </label>
                 </>
               ) : (
-                <label className="mobile-field">
-                  <span>Faturado geral <small>Da nota</small></span>
-                  <input disabled value={`${totalBilled} ovos`} />
-                </label>
+                <div className="fstd-quantity-gap">
+                  <strong>{totalDivisionBilled} / {totalDatabaseBilled} <small>ovos</small></strong>
+                  <small>Faltam {remainingDatabaseBilled} ovos</small>
+                </div>
               )}
-              {totalDivisionBilled > 0 && remainingBilled > 0 && (
-                <button className="fstd-add-reason" onClick={addDivision} type="button">
-                  + Adicionar outro motivo
-                </button>
-              )}
-              <p className="fstd-quantity-breakdown">
-                Galinha: {form.faturadoGalinha} · Codorna: {form.faturadoCodorna}
-              </p>
-              <p className="fstd-quantity-breakdown">
-                Faturado por motivos: {totalDivisionBilled} de {totalBilled} ovos
-              </p>
-              <p className="fstd-return-total">
-                Retorno informado: {totalReturn} ovos
-              </p>
-              {totalDivisionBilled > totalBilled && <strong className="fstd-quantity-error">A soma dos faturados por motivo não pode passar do faturado geral.</strong>}
-              {totalDivisionBilled > 0 && totalDivisionBilled < totalBilled && (
-                <small className="fstd-quantity-hint">Distribua mais {remainingBilled} ovos nos faturados dos motivos para poder enviar.</small>
-              )}
-              {totalReturn > totalBilled && <strong className="fstd-quantity-error">A quantidade não pode passar do faturado.</strong>}
             </FieldCard>
           )}
 
-          <FieldCard title="Fotos">
+          <FieldCard required title="Fotos">
             <label className="photo-button">
               <input
                 accept="image/jpeg,image/png,image/webp"
                 multiple
                 onChange={(event) => updateForm({ fotos: Array.from(event.target.files ?? []) })}
+                required={!hasPhotos}
                 type="file"
               />
               Envio de imagens
@@ -2057,10 +2153,10 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
   const [selectedProductMode, setSelectedProductMode] = useState(null)
   const [documentPreview, setDocumentPreview] = useState(null)
   const processProducts = process?.produtos ?? []
-  const persistedByCode = new Map(processProducts.map((product) => [product.codigo_produto, product]))
+  const persistedByKey = new Map(processProducts.map((product) => [getProductGroupKey(product), product]))
   const products = (nfd?.produtos ?? []).map((product) => ({
     ...product,
-    persisted: persistedByCode.get(product.codigo_produto),
+    persisted: persistedByKey.get(getProductGroupKey(product)),
     is_avulsa: Boolean(nfd?.is_avulsa),
   }))
   const allCompleted = products.length > 0 && products.every((product) => product.persisted?.status === 'concluido')
@@ -2333,7 +2429,7 @@ function PromotorWorkspace({ profile, onLogout }) {
       const processIds = processos.map((processo) => processo.id)
       const { data: produtos, error: produtosError } = await supabase
         .from('fstd_produtos')
-        .select('id, processo_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
+        .select('id, processo_id, produto_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
         .in('processo_id', processIds)
 
       if (produtosError) throw produtosError
@@ -2536,7 +2632,7 @@ function PromotorWorkspace({ profile, onLogout }) {
 
       const { data: produtosSalvos, error: produtosReadError } = await supabase
         .from('fstd_produtos')
-        .select('id, processo_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
+        .select('id, processo_id, produto_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
         .eq('processo_id', processoId)
       if (produtosReadError) throw produtosReadError
 
@@ -2573,7 +2669,7 @@ function PromotorWorkspace({ profile, onLogout }) {
 
   const fstdProductMutation = useMutation({
     mutationFn: async ({ product, divisoes, observacao, fotos = [], fotosExistentes = [], faturadoGalinha, faturadoCodorna }) => {
-      let processoId = currentFstdTarget?.fstd_process_id
+      let processoId = currentFstdTarget?.fstd_process_id ?? currentFstdTarget?.fstd_process?.id
 
       if (!processoId) {
         const { data, error } = await supabase.rpc('iniciar_fstd_produtos_v2', {
@@ -2725,7 +2821,10 @@ function PromotorWorkspace({ profile, onLogout }) {
         const pdfPath = `${authData.user.id}/${processoId}/${document.numero_controle}.pdf`
         const { error: uploadError } = await supabase.storage
           .from('fstd-pdfs')
-          .upload(pdfPath, pdfBlob, { contentType: 'application/pdf', upsert: true })
+          .upload(pdfPath, pdfBlob, {
+            contentType: 'application/pdf',
+            upsert: Boolean(document.pdf_path),
+          })
 
         if (uploadError && !/already exists|duplicate/i.test(uploadError.message ?? '')) {
           throw uploadError
@@ -2859,8 +2958,8 @@ function PromotorWorkspace({ profile, onLogout }) {
   }
 
   if (avulsaAddProductsTarget && selectedStore) {
-    const existingProductCodes = (avulsaAddProductsTarget.fstd_process?.produtos ?? [])
-      .map((product) => product.codigo_produto)
+    const existingProductKeys = (avulsaAddProductsTarget.fstd_process?.produtos ?? [])
+      .map((product) => getCatalogProductKey(product))
 
     return (
       <>
@@ -2876,7 +2975,7 @@ function PromotorWorkspace({ profile, onLogout }) {
             valor: String(avulsaAddProductsTarget.valor_total ?? ''),
             dataEmissao: avulsaAddProductsTarget.data_emissao ?? getLocalIsoDate(),
           }}
-          excludedProductCodes={existingProductCodes}
+          excludedProductKeys={existingProductKeys}
           isAddingProducts
           onBack={() => setAvulsaAddProductsTarget(null)}
           onCreate={async (payload) => {
