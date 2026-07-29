@@ -948,10 +948,10 @@ function StoresScreen({
           {filteredStores.map((store) => {
             const storeNfds = nfds.filter((nfd) => nfd.loja_id === store.id)
             const overdueNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'atrasada').length
-            const otherNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'outros').length
-            const avulsaNotes = storeNfds.filter((nfd) => nfd.status_nfd === 'avulsa').length
-            const pendingNotes = overdueNotes + otherNotes + avulsaNotes
-            const storeIconStatus = overdueNotes > 0 ? 'overdue' : otherNotes > 0 || avulsaNotes > 0 ? 'other' : 'clear'
+    const pendingNotes = storeNfds.filter((nfd) => (
+      nfd.visual_status === 'overdue' || nfd.visual_status === 'on-time'
+    )).length
+            const storeIconStatus = overdueNotes > 0 ? 'overdue' : 'clear'
 
             return (
               <button

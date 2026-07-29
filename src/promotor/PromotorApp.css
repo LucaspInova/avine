@@ -616,6 +616,10 @@
   color: #31702d;
 }
 
+.store-glyph.is-clear {
+  color: #31702d;
+}
+
 .store-glyph.is-overdue {
   color: #ff1616;
 }
