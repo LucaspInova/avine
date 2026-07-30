@@ -177,7 +177,8 @@ export function RequireRole({ profile: requiredProfile, children }) {
     return <Navigate to="/" replace />
   }
 
-  if (auth.profile.perfil !== requiredProfile) {
+  const allowedProfiles = Array.isArray(requiredProfile) ? requiredProfile : [requiredProfile]
+  if (!allowedProfiles.includes(auth.profile.perfil)) {
     return <Navigate to={routeForProfile(auth.profile)} replace />
   }
 

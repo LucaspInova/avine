@@ -288,6 +288,8 @@ export type Database = {
           loja_codigo: string | null
           comentario: string
           created_at: string
+          reconhecida_em: string | null
+          reconhecida_por: string | null
         }
         Insert: {
           id?: string
@@ -299,6 +301,8 @@ export type Database = {
           loja_codigo?: string | null
           comentario: string
           created_at?: string
+          reconhecida_em?: string | null
+          reconhecida_por?: string | null
         }
         Update: {
           id?: string
@@ -310,6 +314,8 @@ export type Database = {
           loja_codigo?: string | null
           comentario?: string
           created_at?: string
+          reconhecida_em?: string | null
+          reconhecida_por?: string | null
         }
         Relationships: [
           {
@@ -322,6 +328,13 @@ export type Database = {
           {
             foreignKeyName: 'nfd_desconhecimentos_promotor_id_fkey'
             columns: ['promotor_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'nfd_desconhecimentos_reconhecida_por_fkey'
+            columns: ['reconhecida_por']
             isOneToOne: false
             referencedRelation: 'usuarios'
             referencedColumns: ['id']

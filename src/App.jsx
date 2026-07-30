@@ -15,8 +15,10 @@ import {
   validateProfilePhoto,
 } from './lib/profilePhoto'
 import { sortStoresByCode } from './lib/storeSorting'
+import { GerencialFinalizedNfdModal, GerencialFstdModal, InvoiceIcon } from './promotor/PromotorApp.jsx'
 import avineLogo from './assets/foto_logoavine.png'
 import profileUserIcon from './assets/ui-icons/do-utilizador.png'
+import pdfIcon from './assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from './components/LogoutConfirmDialog.jsx'
 import './App.css'
 
@@ -29,9 +31,11 @@ const emptyPromotorSlots = [1, 2, 3]
 const navItems = [
   { id: 'usuarios', label: 'Usuários', icon: 'users' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
+  { id: 'notas', label: 'Notas fiscais', icon: 'notes' },
+  { id: 'configuracoes', label: 'Gerenciais', icon: 'gear', separated: true },
 ]
 
-const gerencialScreenIds = ['usuarios', 'lojas']
+const gerencialScreenIds = ['usuarios', 'lojas', 'notas', 'configuracoes']
 const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
 
 function getInitialGerencialScreen() {
@@ -68,56 +72,34 @@ const initialGerencialForm = {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const mockNotasGroups = [
-  {
-    date: '18/6/2026',
-    pages: 15,
-    rows: [
-      { loja: 'SPAZIO OLH', nfd: '1509', status: 'Pendente' },
-      { loja: 'MAT SUPER MA', nfd: '163614', status: 'Pendente' },
-      { loja: 'MAT BELEM 2', nfd: '166702', status: 'Pendente' },
-      { loja: 'MAT. ACAILAN', nfd: '67826', status: 'Pendente' },
-      { loja: 'MAT CANINDE', nfd: '22918', status: 'Pendente' },
-      { loja: 'MAT JK', nfd: '1977', status: 'Pendente' },
-      { loja: 'REDE MENOR 1', nfd: '97480', status: 'Pendente' },
-      { loja: 'MAT ZEQUIN', nfd: '105253', status: 'Pendente' },
-      { loja: 'MAT CRATEUS', nfd: '21171', status: 'FSTD' },
-      { loja: 'LIDER MARABA', nfd: '218115', status: 'Pendente' },
-    ],
-  },
-  {
-    date: '17/6/2026',
-    pages: 15,
-    rows: [
-      { loja: 'MAT ITAPIPOC', nfd: '39913', status: 'FSTD' },
-      { loja: 'SENDAS BATIS', nfd: '123186', status: 'Pendente' },
-      { loja: 'NORDESTAO 03', nfd: '117142', status: 'Pendente' },
-      { loja: 'MAXXI PI JOA', nfd: '53574', status: 'FSTD' },
-      { loja: 'VANGU JOAQUI', nfd: '45485', status: 'FSTD' },
-      { loja: 'MAT JARDIM R', nfd: '258733', status: 'FSTD' },
-      { loja: 'EVANDRO 05', nfd: '61202', status: 'FSTD' },
-      { loja: 'MAT CAJAZEIR', nfd: '175184', status: 'Pendente' },
-      { loja: 'MAT JARDIM R', nfd: '258737', status: 'FSTD' },
-      { loja: 'ATAC PALMARE', nfd: '44561', status: 'Pendente' },
-    ],
-  },
-  {
-    date: '16/6/2026',
-    pages: 18,
-    rows: [
-      { loja: 'SODEXO JABOA', nfd: '126651', status: 'Pendente' },
-      { loja: 'MAT ARACAJU', nfd: '61608', status: 'FSTD' },
-      { loja: 'MERC PIRAJA', nfd: '91736', status: 'Pendente' },
-      { loja: 'MAT FOOD', nfd: '9181', status: 'FSTD' },
-      { loja: 'CARONE MAIOB', nfd: '19495', status: 'FSTD' },
-      { loja: 'MAT CAXIAS 2', nfd: '1509', status: 'FSTD' },
-      { loja: 'MAT PORTO SE', nfd: '40522', status: 'FSTD' },
-      { loja: 'MAIS BARA 03', nfd: '85990', status: 'Pendente' },
-      { loja: 'ATAC PALMARE', nfd: '44530', status: 'FSTD' },
-      { loja: 'SUPER MAX 2', nfd: '7100', status: 'Pendente' },
-    ],
-  },
-]
+const NOTES_PAGE_SIZE = 10
+
+function formatNoteDate(value) {
+  const date = String(value ?? '').slice(0, 10)
+  const [year, month, day] = date.split('-')
+  return year && month && day ? `${day}/${month}/${year}` : 'Sem data'
+}
+
+function formatNoteQuantity(value) {
+  return Number(value ?? 0).toLocaleString('pt-BR')
+}
+
+function getNoteDateKey(note) {
+  return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
+}
+
+async function listAllRows(queryFactory, pageSize = 1000) {
+  const rows = []
+
+  for (let page = 0; ; page += 1) {
+    const from = page * pageSize
+    const { data, error } = await queryFactory(from, from + pageSize - 1)
+    if (error) throw error
+
+    rows.push(...(data ?? []))
+    if ((data ?? []).length < pageSize) return rows
+  }
+}
 
 function normalizaNome(nome) {
   return nome.trim().replace(/\s+/g, ' ').toUpperCase()
@@ -1527,6 +1509,7 @@ function GerenciaisScreen({
           <div className="table-row table-head" role="row">
             <span role="columnheader">NOME</span>
             <span role="columnheader">EMAIL</span>
+            <span role="columnheader">NOVA SENHA</span>
             <span role="columnheader">STATUS</span>
             <span role="columnheader">AÇÕES</span>
           </div>
@@ -1562,6 +1545,21 @@ function GerenciaisScreen({
                     />
                   ) : (
                     usuario.email
+                  )}
+                </span>
+
+                <span className="password-cell" role="cell">
+                  {isEditing ? (
+                    <input
+                      value={editForm.senha}
+                      onChange={(event) => onEditChange({ senha: event.target.value })}
+                      placeholder="Opcional"
+                      type="password"
+                      minLength={12}
+                      autoComplete="new-password"
+                    />
+                  ) : (
+                    '—'
                   )}
                 </span>
 
@@ -1758,45 +1756,647 @@ function ReportScreen() {
 }
 
 function NotaStatusIcon({ status }) {
-  const isDone = status === 'FSTD'
+  if (status === 'Desconhecida') return <InvoiceIcon status="unknown" />
+
+  const visualStatus = status === 'Finalizada' ? 'sent' : status === 'Desconhecida' ? 'unknown' : 'overdue'
+  const iconVariant = visualStatus === 'sent' ? 'finalized' : visualStatus === 'unknown' ? 'unknown' : null
+
+  if (iconVariant) {
+    const paths = {
+      finalized: {
+        main: 'M9 1.5H5.625c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5Zm6.61 10.936a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 14.47a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z',
+        corner: 'M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z',
+      },
+      unknown: {
+        main: 'M5.625 1.5H9a3.75 3.75 0 0 1 3.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 0 1 3.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 0 1-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875Z',
+        marker: 'M11.625 16.5a1.875 1.875 0 1 0 0-3.75 1.875 1.875 0 0 0 0 3.75Z',
+        corner: 'M14.25 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 16.5 7.5h-1.875a.375.375 0 0 1-.375-.375V5.25Z',
+      },
+    }[iconVariant]
+
+    return (
+      <svg className={`document-glyph is-${visualStatus}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        {paths.marker && <path d={paths.marker} />}
+        <path fillRule="evenodd" d={paths.main} clipRule="evenodd" />
+        <path d={paths.corner} />
+      </svg>
+    )
+  }
 
   return (
-    <span className={`nota-file-icon ${isDone ? 'is-done' : 'is-pending'}`} aria-hidden="true">
-      <span />
-    </span>
+    <svg className={`document-glyph is-${visualStatus}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path fillRule="evenodd" d="M5.625 1.5H9a3.75 3.75 0 0 1 3.75 3.75v1.875c0 1.036.84 1.875 1.875 1.875H16.5a3.75 3.75 0 0 1 3.75 3.75v7.875c0 1.035-.84 1.875-1.875 1.875H5.625a1.875 1.875 0 0 1-1.875-1.875V3.375c0-1.036.84-1.875 1.875-1.875ZM9.75 14.25a.75.75 0 0 0 0 1.5H15a.75.75 0 0 0 0-1.5H9.75Z" clipRule="evenodd" />
+      <path d="M14.25 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 16.5 7.5h-1.875a.375.375 0 0 1-.375-.375V5.25Z" />
+    </svg>
   )
 }
 
-function NotesPagination({ pages }) {
+const NOTE_STATUS_OPTIONS = ['Finalizada', 'Pendente', 'Desconhecida']
+
+function uniqueSortedValues(values, { uppercase = false } = {}) {
+  const unique = new Map()
+
+  values.forEach((value) => {
+    const normalized = String(value ?? '').trim()
+    if (!normalized) return
+
+    const display = uppercase ? normalized.toUpperCase() : normalized
+    const key = display.toLocaleLowerCase('pt-BR')
+    if (!unique.has(key)) unique.set(key, display)
+  })
+
+  return [...unique.values()].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
+}
+
+function NotesFilterPopover({
+  notes,
+  selectedStatuses,
+  selectedUfs,
+  selectedCities,
+  onToggleStatus,
+  onToggleUf,
+  onToggleCity,
+  onClear,
+  onClose,
+}) {
+  const [expandedSection, setExpandedSection] = useState(null)
+  const ufs = uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true })
+  const cities = uniqueSortedValues(notes.map((note) => note.cidade))
+  const sections = [
+    { id: 'status', label: 'Status', options: NOTE_STATUS_OPTIONS, selected: selectedStatuses, onToggle: onToggleStatus },
+    { id: 'estado', label: 'Estado', options: ufs, selected: selectedUfs, onToggle: onToggleUf },
+    { id: 'cidade', label: 'Cidade', options: cities, selected: selectedCities, onToggle: onToggleCity },
+  ]
+
+  return (
+    <div className="filter-popover notes-filter-popover">
+      {sections.map((section) => {
+        const isExpanded = expandedSection === section.id
+
+        return (
+          <div className="notes-filter-section" key={section.id}>
+            <button
+              className={`notes-filter-section-trigger ${isExpanded ? 'is-expanded' : ''}`}
+              type="button"
+              onClick={() => setExpandedSection(isExpanded ? null : section.id)}
+              aria-expanded={isExpanded}
+            >
+              <span>{section.label}</span>
+              <span className="filter-chevron" aria-hidden="true" />
+            </button>
+
+            {isExpanded && (
+              <div className="filter-options notes-filter-options">
+                {section.options.length === 0 ? (
+                  <p className="filter-empty">Nenhuma opção encontrada.</p>
+                ) : section.options.map((option) => (
+                  <label key={option} className="filter-option">
+                    <span>{option}</span>
+                    <input
+                      checked={section.selected.includes(option)}
+                      onChange={() => section.onToggle(option)}
+                      type="checkbox"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      <div className="filter-footer">
+        <button className="secondary-button" type="button" onClick={onClear}>
+          Limpar tudo
+        </button>
+        <button className="primary-button" type="button" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function NotesPagination({ page, pages, onChange }) {
+  const pageNumbers = pages <= 7
+    ? Array.from({ length: pages }, (_, index) => index)
+    : [0, 1, 2, 'ellipsis', pages - 1]
+
   return (
     <nav className="pagination notes-pagination" aria-label="Páginas da lista de NFD">
-      <button type="button" disabled aria-label="Página anterior">&lsaquo;</button>
-      <button className="is-active" type="button">1</button>
-      <button type="button">2</button>
-      <button type="button">3</button>
-      <button type="button">4</button>
-      <button type="button">5</button>
-      <span>...</span>
-      <button type="button">{pages}</button>
-      <button type="button" aria-label="Próxima página">&rsaquo;</button>
+      <button type="button" disabled={page === 0} onClick={() => onChange(page - 1)} aria-label="Página anterior">&lsaquo;</button>
+      {pageNumbers.map((pageNumber, index) => (
+        pageNumber === 'ellipsis' ? (
+          <span key={`ellipsis-${index}`}>...</span>
+        ) : (
+          <button
+            className={pageNumber === page ? 'is-active' : ''}
+            type="button"
+            key={pageNumber}
+            onClick={() => onChange(pageNumber)}
+          >
+            {pageNumber + 1}
+          </button>
+        )
+      ))}
+      <button type="button" disabled={page === pages - 1} onClick={() => onChange(page + 1)} aria-label="Próxima página">&rsaquo;</button>
     </nav>
   )
 }
 
-function NotasScreen({ search, onSearch }) {
-  const [statusFilter, setStatusFilter] = useState('')
+function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
+  const [invoiceCopied, setInvoiceCopied] = useState(false)
+  const [pendingBusy, setPendingBusy] = useState(false)
+  const [pendingError, setPendingError] = useState('')
+  const [unknownBusy, setUnknownBusy] = useState(false)
+  const [unknownError, setUnknownError] = useState('')
+  const [unknownConfirmOpen, setUnknownConfirmOpen] = useState(false)
+  const [unknownComment, setUnknownComment] = useState('')
+  const [recognizeBusy, setRecognizeBusy] = useState(false)
+  const [recognizeError, setRecognizeError] = useState('')
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  if (!note) return null
+
+  const isFinalized = note.status === 'Finalizada'
+  const isUnknown = note.status === 'Desconhecida'
+  const title = `${note.codigo_cliente ?? '-'} - ${note.nota_fiscal ?? '-'}`
+  const statusDescription = isFinalized ? 'FSTD Finalizada' : note.status === 'Desconhecida' ? 'NFD Desconhecida' : 'FSTD Pendente'
+
+  async function handleOpenInvoice() {
+    window.open('https://meudanfe.com.br/#', '_blank', 'noopener,noreferrer')
+
+    const accessKey = String(note.chave_acesso ?? '').trim()
+    if (!accessKey) return
+
+    try {
+      await navigator.clipboard.writeText(accessKey)
+      setInvoiceCopied(true)
+    } catch {
+      setInvoiceCopied(false)
+    }
+  }
+
+  async function handleOpenPending() {
+    if (isFinalized || note.status !== 'Pendente' || !onPending || pendingBusy) return
+
+    setPendingBusy(true)
+    setPendingError('')
+    try {
+      await onPending(note)
+    } catch (requestError) {
+      setPendingError(
+        requestError?.message
+        || requestError?.details
+        || requestError?.hint
+        || 'Não foi possível abrir o preenchimento da NFD.',
+      )
+    } finally {
+      setPendingBusy(false)
+    }
+  }
+
+  function handleOpenUnknownConfirm() {
+    if (isFinalized || isUnknown || !onUnknown || unknownBusy) return
+    setUnknownComment('')
+    setUnknownError('')
+    setUnknownConfirmOpen(true)
+  }
+
+  async function handleMarkUnknown() {
+    if (isFinalized || isUnknown || !onUnknown || unknownBusy) return
+
+    const comment = unknownComment.trim()
+    if (comment.length < 5) return
+
+    setUnknownBusy(true)
+    setUnknownError('')
+    try {
+      await onUnknown(note, comment)
+      setUnknownConfirmOpen(false)
+    } catch (requestError) {
+      setUnknownError(
+        requestError?.message
+        || requestError?.details
+        || requestError?.hint
+        || 'Não foi possível atualizar a NFD como desconhecida.',
+      )
+    } finally {
+      setUnknownBusy(false)
+    }
+  }
+
+  async function handleRecognize() {
+    if (!isUnknown || !onRecognize || recognizeBusy) return
+
+    setRecognizeBusy(true)
+    setRecognizeError('')
+    try {
+      await onRecognize(note)
+    } catch (requestError) {
+      setRecognizeError(
+        requestError?.message
+        || requestError?.details
+        || requestError?.hint
+        || 'Não foi possível reconhecer novamente esta NFD.',
+      )
+    } finally {
+      setRecognizeBusy(false)
+    }
+  }
+
+  return (
+    <div className="nota-modal-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="nota-modal" role="dialog" aria-modal="true" aria-labelledby="nota-modal-title">
+        <header className="nota-modal-titlebar">
+          <strong id="nota-modal-title">{title}</strong>
+          <button type="button" onClick={onClose} aria-label="Fechar nota fiscal">
+            <Icon name="x" />
+          </button>
+        </header>
+
+        <div className="nota-modal-summary">
+          <button className="nota-modal-summary-button is-invoice" type="button" onClick={handleOpenInvoice}>
+            <NotaStatusIcon status="Finalizada" />
+            <span>
+              <strong>NFD</strong>
+              <small>Emitida em {formatNoteDate(note.data_emissao)}</small>
+            </span>
+            <img className="nota-modal-pdf-icon" src={pdfIcon} alt="" aria-hidden="true" />
+          </button>
+
+          <button className="nota-modal-summary-button is-status" type="button" disabled={isFinalized || note.status !== 'Pendente' || pendingBusy} onClick={handleOpenPending}>
+            <NotaStatusIcon status={note.status} />
+            <span>
+              <strong>{note.status}</strong>
+              <small>{pendingBusy ? 'Abrindo preenchimento...' : statusDescription}</small>
+            </span>
+            <span className="nota-modal-add" aria-hidden="true">+</span>
+          </button>
+        </div>
+
+        <div className="nota-modal-body">
+          <div className="nota-modal-content">
+            <div className="nota-modal-backlink">‹ <strong>{title}</strong></div>
+            <h2>Faturado</h2>
+            <dl>
+              <div>
+                <dt>Galinha</dt>
+                <dd>{formatNoteQuantity(note.quantidade_galinha)} ovos</dd>
+              </div>
+              <div>
+                <dt>Codorna</dt>
+                <dd>{formatNoteQuantity(note.quantidade_codorna)} ovos</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="nota-modal-alerts">
+            <div className="nota-modal-alert is-pdf">
+              <img src={pdfIcon} alt="" aria-hidden="true" />
+              <span>
+                <strong>Arquivo PDF indisponível!</strong>
+                <small>{statusDescription}</small>
+              </span>
+            </div>
+            <div className="nota-modal-alert is-unknown">
+              <Icon name="alert" />
+              <span>{isUnknown ? 'NFD marcada como desconhecida' : 'Desconheço NF?'}</span>
+              {isUnknown ? (
+                <button className="is-recognize" type="button" disabled={recognizeBusy} onClick={handleRecognize}>
+                  {recognizeBusy ? 'Atualizando...' : 'Reconheço NFD'}
+                </button>
+              ) : (
+                <button type="button" disabled={isFinalized || unknownBusy} onClick={handleOpenUnknownConfirm}>
+                  Desconheço
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {invoiceCopied && <p className="nota-modal-copy-feedback" role="status">Chave de acesso copiada.</p>}
+        {pendingError && <p className="nota-modal-pending-error" role="alert">{pendingError}</p>}
+        {unknownError && <p className="nota-modal-pending-error" role="alert">{unknownError}</p>}
+        {recognizeError && <p className="nota-modal-pending-error" role="alert">{recognizeError}</p>}
+      </section>
+
+      {unknownConfirmOpen && (
+        <div className="nota-unknown-confirm-layer" role="presentation">
+          <section className="nota-unknown-confirm" role="dialog" aria-modal="true" aria-labelledby="nota-unknown-confirm-title">
+            <header>
+              <strong id="nota-unknown-confirm-title">Desconhecer NFD</strong>
+              <button type="button" onClick={() => setUnknownConfirmOpen(false)} aria-label="Fechar confirmação">×</button>
+            </header>
+            <p>Informe por que o usuário não reconhece esta nota fiscal.</p>
+            <label>
+              <span>Motivo <small>Obrigatório</small></span>
+              <textarea
+                value={unknownComment}
+                onChange={(event) => setUnknownComment(event.target.value)}
+                placeholder="Explique o motivo"
+                rows="4"
+                autoFocus
+              />
+            </label>
+            {unknownError && <strong className="nota-unknown-confirm-error" role="alert">{unknownError}</strong>}
+            <footer>
+              <button type="button" onClick={() => setUnknownConfirmOpen(false)}>Cancelar</button>
+              <button type="button" disabled={unknownComment.trim().length < 5 || unknownBusy} onClick={handleMarkUnknown}>
+                {unknownBusy ? 'Atualizando...' : 'Confirmar'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NotasScreen({ search, onSearch, lojas, currentUser }) {
+  const [notes, setNotes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [isFilterOpen, setFilterOpen] = useState(false)
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [selectedUfs, setSelectedUfs] = useState([])
+  const [selectedCities, setSelectedCities] = useState([])
+  const [pageByDate, setPageByDate] = useState({})
+  const [selectedNote, setSelectedNote] = useState(null)
+  const [selectedFstd, setSelectedFstd] = useState(null)
+  const [selectedFinalized, setSelectedFinalized] = useState(null)
+  const [completionMessage, setCompletionMessage] = useState('')
   const query = search.trim().toLowerCase()
 
-  const filteredGroups = mockNotasGroups
-    .map((group) => ({
-      ...group,
-      rows: group.rows.filter((row) => {
-        const matchesQuery = `${row.loja} ${row.nfd} ${row.status}`.toLowerCase().includes(query)
-        const matchesStatus = !statusFilter || row.status === statusFilter
-        return matchesQuery && matchesStatus
-      }),
-    }))
-    .filter((group) => group.rows.length > 0)
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadNotas() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const [importedNotes, fstdProcesses, unknownNfds, noteLocations] = await Promise.all([
+          listAllRows((from, to) => supabase
+            .from('nfd_notas')
+            .select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')
+            .order('data_referencia', { ascending: false })
+            .order('nota_fiscal', { ascending: false })
+            .range(from, to)),
+          listAllRows((from, to) => supabase
+            .from('fstd_processos')
+            .select('id, nfd_chave_acesso, status, created_at')
+            .order('created_at', { ascending: false })
+            .range(from, to)),
+          listAllRows((from, to) => supabase
+            .from('nfd_desconhecimentos')
+            .select('id, nfd_referencia, nfd_chave_acesso, nfd_numero, loja_codigo, created_at, reconhecida_em')
+            .is('reconhecida_em', null)
+            .order('created_at', { ascending: false })
+            .range(from, to)),
+          listAllRows((from, to) => supabase
+            .from('nfd_itens')
+            .select('chave_acesso, uf, cidade')
+            .order('chave_acesso', { ascending: true })
+            .range(from, to)),
+        ])
+
+        const statusByKey = new Map(
+          fstdProcesses.map((process) => [String(process.nfd_chave_acesso), process.status]),
+        )
+        const unknownByKey = new Set()
+        unknownNfds.forEach((item) => {
+          if (item.nfd_chave_acesso) unknownByKey.add(`key:${item.nfd_chave_acesso}`)
+          if (item.nfd_referencia) unknownByKey.add(`ref:${item.nfd_referencia}`)
+        })
+        const locationByKey = new Map()
+        noteLocations.forEach((item) => {
+          const key = String(item.chave_acesso)
+          const current = locationByKey.get(key) ?? {}
+          locationByKey.set(key, {
+            uf: current.uf || item.uf,
+            cidade: current.cidade || item.cidade,
+          })
+        })
+
+        if (isMounted) {
+          setNotes(importedNotes.map((note) => ({
+            ...note,
+            uf: note.uf || locationByKey.get(String(note.chave_acesso))?.uf || '',
+            cidade: note.cidade || locationByKey.get(String(note.chave_acesso))?.cidade || '',
+            status: unknownByKey.has(`key:${note.chave_acesso}`)
+              || unknownByKey.has(`ref:${note.codigo_cliente}:${note.nota_fiscal}`)
+              ? 'Desconhecida'
+              : statusByKey.get(String(note.chave_acesso)) === 'concluida'
+                ? 'Finalizada'
+                : 'Pendente',
+          })))
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar as notas fiscais.')
+          setNotes([])
+        }
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    void loadNotas()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const filteredGroups = useMemo(() => {
+    const groups = new Map()
+
+    notes.forEach((note) => {
+      const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
+      const nfd = String(note.nota_fiscal ?? '-')
+      const matchesQuery = `${storeName} ${nfd} ${note.status}`.toLowerCase().includes(query)
+      const noteUf = String(note.uf ?? '').trim().toUpperCase()
+      const noteCity = String(note.cidade ?? '').trim()
+      const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(note.status)
+      const matchesUf = selectedUfs.length === 0 || selectedUfs.includes(noteUf)
+      const matchesCity = selectedCities.length === 0 || selectedCities
+        .some((city) => city.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
+      if (!matchesQuery || !matchesStatus || !matchesUf || !matchesCity) return
+
+      const dateKey = getNoteDateKey(note)
+      if (!groups.has(dateKey)) {
+        groups.set(dateKey, {
+          key: dateKey,
+          date: dateKey === 'sem-data' ? 'Sem data' : formatNoteDate(dateKey),
+          rows: [],
+        })
+      }
+
+      groups.get(dateKey).rows.push({
+        key: note.chave_acesso || `${dateKey}-${nfd}-${storeName}`,
+        loja: storeName,
+        nfd,
+        status: note.status,
+        note,
+      })
+    })
+
+    return [...groups.values()]
+      .sort((a, b) => b.key.localeCompare(a.key))
+      .map((group) => {
+        const pages = Math.max(1, Math.ceil(group.rows.length / NOTES_PAGE_SIZE))
+        const page = Math.min(pageByDate[group.key] ?? 0, pages - 1)
+        return {
+          ...group,
+          pages,
+          page,
+          rows: group.rows.slice(page * NOTES_PAGE_SIZE, (page + 1) * NOTES_PAGE_SIZE),
+        }
+      })
+  }, [notes, pageByDate, query, selectedCities, selectedStatuses, selectedUfs])
+
+  const activeFiltersCount = selectedStatuses.length + selectedUfs.length + selectedCities.length
+
+  function getStoreForNote(note) {
+    return (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
+  }
+
+  function handleSelectNote(note) {
+    if (note.status === 'Finalizada') {
+      const store = getStoreForNote(note)
+      if (store) {
+        setSelectedNote(null)
+        setSelectedFinalized({ note, store })
+        return
+      }
+    }
+
+    setSelectedNote(note)
+  }
+
+  async function handlePendingNote(note) {
+    if (note.status === 'Finalizada') return
+    if (!currentUser?.id) throw new Error('Sessão do usuário Gerencial não encontrada.')
+
+    let store = (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
+    if (!store) {
+      const { data, error } = await supabase
+        .from('lojas')
+        .select('id, codigo, nome, uf, cidade')
+        .eq('codigo', note.codigo_cliente)
+        .maybeSingle()
+      if (error) throw error
+      store = data
+    }
+    if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
+
+    const { error: processError } = await supabase.rpc('iniciar_fstd_produtos_v2', {
+      p_loja_id: store.id,
+      p_nfd_chave_acesso: String(note.chave_acesso),
+    })
+    if (processError) throw processError
+
+    const selectedNfd = {
+      ...note,
+      id: note.chave_acesso,
+      numero: String(note.nota_fiscal),
+      loja_id: store.id,
+      loja_codigo: store.codigo,
+      loja_nome: store.nome,
+      nome_abreviado: store.nome,
+      status_nfd: 'atrasada',
+    }
+    setSelectedNote(null)
+    setSelectedFstd({ note: selectedNfd, store })
+  }
+
+  async function handleUnknownNote(note, comment) {
+    const store = getStoreForNote(note)
+    if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
+
+    const { error: unknownError } = await supabase.rpc('desconhecer_nfd_gerencial', {
+      p_loja_id: store.id,
+      p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`,
+      p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null,
+      p_nfd_numero: String(note.nota_fiscal ?? ''),
+      p_loja_codigo: store.codigo ? String(store.codigo) : null,
+      p_comentario: comment,
+    })
+    if (unknownError) throw unknownError
+
+    setNotes((current) => current.map((item) => (
+      String(item.chave_acesso) === String(note.chave_acesso)
+        ? { ...item, status: 'Desconhecida' }
+        : item
+    )))
+    setSelectedNote((current) => current ? { ...current, status: 'Desconhecida' } : current)
+  }
+
+  async function handleRecognizeNote(note) {
+    const { error: recognizeError } = await supabase.rpc('reconhecer_nfd_gerencial', {
+      p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`,
+      p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null,
+      p_nfd_numero: String(note.nota_fiscal ?? ''),
+    })
+    if (recognizeError) throw recognizeError
+
+    setNotes((current) => current.map((item) => (
+      String(item.chave_acesso) === String(note.chave_acesso)
+        ? { ...item, status: 'Pendente' }
+        : item
+    )))
+    setSelectedNote((current) => current ? { ...current, status: 'Pendente' } : current)
+  }
+
+  function handleEditFinalizedNfd(note, store) {
+    const editableNote = {
+      ...note,
+      status: 'Finalizada',
+      status_nfd: 'finalizada',
+    }
+
+    setSelectedFinalized(null)
+    setSelectedFstd({ note: editableNote, store, allowFinalizedEdit: true })
+  }
+
+  function handleFstdCompleted() {
+    if (!selectedFstd?.note || !selectedFstd?.store) return
+
+    const finalizedNote = {
+      ...selectedFstd.note,
+      status: 'Finalizada',
+      status_nfd: 'finalizada',
+    }
+
+    setNotes((current) => current.map((item) => (
+      String(item.chave_acesso) === String(finalizedNote.chave_acesso)
+        ? { ...item, status: 'Finalizada' }
+        : item
+    )))
+    setCompletionMessage(`NFD ${finalizedNote.nota_fiscal ?? finalizedNote.numero} finalizada com sucesso.`)
+    setSelectedFstd(null)
+    setSelectedFinalized({ note: finalizedNote, store: selectedFstd.store })
+  }
+
+  function toggleFilterValue(setter, value) {
+    setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])
+    setPageByDate({})
+  }
+
+  function clearFilters() {
+    setSelectedStatuses([])
+    setSelectedUfs([])
+    setSelectedCities([])
+    setPageByDate({})
+  }
 
   return (
     <section className="notes-page">
@@ -1809,24 +2409,56 @@ function NotasScreen({ search, onSearch }) {
               <Icon name="search" />
               <input
                 value={search}
-                onChange={(event) => onSearch(event.target.value)}
+                onChange={(event) => {
+                  onSearch(event.target.value)
+                  setPageByDate({})
+                }}
                 placeholder="Procurar"
                 type="search"
               />
             </label>
 
-            <label className="filter-field">
-              <Icon name="filter" />
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="">Filtrar</option>
-                <option value="Pendente">Pendente</option>
-                <option value="FSTD">FSTD</option>
-              </select>
-            </label>
+            <div className="filter-wrap">
+              <button
+                className={`filter-trigger ${isFilterOpen ? 'is-open' : ''}`}
+                type="button"
+                onClick={() => setFilterOpen((open) => !open)}
+                aria-expanded={isFilterOpen}
+                aria-haspopup="true"
+              >
+                <Icon name="filter" />
+                <span>{activeFiltersCount ? `${activeFiltersCount} filtro${activeFiltersCount > 1 ? 's' : ''}` : 'Filtrar'}</span>
+                <span className="select-chevron" />
+              </button>
+
+              {isFilterOpen && (
+                <NotesFilterPopover
+                  notes={notes}
+                  selectedStatuses={selectedStatuses}
+                  selectedUfs={selectedUfs}
+                  selectedCities={selectedCities}
+                  onToggleStatus={(value) => toggleFilterValue(setSelectedStatuses, value)}
+                  onToggleUf={(value) => toggleFilterValue(setSelectedUfs, value)}
+                  onToggleCity={(value) => toggleFilterValue(setSelectedCities, value)}
+                  onClear={clearFilters}
+                  onClose={() => setFilterOpen(false)}
+                />
+              )}
+            </div>
           </div>
         </div>
 
-        {filteredGroups.map((group) => (
+        {completionMessage && (
+          <p className="notes-completion-message" role="status">
+            {completionMessage}
+          </p>
+        )}
+
+        {loading && <p className="table-message">Carregando notas fiscais...</p>}
+
+        {!loading && error && <p className="table-message">{error}</p>}
+
+        {!loading && !error && filteredGroups.map((group) => (
           <section className="notes-date-group" key={group.date}>
             <h3>{group.date}</h3>
 
@@ -1838,7 +2470,19 @@ function NotasScreen({ search, onSearch }) {
               </div>
 
               {group.rows.map((row) => (
-                <div className="notes-row" role="row" key={`${group.date}-${row.loja}-${row.nfd}`}>
+                <div
+                  className="notes-row notes-row-interactive"
+                  role="row"
+                  key={`${group.key}-${row.key}`}
+                  tabIndex="0"
+                  onClick={() => handleSelectNote(row.note)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      handleSelectNote(row.note)
+                    }
+                  }}
+                >
                   <span className="notes-store-cell" role="cell">
                     <NotaStatusIcon status={row.status} />
                     <strong>{row.loja}</strong>
@@ -1849,14 +2493,38 @@ function NotasScreen({ search, onSearch }) {
               ))}
             </div>
 
-            <NotesPagination pages={group.pages} />
+            <NotesPagination
+              page={group.page}
+              pages={group.pages}
+              onChange={(nextPage) => setPageByDate((current) => ({ ...current, [group.key]: nextPage }))}
+            />
           </section>
         ))}
 
-        {filteredGroups.length === 0 && (
+        {!loading && !error && filteredGroups.length === 0 && (
           <p className="table-message">Nenhuma NFD encontrada.</p>
         )}
       </div>
+      <NotaFiscalModal
+        note={selectedNote}
+        onClose={() => setSelectedNote(null)}
+        onPending={handlePendingNote}
+        onUnknown={handleUnknownNote}
+        onRecognize={handleRecognizeNote}
+      />
+      <GerencialFstdModal
+        note={selectedFstd?.note}
+        store={selectedFstd?.store}
+        allowFinalizedEdit={selectedFstd?.allowFinalizedEdit}
+        onClose={() => setSelectedFstd(null)}
+        onCompleted={handleFstdCompleted}
+      />
+      <GerencialFinalizedNfdModal
+        note={selectedFinalized?.note}
+        store={selectedFinalized?.store}
+        onClose={() => setSelectedFinalized(null)}
+        onEdit={(note, store) => handleEditFinalizedNfd(note, store)}
+      />
     </section>
   )
 }
@@ -1916,6 +2584,7 @@ function App() {
   const [gerencialEditForm, setGerencialEditForm] = useState({
     nome: '',
     email: '',
+    senha: '',
     ativo: true,
   })
   const [gerencialBusy, setGerencialBusy] = useState(false)
@@ -2477,6 +3146,7 @@ function App() {
     setGerencialEditForm({
       nome: usuario.nome,
       email: usuario.email,
+      senha: '',
       ativo: usuario.ativo,
     })
     setGerencialError('')
@@ -2484,7 +3154,7 @@ function App() {
 
   function cancelEditGerencial() {
     setGerencialEditId('')
-    setGerencialEditForm({ nome: '', email: '', ativo: true })
+    setGerencialEditForm({ nome: '', email: '', senha: '', ativo: true })
     setGerencialError('')
   }
 
@@ -2493,11 +3163,17 @@ function App() {
       usuario_id: gerencialEditId,
       nome: normalizaTexto(gerencialEditForm.nome),
       email: gerencialEditForm.email.trim().toLowerCase(),
+      senha: gerencialEditForm.senha,
       ativo: gerencialEditForm.ativo,
     }
 
-    if (!payload.usuario_id || payload.nome.length < 4 || !emailPattern.test(payload.email)) {
-      setGerencialError('Revise nome e email antes de salvar.')
+    if (
+      !payload.usuario_id
+      || payload.nome.length < 4
+      || !emailPattern.test(payload.email)
+      || (payload.senha && payload.senha.length < 12)
+    ) {
+      setGerencialError('Revise nome, email e a nova senha antes de salvar.')
       return
     }
 
@@ -2522,6 +3198,7 @@ function App() {
         fotos_habilitadas: target.fotos_habilitadas,
         ativo: payload.ativo,
         acesso_habilitado: payload.ativo,
+        password: payload.senha || undefined,
       })
     } catch (updateError) {
       setGerencialError(updateError instanceof Error ? updateError.message : 'Não foi possível editar o Gerencial.')
@@ -2678,7 +3355,7 @@ function App() {
         ) : isRelatorios ? (
           <ReportScreen />
         ) : isNotas ? (
-          <NotasScreen search={search} onSearch={setSearch} />
+          <NotasScreen search={search} onSearch={setSearch} lojas={lojas} currentUser={currentUser} />
         ) : isLojas ? (
           <LojasScreen
             search={search}

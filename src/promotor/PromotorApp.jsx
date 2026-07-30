@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
@@ -59,11 +59,18 @@ function normalizeNonNegativeQuantity(value) {
 function formatDate(date) {
   if (!date) return '-'
 
+  const value = String(date)
+  const parsedDate = value.length === 10
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value)
+
+  if (Number.isNaN(parsedDate.getTime())) return '-'
+
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`))
+  }).format(parsedDate)
 }
 
 function formatMoney(value) {
@@ -657,7 +664,7 @@ function StoreIcon({ status }) {
   )
 }
 
-function InvoiceIcon({ status }) {
+export function InvoiceIcon({ status }) {
   const iconVariant = status === 'sent'
     ? 'finalized'
     : status === 'avulsa' || status === 'avulsa-finalizada' || status === 'avulsa-erro'
@@ -1488,7 +1495,9 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
         <header className="fstd-topbar">
           <button type="button" onClick={onBack}>Cancelar</button>
           <strong>{nfd?.numero ?? 'Avulsa'}</strong>
-          <button type="submit" disabled={!canSubmit}>{busy ? 'Enviando' : 'Enviar'}</button>
+          <button type="submit" disabled={!canSubmit}>
+            {busy ? 'Enviando...' : 'Enviar'}
+          </button>
         </header>
 
         <section className="fstd-hero">
@@ -1633,7 +1642,7 @@ function getFstdDivisionDefaults(product) {
       .map((division) => ({
         motivoId: division.motivo_id,
         faturado: String(normalizeQuantity(division.quantidade_faturada ?? division.quantidade)),
-        retorno: '',
+        retorno: String(normalizeQuantity(division.quantidade_retorno ?? division.quantidade)),
       }))
     : []
 
@@ -1643,7 +1652,7 @@ function getFstdDivisionDefaults(product) {
     return [{
       motivoId: product.persisted.motivo_id,
       faturado: String(product.persisted.quantidade_faturada_galinha + product.persisted.quantidade_faturada_codorna),
-      retorno: '',
+      retorno: String(normalizeQuantity(product.persisted.quantidade_retorno)),
     }]
   }
 
@@ -1722,7 +1731,7 @@ function FstdStoredPhotos({ paths, removable = false, onRemove }) {
   )
 }
 
-function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
+function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embeddedFstd = false, allowFinalizedEdit = false, onSubmit }) {
   const isAvulsa = Boolean(product.is_avulsa)
   const isEditing = product.persisted?.status === 'concluido'
   const [form, setForm] = useState(() => ({
@@ -1856,8 +1865,10 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
       <form className="fstd-mobile-form fstd-product-form" onSubmit={handleSubmit}>
         <header className="fstd-topbar">
           <button type="button" onClick={onBack}>‹</button>
-          <span />
-          <button type="submit" disabled={!canSubmit}>{busy ? 'Enviando' : isEditing ? 'Salvar' : 'Concluir'}</button>
+          {embeddedFstd ? <strong>{allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD'}</strong> : <span />}
+          {embeddedFstd
+            ? <button className="fstd-product-close" type="button" onClick={onClose} aria-label="Fechar preenchimento">×</button>
+            : <button type="submit" disabled={!canSubmit}>{busy ? 'Enviando' : isEditing ? 'Salvar' : 'Concluir'}</button>}
         </header>
 
         <section className="fstd-product-hero">
@@ -2023,14 +2034,16 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onSubmit }) {
 
         <footer className="fstd-product-actions">
           <button type="button" onClick={onBack}>Cancelar</button>
-          <button type="submit" disabled={!canSubmit}>{busy ? 'Enviando' : 'Enviar'}</button>
+          <button type="submit" disabled={!canSubmit}>
+            {busy ? isEditing ? 'Salvando...' : 'Enviando...' : isEditing ? 'Salvar' : 'Enviar'}
+          </button>
         </footer>
       </form>
     </main>
   )
 }
 
-function FstdProductSummary({ store, nfd, product, motivos, canEdit, error, onBack, onEdit }) {
+function FstdProductSummary({ store, nfd, product, motivos, canEdit, editingFinalized = false, error, onBack, onEdit }) {
   const motivoById = new Map(motivos.map((motivo) => [motivo.id, motivo.nome]))
   const divisions = product.persisted?.divisoes?.length > 0
     ? product.persisted.divisoes
@@ -2045,7 +2058,7 @@ function FstdProductSummary({ store, nfd, product, motivos, canEdit, error, onBa
     <main className="promotor-app fstd-app fstd-summary-page">
       <header className="fstd-list-topbar">
         <button type="button" onClick={onBack}>‹</button>
-        <strong>FSTD</strong>
+        <strong>{editingFinalized ? 'Editar NFD' : 'FSTD'}</strong>
         <span />
       </header>
 
@@ -2148,7 +2161,7 @@ function FstdDocumentPreview({ document, onClose }) {
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onClose, hideBack = false, embeddedFstd = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
   const [selectedProductCode, setSelectedProductCode] = useState(null)
   const [selectedProductMode, setSelectedProductMode] = useState(null)
   const [documentPreview, setDocumentPreview] = useState(null)
@@ -2171,7 +2184,8 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
         nfd={nfd}
         product={selectedProduct}
         motivos={motivos}
-        canEdit={!processFinalized}
+        canEdit={!processFinalized || allowFinalizedEdit}
+        editingFinalized={allowFinalizedEdit}
         error={error}
         onBack={() => {
           setSelectedProductCode(null)
@@ -2189,6 +2203,9 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
         motivos={motivos}
         busy={busy}
         error={error}
+        embeddedFstd={embeddedFstd}
+        allowFinalizedEdit={allowFinalizedEdit}
+        onClose={onClose}
         onBack={() => {
           if (selectedProduct.persisted?.status === 'concluido') {
             setSelectedProductMode('view')
@@ -2219,9 +2236,11 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
     <>
       <main className={`promotor-app fstd-app fstd-list-page${isAvulsa ? ' is-avulsa' : ''}`}>
       <header className="fstd-list-topbar">
-        <button type="button" onClick={onBack}>‹</button>
-        <strong>FSTD</strong>
-        <span />
+        {hideBack ? <button type="button" onClick={onClose} aria-label="Fechar preenchimento">‹</button> : <button type="button" onClick={onBack}>‹</button>}
+        <strong>{hideBack ? allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD' : 'FSTD'}</strong>
+        {hideBack
+          ? <button className="fstd-list-close" type="button" onClick={onClose} aria-label="Fechar FSTD">×</button>
+          : <span />}
       </header>
 
       <section className="fstd-list-hero">
@@ -2296,12 +2315,114 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
   )
 }
 
-function PromotorWorkspace({ profile, onLogout }) {
+function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocument, documentBusy, documentError }) {
+  const [document, setDocument] = useState(null)
+  const [documentLoadError, setDocumentLoadError] = useState('')
+  const nfdRef = useRef(nfd)
+  const nfdProcessId = nfd?.fstd_process_id
+
+  useEffect(() => {
+    nfdRef.current = nfd
+  }, [nfd])
+
+  useEffect(() => {
+    let active = true
+    void onViewDocument(nfdRef.current)
+      .then((result) => {
+        if (active) {
+          setDocumentLoadError('')
+          setDocument(result)
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setDocumentLoadError(error?.message || 'PDF FSTD indisponível.')
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [nfdProcessId, onViewDocument])
+
+  const products = nfd?.fstd_process?.produtos ?? []
+  const billedGalinha = Number(nfd?.quantidade_galinha ?? 0)
+  const billedCodorna = Number(nfd?.quantidade_codorna ?? 0)
+  const returnedTotal = products.reduce((total, product) => total + Number(product.quantidade_retorno ?? 0), 0)
+  const title = `${getStoreCode(store, nfd)} - ${getNfdNumber(nfd)}`
+  const error = documentLoadError || documentError
+
+  return (
+    <main className="gerencial-finalized-page">
+      <header className="gerencial-finalized-titlebar">
+        <strong>{title}</strong>
+        <button type="button" onClick={onClose} aria-label="Fechar NFD finalizada">×</button>
+      </header>
+
+      <section className="gerencial-finalized-summary">
+        <div className="gerencial-finalized-summary-item">
+          <InvoiceIcon status="sent" />
+          <span>
+            <strong>NFD</strong>
+            <small>Emitida em {formatDate(nfd?.data_emissao)}</small>
+          </span>
+        </div>
+        <button
+          className="gerencial-finalized-summary-item is-editable"
+          type="button"
+          onClick={() => onEdit?.(nfd, store)}
+          aria-label="Editar FSTD finalizada"
+        >
+          <InvoiceIcon status="sent" />
+          <span>
+            <strong>FSTD</strong>
+            <small>Finalizada em {formatDate(nfd?.fstd_process?.finalizada_em)}</small>
+          </span>
+          <span className="gerencial-finalized-edit-hint">Editar</span>
+        </button>
+      </section>
+
+      <section className="gerencial-finalized-body">
+        <div className="gerencial-finalized-facts">
+          <div className="gerencial-finalized-backlink">{title}</div>
+          <h2>Faturado</h2>
+          <dl>
+            <div><dt>Galinha</dt><dd>{billedGalinha.toLocaleString('pt-BR')} ovos</dd></div>
+            <div><dt>Codorna</dt><dd>{billedCodorna.toLocaleString('pt-BR')} ovos</dd></div>
+          </dl>
+          <h2>Retorno</h2>
+          <dl>
+            <div><dt>Total</dt><dd>{returnedTotal.toLocaleString('pt-BR')} ovos</dd></div>
+          </dl>
+        </div>
+
+        <div className="gerencial-finalized-pdf">
+          <div className="gerencial-finalized-pdf-toolbar">
+            <strong>PDF FSTD</strong>
+            {document?.url && (
+              <a href={document.url} download={`FSTD-${document.controlNumber}.pdf`} rel="noreferrer" target="_blank">
+                Download
+              </a>
+            )}
+          </div>
+          {documentBusy && <p>Gerando PDF...</p>}
+          {!documentBusy && document?.url && (
+            <iframe src={document.url} title={`PDF FSTD ${document.controlNumber}`} />
+          )}
+          {!documentBusy && !document?.url && !error && <p>PDF indisponível.</p>}
+          {error && <strong className="promotor-error">{error}</strong>}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFinalized = false, allowFinalizedEdit = false, initialStore = null, initialFstdTarget, onEmbeddedClose, onEmbeddedComplete, onEmbeddedEdit }) {
   const queryClient = useQueryClient()
-  const [savedNavigation] = useState(() => readPromotorNavigation(profile.id))
-  const [selectedStore, setSelectedStore] = useState(() => savedNavigation?.selectedStore ?? null)
-  const [selectedNfd, setSelectedNfd] = useState(() => savedNavigation?.selectedNfd ?? null)
-  const [fstdTarget, setFstdTarget] = useState(() => savedNavigation?.fstdTarget)
+  const [savedNavigation] = useState(() => embeddedFstd || embeddedFinalized ? null : readPromotorNavigation(profile.id))
+  const [selectedStore, setSelectedStore] = useState(() => initialStore ?? savedNavigation?.selectedStore ?? null)
+  const [selectedNfd, setSelectedNfd] = useState(() => embeddedFstd || embeddedFinalized ? null : savedNavigation?.selectedNfd ?? null)
+  const [fstdTarget, setFstdTarget] = useState(() => embeddedFstd || embeddedFinalized ? initialFstdTarget : savedNavigation?.fstdTarget)
   const [isAvulsaOpen, setAvulsaOpen] = useState(false)
   const [avulsaAddProductsTarget, setAvulsaAddProductsTarget] = useState(null)
   const [conferenceAlertDismissed, setConferenceAlertDismissed] = useState(false)
@@ -2336,6 +2457,8 @@ function PromotorWorkspace({ profile, onLogout }) {
   }, [profile?.foto_url])
 
   useEffect(() => {
+    if (embeddedFstd || embeddedFinalized) return
+
     savePromotorNavigation(profile.id, {
       selectedStore,
       selectedNfd,
@@ -2344,7 +2467,7 @@ function PromotorWorkspace({ profile, onLogout }) {
       nfdSearch,
       statusFilter,
     })
-  }, [fstdTarget, nfdSearch, profile.id, selectedNfd, selectedStore, statusFilter, storeSearch])
+  }, [embeddedFinalized, embeddedFstd, fstdTarget, nfdSearch, profile.id, selectedNfd, selectedStore, statusFilter, storeSearch])
 
   const storesQuery = useQuery({
     queryKey: ['promotor', 'lojas', profile.id],
@@ -2459,11 +2582,15 @@ function PromotorWorkspace({ profile, onLogout }) {
   const desconhecimentosQuery = useQuery({
     queryKey: ['promotor', 'nfd-desconhecimentos', profile.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('nfd_desconhecimentos')
         .select('nfd_referencia, comentario, created_at')
-        .eq('promotor_id', profile.id)
+        .is('reconhecida_em', null)
         .order('created_at', { ascending: false })
+
+      if (profile.perfil !== 'Gerencial') query = query.eq('promotor_id', profile.id)
+
+      const { data, error } = await query
 
       if (error) throw error
       return data ?? []
@@ -2776,9 +2903,17 @@ function PromotorWorkspace({ profile, onLogout }) {
       if (error) throw error
       return data
     },
-    onSuccess: async () => {
+    onSuccess: async (completedProcess) => {
       await queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] })
       await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
+      if (embeddedFstd) {
+        if (onEmbeddedComplete) {
+          onEmbeddedComplete(completedProcess)
+        } else {
+          onEmbeddedClose?.()
+        }
+        return
+      }
       setFstdTarget(undefined)
       setSelectedNfd(null)
       setStatusFilter(currentFstdTarget?.conferencia_status === 'conferida' ? 'finalizada' : 'avulsa')
@@ -2786,9 +2921,10 @@ function PromotorWorkspace({ profile, onLogout }) {
   })
 
   const fstdDocumentMutation = useMutation({
-    mutationFn: async () => {
-      const processoId = currentFstdTarget?.fstd_process_id
-      if (!processoId || currentFstdTarget?.fstd_process?.status !== 'concluida') {
+    mutationFn: async (targetOverride) => {
+      const documentTarget = targetOverride ?? currentFstdTarget
+      const processoId = documentTarget?.fstd_process_id
+      if (!processoId || documentTarget?.fstd_process?.status !== 'concluida') {
         throw new Error('Finalize a FSTD antes de gerar o documento.')
       }
 
@@ -2808,17 +2944,18 @@ function PromotorWorkspace({ profile, onLogout }) {
         if (authError) throw authError
         if (!authData.user) throw new Error('Sessão expirada. Entre novamente para visualizar o FSTD.')
 
-        const photoUrls = await getFstdPhotoUrls(currentFstdTarget.fstd_process)
+        const photoUrls = await getFstdPhotoUrls(documentTarget.fstd_process)
         const pdfBlob = await generateFstdPdf({
           document,
-          process: currentFstdTarget.fstd_process,
-          nfd: currentFstdTarget,
+          process: documentTarget.fstd_process,
+          nfd: documentTarget,
           store: selectedStore,
           responsible: profile.nome,
           motivos: motivosQuery.data ?? [],
           photoUrls,
         })
-        const pdfPath = `${authData.user.id}/${processoId}/${document.numero_controle}.pdf`
+        const pdfPath = document.pdf_path
+          || `${authData.user.id}/${processoId}/${document.numero_controle}.pdf`
         const { error: uploadError } = await supabase.storage
           .from('fstd-pdfs')
           .upload(pdfPath, pdfBlob, {
@@ -2836,10 +2973,10 @@ function PromotorWorkspace({ profile, onLogout }) {
           p_pdf_metadata: {
             template_version: FSTD_PDF_TEMPLATE_VERSION,
             processo_id: processoId,
-            nfd_chave_acesso: currentFstdTarget.chave_acesso,
-            nfd_numero: currentFstdTarget.nota_fiscal,
+            nfd_chave_acesso: documentTarget.chave_acesso,
+            nfd_numero: documentTarget.nota_fiscal,
             loja: selectedStore,
-            produtos: currentFstdTarget.fstd_process?.produtos ?? [],
+            produtos: documentTarget.fstd_process?.produtos ?? [],
           },
         })
         if (saveError) throw saveError
@@ -2859,6 +2996,12 @@ function PromotorWorkspace({ profile, onLogout }) {
       }
     },
   })
+
+  const { mutateAsync: mutateFstdDocument } = fstdDocumentMutation
+  const viewFinalizedDocument = useCallback(
+    (target) => mutateFstdDocument(target),
+    [mutateFstdDocument],
+  )
 
   const desconhecerMutation = useMutation({
     mutationFn: async ({ nfd, comment }) => {
@@ -2989,6 +3132,85 @@ function PromotorWorkspace({ profile, onLogout }) {
     )
   }
 
+  if (embeddedFinalized) {
+    const embeddedLoading = storesQuery.isLoading
+      || nfdsQuery.isLoading
+      || produtosCatalogQuery.isLoading
+      || fstdProcessosQuery.isLoading
+      || motivosQuery.isLoading
+
+    const finalizedProcess = (fstdProcessosQuery.data ?? []).find((processo) => (
+      String(processo.nfd_chave_acesso) === String(currentFstdTarget?.chave_acesso)
+      || (
+        processo.is_avulsa
+        && String(processo.loja_id) === String(selectedStore?.id)
+        && String(processo.nfd_numero) === String(currentFstdTarget?.nota_fiscal ?? currentFstdTarget?.numero)
+      )
+    ))
+    const finalizedTarget = currentFstdTarget?.fstd_process
+      ? currentFstdTarget
+      : finalizedProcess
+        ? {
+          ...currentFstdTarget,
+          fstd_process_id: finalizedProcess.id,
+          fstd_process_status: finalizedProcess.status,
+          fstd_process: finalizedProcess,
+          produtos: mergeNfdProducts(currentFstdTarget?.produtos ?? [], finalizedProcess.produtos),
+        }
+        : currentFstdTarget
+
+    if (embeddedLoading) {
+      return <div className="gerencial-fstd-loading">Carregando NFD finalizada...</div>
+    }
+
+    return (
+      <GerencialFinalizedNfdScreen
+        store={selectedStore}
+        nfd={finalizedTarget}
+        documentBusy={fstdDocumentMutation.isPending}
+        documentError={pageError || fstdDocumentMutation.error?.message}
+        onClose={onEmbeddedClose}
+        onEdit={onEmbeddedEdit}
+        onViewDocument={viewFinalizedDocument}
+      />
+    )
+  }
+
+  if (embeddedFstd) {
+    const embeddedLoading = storesQuery.isLoading
+      || nfdsQuery.isLoading
+      || produtosCatalogQuery.isLoading
+      || fstdProcessosQuery.isLoading
+      || motivosQuery.isLoading
+
+    if (embeddedLoading) {
+      return <div className="gerencial-fstd-loading">Carregando FSTD...</div>
+    }
+
+    return (
+      <FstdScreen
+        store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
+        nfd={currentFstdTarget}
+        process={currentFstdTarget?.fstd_process ?? null}
+        motivos={motivosQuery.data ?? []}
+        busy={fstdProductMutation.isPending}
+        error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
+        finalizeBusy={finalizarFstdMutation.isPending}
+        documentBusy={fstdDocumentMutation.isPending}
+        documentError={fstdDocumentMutation.error?.message}
+        hideBack
+        embeddedFstd
+        allowFinalizedEdit={allowFinalizedEdit}
+        onClose={onEmbeddedClose}
+        onBack={() => {}}
+        onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
+        onAddProducts={() => {}}
+        onFinalize={() => finalizarFstdMutation.mutate()}
+        onViewDocument={() => fstdDocumentMutation.mutateAsync()}
+      />
+    )
+  }
+
   if (currentFstdTarget !== undefined && selectedStore) {
     return (
       <>
@@ -3103,6 +3325,59 @@ function PromotorWorkspace({ profile, onLogout }) {
         }}
       />
       {conferenceAlert}
+    </div>
+  )
+}
+
+export function GerencialFstdModal({ note, store, allowFinalizedEdit = false, onClose, onCompleted }) {
+  const { profile } = useAuth()
+
+  if (!profile || !note || !store) return null
+
+  return (
+    <div
+      className="gerencial-fstd-modal-layer"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section className="gerencial-fstd-modal" role="dialog" aria-modal="true" aria-label="Realizar FSTD">
+        <PromotorWorkspace
+          profile={profile}
+          embeddedFstd
+          allowFinalizedEdit={allowFinalizedEdit}
+          initialStore={store}
+          initialFstdTarget={note}
+          onEmbeddedClose={onClose}
+          onEmbeddedComplete={onCompleted}
+          onLogout={onClose}
+        />
+      </section>
+    </div>
+  )
+}
+
+export function GerencialFinalizedNfdModal({ note, store, onClose, onEdit }) {
+  const { profile } = useAuth()
+
+  if (!profile || !note || !store) return null
+
+  return (
+    <div
+      className="gerencial-fstd-modal-layer"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section className="gerencial-fstd-modal gerencial-finalized-modal" role="dialog" aria-modal="true" aria-label="NFD finalizada">
+        <PromotorWorkspace
+          profile={profile}
+          embeddedFinalized
+          initialStore={store}
+          initialFstdTarget={note}
+          onEmbeddedClose={onClose}
+          onEmbeddedEdit={onEdit}
+          onLogout={onClose}
+        />
+      </section>
     </div>
   )
 }
