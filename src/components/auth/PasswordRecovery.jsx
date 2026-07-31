@@ -7,6 +7,8 @@ import { supabase } from '../../lib/supabaseClient'
 import './AvineLogin.css'
 import './PasswordRecovery.css'
 
+const PASSWORD_MIN_LENGTH = 8
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const recoveryPath = '/redefinir-senha'
 
@@ -267,8 +269,8 @@ function ResetPasswordScreen() {
     return () => window.clearTimeout(redirectTimer)
   }, [navigate, success])
 
-  const passwordError = submitted && password.length < 12
-    ? 'A senha deve ter pelo menos 12 caracteres.'
+  const passwordError = submitted && password.length < PASSWORD_MIN_LENGTH
+    ? `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`
     : ''
   const confirmationError = submitted && password !== confirmation
     ? 'As senhas não coincidem.'
@@ -279,7 +281,7 @@ function ResetPasswordScreen() {
     setSubmitted(true)
     setError('')
 
-    if (password.length < 12 || password !== confirmation || busy) return
+    if (password.length < PASSWORD_MIN_LENGTH || password !== confirmation || busy) return
 
     setBusy(true)
     try {
@@ -380,7 +382,7 @@ function ResetPasswordScreen() {
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 autoComplete="new-password"
-                minLength={12}
+                minLength={PASSWORD_MIN_LENGTH}
                 placeholder="Digite sua nova senha"
                 aria-invalid={Boolean(passwordError)}
                 aria-describedby={passwordError ? 'new-password-error' : undefined}
@@ -401,7 +403,7 @@ function ResetPasswordScreen() {
                 onChange={(event) => setConfirmation(event.target.value)}
                 type="password"
                 autoComplete="new-password"
-                minLength={12}
+                minLength={PASSWORD_MIN_LENGTH}
                 placeholder="Digite a senha novamente"
                 aria-invalid={Boolean(confirmationError)}
                 aria-describedby={confirmationError ? 'confirm-password-error' : undefined}

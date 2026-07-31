@@ -10,6 +10,7 @@ import LogoutConfirmDialog from '../components/LogoutConfirmDialog.jsx'
 import avineLogo from '../assets/foto_logoavine.png'
 import profileUserIcon from '../assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../assets/ui-icons/arquivo-pdf.png'
+import cameraIcon from '../assets/fstd-icons/camera.png'
 import {
   clearPromotorNavigation,
   readPromotorNavigation,
@@ -1668,6 +1669,22 @@ function getFstdStoredPhotoPaths(product) {
     : []
 }
 
+function readFstdPhotoPreview(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve({
+      file,
+      url: typeof reader.result === 'string' ? reader.result : '',
+    })
+    reader.onerror = () => resolve({ file, url: '' })
+    reader.readAsDataURL(file)
+  })
+}
+
+function createFstdPhotoPreviews(files) {
+  return Promise.all((Array.isArray(files) ? files : []).map(readFstdPhotoPreview))
+}
+
 function cleanLegacyPhotoObservation(value) {
   return String(value ?? '')
     .split(/\r?\n/)
@@ -1731,21 +1748,36 @@ function FstdStoredPhotos({ paths, removable = false, onRemove }) {
   )
 }
 
-function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embeddedFstd = false, allowFinalizedEdit = false, onSubmit }) {
+function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embeddedFstd = false, allowFinalizedEdit = false, initialDraft = null, onSubmit }) {
   const isAvulsa = Boolean(product.is_avulsa)
   const isEditing = product.persisted?.status === 'concluido'
-  const [form, setForm] = useState(() => ({
-    ...initialFstdForm,
-    divisoes: getFstdDivisionDefaults(product),
-    faturadoGalinha: String(getProductBilledQuantity(product, 'galinha')),
-    faturadoCodorna: String(getProductBilledQuantity(product, 'codorna')),
-    fotosExistentes: isEditing ? getFstdStoredPhotoPaths(product) : [],
-    lotes: isEditing ? getEditableObservation(product.persisted?.observacao) : '',
-  }))
-  const photoPreviews = useMemo(
-    () => form.fotos.map((file) => ({ file, url: URL.createObjectURL(file) })),
-    [form.fotos],
-  )
+  const [form, setForm] = useState(() => {
+    const draftDivisions = Array.isArray(initialDraft?.divisoes)
+      ? initialDraft.divisoes.map((division) => ({
+        motivoId: division.motivoId ?? '',
+        faturado: String(division.faturado ?? ''),
+        retorno: String(division.retorno ?? ''),
+      }))
+      : []
+
+    return {
+      ...initialFstdForm,
+      divisoes: draftDivisions.length > 0 ? draftDivisions : getFstdDivisionDefaults(product),
+      faturadoGalinha: initialDraft?.faturadoGalinha != null
+        ? String(initialDraft.faturadoGalinha)
+        : String(getProductBilledQuantity(product, 'galinha')),
+      faturadoCodorna: initialDraft?.faturadoCodorna != null
+        ? String(initialDraft.faturadoCodorna)
+        : String(getProductBilledQuantity(product, 'codorna')),
+      fotos: Array.isArray(initialDraft?.fotos) ? initialDraft.fotos : [],
+      fotosPreviews: Array.isArray(initialDraft?.fotosPreviews) ? initialDraft.fotosPreviews : [],
+      fotosExistentes: Array.isArray(initialDraft?.fotosExistentes)
+        ? initialDraft.fotosExistentes
+        : isEditing ? getFstdStoredPhotoPaths(product) : [],
+      lotes: initialDraft?.lotes ?? (isEditing ? getEditableObservation(product.persisted?.observacao) : ''),
+    }
+  })
+  const photoPreviews = form.fotosPreviews
   const billedGalinha = isAvulsa
     ? normalizeQuantity(form.faturadoGalinha)
     : getProductBilledQuantity(product, 'galinha')
@@ -1781,12 +1813,15 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
       && !busy,
   )
 
-  useEffect(() => {
-    return () => photoPreviews.forEach((preview) => URL.revokeObjectURL(preview.url))
-  }, [photoPreviews])
-
   function updateForm(patch) {
     setForm((current) => ({ ...current, ...patch }))
+  }
+
+  async function updatePhotos(files) {
+    updateForm({
+      fotos: files,
+      fotosPreviews: await createFstdPhotoPreviews(files),
+    })
   }
 
   function updateAvulsaBilled(field, value) {
@@ -1829,6 +1864,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
     setForm((current) => ({
       ...current,
       fotos: current.fotos.filter((_, index) => index !== indexToRemove),
+      fotosPreviews: current.fotosPreviews.filter((_, index) => index !== indexToRemove),
     }))
   }
 
@@ -2006,7 +2042,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
               <input
                 accept="image/jpeg,image/png,image/webp"
                 multiple
-                onChange={(event) => updateForm({ fotos: Array.from(event.target.files ?? []) })}
+                onChange={(event) => { void updatePhotos(Array.from(event.target.files ?? [])) }}
                 required={!hasPhotos}
                 type="file"
               />
@@ -2135,6 +2171,160 @@ function FstdProductSummary({ store, nfd, product, motivos, canEdit, editingFina
   )
 }
 
+function FstdQuickProductForm({ product, motivos, busy, error, initialDraft = null, onSubmit, onOpenDetailed }) {
+  const totalBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
+  const defaultDivision = initialDraft?.divisoes?.[0] ?? getFstdDivisionDefaults(product)[0] ?? { motivoId: '', retorno: '' }
+  const [motivoId, setMotivoId] = useState(defaultDivision.motivoId ?? '')
+  const [retorno, setRetorno] = useState(defaultDivision.retorno != null ? String(defaultDivision.retorno) : '')
+  const [fotos, setFotos] = useState(() => (Array.isArray(initialDraft?.fotos) ? initialDraft.fotos : []))
+  const [photoPreviews, setPhotoPreviews] = useState(() => (Array.isArray(initialDraft?.fotosPreviews) ? initialDraft.fotosPreviews : []))
+  const normalizedReturn = normalizeNonNegativeQuantity(retorno)
+  const hasPhotos = fotos.length > 0
+  const returnIsTooHigh = String(retorno).trim() !== '' && normalizedReturn > totalBilled
+  const canSubmit = Boolean(
+    motivoId
+      && totalBilled > 0
+      && String(retorno).trim() !== ''
+      && !returnIsTooHigh
+      && hasPhotos
+      && !busy,
+  )
+
+  function handleReturnChange(value) {
+    if (value === '') {
+      setRetorno('')
+      return
+    }
+
+    const parsed = Number.parseInt(value, 10)
+    if (!Number.isFinite(parsed)) return
+    setRetorno(String(Math.min(Math.max(0, parsed), totalBilled)))
+  }
+
+  async function handlePhotoChange(files) {
+    setFotos(files)
+    setPhotoPreviews(await createFstdPhotoPreviews(files))
+  }
+
+  function removePhoto(indexToRemove) {
+    setFotos((current) => current.filter((_, index) => index !== indexToRemove))
+    setPhotoPreviews((current) => current.filter((_, index) => index !== indexToRemove))
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (!canSubmit) return
+
+    await onSubmit({
+      product,
+      divisoes: [{ motivoId, faturado: totalBilled, retorno: normalizedReturn }],
+      observacao: null,
+      fotos,
+      fotosExistentes: [],
+      faturadoGalinha: getProductBilledQuantity(product, 'galinha'),
+      faturadoCodorna: getProductBilledQuantity(product, 'codorna'),
+    })
+  }
+
+  return (
+    <form className="fstd-quick-form" onSubmit={handleSubmit}>
+      <div className="fstd-quick-form-header">
+        <strong>Preenchimento</strong>
+        <button className="fstd-quick-submit" disabled={!canSubmit} type="submit">
+          {busy ? 'Enviando...' : 'Enviar'}
+        </button>
+      </div>
+
+      <div className="fstd-quick-fields">
+        <label className="mobile-field">
+          <span>Motivo <small aria-label="Obrigatório" className="required-label">*</small></span>
+          <select required value={motivoId} onChange={(event) => setMotivoId(event.target.value)}>
+            <option value="">Selecione</option>
+            {motivos.filter((motivo) => motivo.ativo || motivo.id === motivoId).map((motivo) => (
+              <option key={motivo.id} value={motivo.id}>{motivo.nome}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mobile-field">
+          <span>Faturado <small aria-label="Obrigatório" className="required-label">*</small></span>
+          <div className="unit-input">
+            <input aria-readonly="true" readOnly required type="number" value={totalBilled} />
+            <em>ovos</em>
+          </div>
+        </label>
+
+        <label className="mobile-field">
+          <span>Retorno <small aria-label="Obrigatório" className="required-label">*</small></span>
+          <div className="unit-input">
+            <input
+              inputMode="numeric"
+              max={totalBilled}
+              min="0"
+              onChange={(event) => handleReturnChange(event.target.value)}
+              required
+              type="number"
+              value={retorno}
+            />
+            <em>ovos</em>
+          </div>
+        </label>
+
+        <button
+          aria-label="Adicionar outro motivo"
+          className="fstd-quick-add"
+          onClick={() => onOpenDetailed({
+            divisoes: [{ motivoId, faturado: totalBilled, retorno: String(retorno).trim() === '' ? '' : normalizedReturn }],
+            fotos,
+            fotosPreviews: photoPreviews,
+            fotosExistentes: [],
+            faturadoGalinha: getProductBilledQuantity(product, 'galinha'),
+            faturadoCodorna: getProductBilledQuantity(product, 'codorna'),
+            lotes: '',
+          })}
+          title="Adicionar outro motivo"
+          type="button"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+      </div>
+
+      <label className="fstd-quick-photos">
+        <span>Fotos <small aria-label="Obrigatório" className="required-label">*</small></span>
+        <span className="photo-button">
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            onChange={(event) => { void handlePhotoChange(Array.from(event.target.files ?? [])) }}
+            required={!hasPhotos}
+            type="file"
+          />
+          <span className="fstd-quick-photo-content">
+            <img src={cameraIcon} alt="" aria-hidden="true" />
+            <span>Envio de imagens</span>
+          </span>
+        </span>
+      </label>
+
+      {photoPreviews.length > 0 && (
+        <div className="fstd-photo-previews">
+          {photoPreviews.map((preview, index) => (
+            <div className="fstd-photo-preview" key={`${preview.file.name}-${index}`}>
+              <img alt={`Pré-visualização de ${preview.file.name}`} src={preview.url} />
+              <button aria-label={`Remover ${preview.file.name}`} onClick={() => removePhoto(index)} type="button">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {returnIsTooHigh && <strong className="fstd-quantity-error">A quantidade de retorno não pode passar do faturado.</strong>}
+      {error && <strong className="promotor-error">{error}</strong>}
+    </form>
+  )
+}
+
 function FstdDocumentPreview({ document, onClose }) {
   if (!document) return null
 
@@ -2164,6 +2354,8 @@ function FstdDocumentPreview({ document, onClose }) {
 function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onClose, hideBack = false, embeddedFstd = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
   const [selectedProductCode, setSelectedProductCode] = useState(null)
   const [selectedProductMode, setSelectedProductMode] = useState(null)
+  const [expandedProductCode, setExpandedProductCode] = useState(null)
+  const [quickDrafts, setQuickDrafts] = useState({})
   const [documentPreview, setDocumentPreview] = useState(null)
   const processProducts = process?.produtos ?? []
   const persistedByKey = new Map(processProducts.map((product) => [getProductGroupKey(product), product]))
@@ -2205,6 +2397,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
         error={error}
         embeddedFstd={embeddedFstd}
         allowFinalizedEdit={allowFinalizedEdit}
+        initialDraft={quickDrafts[selectedProductCode] ?? null}
         onClose={onClose}
         onBack={() => {
           if (selectedProduct.persisted?.status === 'concluido') {
@@ -2216,6 +2409,11 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
         }}
         onSubmit={async (payload) => {
           await onSubmitProduct(payload)
+          setQuickDrafts((current) => {
+            const next = { ...current }
+            delete next[selectedProductCode]
+            return next
+          })
           if (selectedProduct.persisted?.status === 'concluido') {
             setSelectedProductMode('view')
           } else {
@@ -2255,27 +2453,65 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
         {products.length === 0 && <p className="fstd-empty">Esta NFD não possui produtos detalhados para realizar a FSTD.</p>}
         {products.map((product) => {
           const completed = product.persisted?.status === 'concluido'
+          const expanded = expandedProductCode === product.codigo_produto
           return (
-            <button
-              className="fstd-product-row"
-              disabled={processFinalized && !completed}
-              key={product.codigo_produto}
-              onClick={() => {
-                setSelectedProductCode(product.codigo_produto)
-                setSelectedProductMode(completed ? 'view' : 'edit')
-              }}
-              type="button"
-            >
-              <span className={`fstd-status-dot ${completed ? 'is-complete' : ''}`} aria-label={completed ? 'Produto concluído' : 'Produto pendente'} />
-              <span className="fstd-product-row-copy">
-                <strong>{product.nome}</strong>
-            <small>
-              Fat: {getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')} ovos
-              {' · '}Ret: {completed ? product.persisted.quantidade_retorno : '?'}
-            </small>
-              </span>
-              <span className="fstd-product-arrow">›</span>
-            </button>
+            <div className={`fstd-product-item${expanded ? ' is-expanded' : ''}`} key={product.codigo_produto}>
+              <button
+                className="fstd-product-row"
+                disabled={processFinalized && !completed}
+                onClick={() => {
+                  if (completed) {
+                    setSelectedProductCode(product.codigo_produto)
+                    setSelectedProductMode('view')
+                    return
+                  }
+
+                  setExpandedProductCode((current) => current === product.codigo_produto ? null : product.codigo_produto)
+                }}
+                type="button"
+              >
+                <span className={`fstd-status-dot ${completed ? 'is-complete' : ''}`} aria-label={completed ? 'Produto concluído' : 'Produto pendente'} />
+                <span className="fstd-product-row-copy">
+                  <strong>{product.nome}</strong>
+                  <small>
+                    Fat: {getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')} ovos
+                    {' · '}Ret: {completed ? product.persisted.quantidade_retorno : '?'}
+                  </small>
+                </span>
+                <span className={`fstd-product-arrow${expanded ? ' is-expanded' : ''}`} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </span>
+              </button>
+              {expanded && (
+                <FstdQuickProductForm
+                  product={product}
+                  motivos={motivos}
+                  busy={busy}
+                  error={error}
+                  initialDraft={quickDrafts[product.codigo_produto] ?? null}
+                  onOpenDetailed={(draft) => {
+                    setQuickDrafts((current) => ({
+                      ...current,
+                      [product.codigo_produto]: draft,
+                    }))
+                    setExpandedProductCode(null)
+                    setSelectedProductCode(product.codigo_produto)
+                    setSelectedProductMode('edit')
+                  }}
+                  onSubmit={async (payload) => {
+                    await onSubmitProduct(payload)
+                    setQuickDrafts((current) => {
+                      const next = { ...current }
+                      delete next[product.codigo_produto]
+                      return next
+                    })
+                    setExpandedProductCode(null)
+                  }}
+                />
+              )}
+            </div>
           )
         })}
       </div>

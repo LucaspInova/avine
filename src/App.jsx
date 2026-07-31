@@ -5,6 +5,7 @@ import { supabase } from './lib/supabaseClient'
 import {
   createGerencialUser,
   createOperationalUser,
+  deleteManagedUser,
   listManagedUsers,
   setManagedUserAccess,
   updateManagedUser,
@@ -26,6 +27,7 @@ const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL
 const estadosLojas = [...estados, 'TO']
 const perfis = ['Promotor', 'Entregador']
 const perfisFiltro = ['Gerencial', ...perfis]
+const PASSWORD_MIN_LENGTH = 8
 const emptyPromotorSlots = [1, 2, 3]
 
 const navItems = [
@@ -474,7 +476,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
   const isNameValid = trimmedName.length >= 4
-  const isPasswordValid = password.length >= 12
+  const isPasswordValid = password.length >= PASSWORD_MIN_LENGTH
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
@@ -534,13 +536,13 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 className={password && !isPasswordValid ? 'is-invalid' : ''}
                 value={password}
                 onChange={(event) => onChange({ senha: event.target.value })}
-                minLength={12}
+                minLength={PASSWORD_MIN_LENGTH}
                 type="password"
                 autoComplete="new-password"
                 required
               />
               {password && !isPasswordValid && (
-                <strong className="field-error">A senha deve ter pelo menos 12 caracteres.</strong>
+                <strong className="field-error">A senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.</strong>
               )}
             </label>
 
@@ -603,7 +605,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
             </span>
             <span className={isPasswordValid ? 'is-success' : password ? 'is-danger' : ''}>
               <Icon name={isPasswordValid ? 'check' : password ? 'alert' : 'gear'} />
-              {isPasswordValid ? 'Senha válida' : 'Senha mínima de 12 caracteres'}
+              {isPasswordValid ? 'Senha válida' : `Senha mínima de ${PASSWORD_MIN_LENGTH} caracteres`}
             </span>
             <span className={isProfileValid ? 'is-success' : ''}>
               <Icon name={isProfileValid ? 'check' : 'gear'} />
@@ -802,7 +804,7 @@ function EditarUsuarioModal({
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isNameValid = trimmedName.length >= 4
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
-  const isPasswordValid = !form.senha || form.senha.length >= 12
+  const isPasswordValid = !form.senha || form.senha.length >= PASSWORD_MIN_LENGTH
   const isProfileValid = perfis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
@@ -865,13 +867,13 @@ function EditarUsuarioModal({
               className={form.senha && !isPasswordValid ? 'is-invalid' : ''}
               value={form.senha}
               onChange={(event) => onChange({ senha: event.target.value })}
-              minLength={12}
+              minLength={PASSWORD_MIN_LENGTH}
               type="password"
               autoComplete="new-password"
               placeholder="Deixe vazio para manter"
             />
             {form.senha && !isPasswordValid && (
-              <strong className="field-error">A nova senha deve ter pelo menos 12 caracteres.</strong>
+              <strong className="field-error">A nova senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.</strong>
             )}
           </label>
 
@@ -1439,6 +1441,7 @@ function GerenciaisScreen({
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
+  onDelete,
 }) {
   const gerenciais = usuarios.filter((usuario) => usuario.perfil === 'Gerencial')
   const activeCount = gerenciais.filter((usuario) => usuario.ativo).length
@@ -1489,11 +1492,11 @@ function GerenciaisScreen({
             value={form.senha}
             onChange={(event) => onFormChange({ senha: event.target.value })}
             type="password"
-            minLength={12}
+            minLength={PASSWORD_MIN_LENGTH}
             required
             aria-describedby="gerencial-password-hint"
           />
-          <small id="gerencial-password-hint">Mínimo 12 caracteres.</small>
+          <small id="gerencial-password-hint">Mínimo {PASSWORD_MIN_LENGTH} caracteres.</small>
         </label>
         <button className="create-button" type="submit" disabled={busy}>
           <Icon name="plus" />
@@ -1516,6 +1519,7 @@ function GerenciaisScreen({
 
           {filtered.map((usuario) => {
             const isEditing = editId === usuario.id
+            const isLegacyUser = ['admin@avine.com.br', 'avinegerencial@gmail.com'].includes(usuario.email.toLowerCase())
             const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
             const cannotDeactivate = isSelf || (usuario.ativo && activeCount <= 1)
 
@@ -1555,7 +1559,7 @@ function GerenciaisScreen({
                       onChange={(event) => onEditChange({ senha: event.target.value })}
                       placeholder="Opcional"
                       type="password"
-                      minLength={12}
+                      minLength={PASSWORD_MIN_LENGTH}
                       autoComplete="new-password"
                     />
                   ) : (
@@ -1592,9 +1596,16 @@ function GerenciaisScreen({
                       </button>
                     </>
                   ) : (
-                    <button className="secondary-button" type="button" onClick={() => onStartEdit(usuario)}>
-                      Editar
-                    </button>
+                    <>
+                      <button className="secondary-button" type="button" onClick={() => onStartEdit(usuario)}>
+                        Editar
+                      </button>
+                      {isLegacyUser && (
+                        <button className="danger-button" type="button" onClick={() => onDelete(usuario)}>
+                          Excluir
+                        </button>
+                      )}
+                    </>
                   )}
                 </span>
               </div>
@@ -2817,7 +2828,7 @@ function App() {
     if (
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
-      payload.password.length < 12 ||
+      payload.password.length < PASSWORD_MIN_LENGTH ||
       isNomeDuplicado(payload.nome, usuarios) ||
       !perfis.includes(payload.perfil) ||
       !estados.includes(payload.estado)
@@ -3119,7 +3130,7 @@ function App() {
     if (
       payload.nome.length < 4 ||
       !emailPattern.test(payload.email) ||
-      payload.password.length < 12
+      payload.password.length < PASSWORD_MIN_LENGTH
     ) {
       setGerencialError('Revise nome, email e senha antes de criar.')
       return
@@ -3171,7 +3182,7 @@ function App() {
       !payload.usuario_id
       || payload.nome.length < 4
       || !emailPattern.test(payload.email)
-      || (payload.senha && payload.senha.length < 12)
+      || (payload.senha && payload.senha.length < PASSWORD_MIN_LENGTH)
     ) {
       setGerencialError('Revise nome, email e a nova senha antes de salvar.')
       return
@@ -3211,6 +3222,27 @@ function App() {
     }
 
     cancelEditGerencial()
+    setGerencialBusy(false)
+    await loadUsuarios()
+  }
+
+  async function handleDeleteGerencial(usuario) {
+    const shouldDelete = window.confirm(
+      `Excluir ${usuario.nome} (${usuario.email})? A conta de acesso e o perfil serão removidos definitivamente.`,
+    )
+    if (!shouldDelete) return
+
+    setGerencialBusy(true)
+    setGerencialError('')
+
+    try {
+      await deleteManagedUser(usuario.id)
+    } catch (deleteError) {
+      setGerencialError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o Gerencial.')
+      setGerencialBusy(false)
+      return
+    }
+
     setGerencialBusy(false)
     await loadUsuarios()
   }
@@ -3351,6 +3383,7 @@ function App() {
             onStartEdit={startEditGerencial}
             onCancelEdit={cancelEditGerencial}
             onSaveEdit={handleSaveGerencial}
+            onDelete={handleDeleteGerencial}
           />
         ) : isRelatorios ? (
           <ReportScreen />

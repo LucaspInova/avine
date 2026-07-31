@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+const PASSWORD_MIN_LENGTH = 8
+
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
     status,
@@ -80,8 +82,8 @@ Deno.serve(async (request) => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return jsonResponse(400, { error: 'Informe um e-mail valido.' })
   }
-  if (password.length < 12) {
-    return jsonResponse(400, { error: 'A senha deve ter pelo menos 12 caracteres.' })
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return jsonResponse(400, { error: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.` })
   }
   if (!perfisPermitidos.includes(perfil)) {
     return jsonResponse(400, { error: 'Perfil de acesso invalido.' })

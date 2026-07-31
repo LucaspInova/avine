@@ -8,6 +8,11 @@ const corsHeaders = {
 };
 
 const allowedRoles = new Set(["Promotor", "Entregador", "Gerencial"]);
+const PASSWORD_MIN_LENGTH = 8;
+const legacyGerencialEmails = new Set([
+  "admin@avine.com.br",
+  "avinegerencial@gmail.com",
+]);
 const allowedStates = new Set([
   "CE",
   "MA",
@@ -202,6 +207,57 @@ Deno.serve(async (request) => {
     });
   }
 
+  if (action === "delete") {
+    const usuarioId = text(body.usuario_id);
+    if (!usuarioId) {
+      return jsonResponse(400, { error: "Usuario alvo obrigatorio." });
+    }
+
+    const { data: target, error: targetError } = await adminClient
+      .from("usuarios")
+      .select("id, auth_user_id, email, perfil")
+      .eq("id", usuarioId)
+      .maybeSingle();
+
+    if (targetError || !target) {
+      return jsonResponse(404, { error: "Usuario nao encontrado." });
+    }
+
+    if (
+      target.perfil !== "Gerencial" ||
+      !legacyGerencialEmails.has(email(target.email))
+    ) {
+      return jsonResponse(400, {
+        error: "Somente os dois usuarios gerenciais legados podem ser excluidos por esta acao.",
+      });
+    }
+
+    if (target.auth_user_id === caller.id) {
+      return jsonResponse(400, { error: "Voce nao pode excluir o proprio acesso." });
+    }
+
+    if (target.auth_user_id) {
+      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(
+        target.auth_user_id,
+      );
+
+      if (authDeleteError) {
+        return jsonResponse(400, { error: authDeleteError.message });
+      }
+    }
+
+    const { error: profileDeleteError } = await adminClient
+      .from("usuarios")
+      .delete()
+      .eq("id", target.id);
+
+    if (profileDeleteError) {
+      return jsonResponse(400, { error: profileDeleteError.message });
+    }
+
+    return jsonResponse(200, { deleted: true });
+  }
+
   if (action === "create") {
     let profileInput: ReturnType<typeof validateProfile>;
     try {
@@ -213,9 +269,9 @@ Deno.serve(async (request) => {
     }
 
     const password = typeof body.password === "string" ? body.password : "";
-    if (password.length < 12) {
+    if (password.length < PASSWORD_MIN_LENGTH) {
       return jsonResponse(400, {
-        error: "A senha deve ter pelo menos 12 caracteres.",
+        error: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
       });
     }
 
@@ -356,9 +412,9 @@ Deno.serve(async (request) => {
     }
 
     const password = typeof body.password === "string" ? body.password : "";
-    if (password && password.length < 12) {
+    if (password && password.length < PASSWORD_MIN_LENGTH) {
       return jsonResponse(400, {
-        error: "A nova senha deve ter pelo menos 12 caracteres.",
+        error: `A nova senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
       });
     }
 
