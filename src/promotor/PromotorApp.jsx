@@ -1713,7 +1713,30 @@ function getEditableObservation(value) {
   return cleanLegacyPhotoObservation(String(value ?? '').replace(/^(?:Observações:\s*)+/i, ''))
 }
 
-function FstdStoredPhotos({ paths, removable = false, onRemove }) {
+function FstdPhotoLightbox({ photo, onClose }) {
+  if (!photo) return null
+
+  return (
+    <div className="fstd-photo-lightbox" role="dialog" aria-modal="true" aria-label="Visualizar foto enviada">
+      <button className="fstd-photo-lightbox-backdrop" onClick={onClose} type="button" aria-label="Fechar foto" />
+      <section className="fstd-photo-lightbox-dialog">
+        <header className="fstd-photo-lightbox-header">
+          <div>
+            <strong>Foto enviada</strong>
+            <span>{photo.associationLabel || 'Foto da NFD'}</span>
+          </div>
+          <button onClick={onClose} type="button" aria-label="Fechar foto">×</button>
+        </header>
+        <div className="fstd-photo-lightbox-content">
+          {photo.url ? <img alt={photo.alt || 'Foto enviada'} src={photo.url} /> : <span>Foto indisponível</span>}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function FstdStoredPhotos({ paths, removable = false, onRemove, associationLabel = 'Produto da FSTD' }) {
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
   const photoQuery = useQuery({
     queryKey: ['promotor', 'fstd-stored-photos', paths],
     enabled: paths.length > 0,
@@ -1735,16 +1758,31 @@ function FstdStoredPhotos({ paths, removable = false, onRemove }) {
   if (paths.length === 0) return null
 
   return (
-    <div className="fstd-photo-previews fstd-stored-photo-previews">
-      {(photoQuery.data ?? paths.map((path) => ({ path, url: '' }))).map((photo, index) => (
-        <div className="fstd-photo-preview fstd-stored-photo-preview" key={photo.path}>
-          {photo.url ? <img alt={`Foto enviada ${index + 1}`} src={photo.url} /> : <span>Foto</span>}
-          {removable && (
-            <button aria-label={`Remover foto ${index + 1}`} onClick={() => onRemove?.(photo.path)} type="button">×</button>
-          )}
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="fstd-photo-previews fstd-stored-photo-previews">
+        {(photoQuery.data ?? paths.map((path) => ({ path, url: '' }))).map((photo, index) => (
+          <div
+            className="fstd-photo-preview fstd-stored-photo-preview"
+            key={photo.path}
+            onClick={() => setSelectedPhoto({ ...photo, alt: `Foto enviada ${index + 1}`, associationLabel })}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setSelectedPhoto({ ...photo, alt: `Foto enviada ${index + 1}`, associationLabel })
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            {photo.url ? <img alt={`Foto enviada ${index + 1}`} src={photo.url} /> : <span>Foto</span>}
+            {removable && (
+              <button aria-label={`Remover foto ${index + 1}`} onClick={(event) => { event.stopPropagation(); onRemove?.(photo.path) }} type="button">×</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <FstdPhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+    </>
   )
 }
 
@@ -2325,6 +2363,11 @@ function FstdQuickProductForm({ product, motivos, busy, error, initialDraft = nu
   )
 }
 
+// These legacy components remain available for the detailed/editing flow and for
+// compatibility with drafts created before the table layout was introduced.
+const fstdLegacyComponentReferences = [FstdProductForm, FstdProductSummary, FstdQuickProductForm]
+void fstdLegacyComponentReferences
+
 function FstdDocumentPreview({ document, onClose }) {
   if (!document) return null
 
@@ -2351,11 +2394,564 @@ function FstdDocumentPreview({ document, onClose }) {
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onClose, hideBack = false, embeddedFstd = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
-  const [selectedProductCode, setSelectedProductCode] = useState(null)
-  const [selectedProductMode, setSelectedProductMode] = useState(null)
-  const [expandedProductCode, setExpandedProductCode] = useState(null)
-  const [quickDrafts, setQuickDrafts] = useState({})
+function createFstdTableRow(product, division, index, fotosExistentes = []) {
+  return {
+    id: `${product.codigo_produto}-${index}`,
+    isAdditional: index > 0,
+    motivoId: division.motivoId ?? '',
+    otherMotivoId: '',
+    faturado: String(division.faturado ?? ''),
+    initialFaturado: String(division.faturado ?? ''),
+    retorno: String(division.retorno ?? ''),
+    fotos: [],
+    fotosPreviews: [],
+    fotosExistentes: index === 0 ? fotosExistentes : [],
+  }
+}
+
+function createFstdTableDraft(product) {
+  const preserveSavedReturn = product.persisted?.status === 'concluido'
+  const divisions = getFstdDivisionDefaults(product).map((division) => ({
+    motivoId: division.motivoId,
+    faturado: division.faturado,
+    retorno: preserveSavedReturn ? String(division.retorno ?? '') : '',
+  }))
+
+  return {
+    rows: divisions.map((division, index) => createFstdTableRow(
+      product,
+      division,
+      index,
+      index === 0 ? getFstdStoredPhotoPaths(product) : [],
+    )),
+    faturadoGalinha: String(getProductBilledQuantity(product, 'galinha')),
+    faturadoCodorna: String(getProductBilledQuantity(product, 'codorna')),
+  }
+}
+
+function getFstdTableBilledSplit(product, total) {
+  const originalGalinha = getProductBilledQuantity(product, 'galinha')
+  const originalCodorna = getProductBilledQuantity(product, 'codorna')
+
+  if (originalCodorna > 0 && originalGalinha === 0) {
+    return { galinha: 0, codorna: total }
+  }
+
+  if (originalGalinha > 0 && originalCodorna === 0) {
+    return { galinha: total, codorna: 0 }
+  }
+
+  return {
+    galinha: Math.min(originalGalinha, total),
+    codorna: Math.max(0, total - Math.min(originalGalinha, total)),
+  }
+}
+
+function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinalizedEdit, onSubmit }) {
+  const finalizationLocked = processFinalized && !allowFinalizedEdit
+  const canEdit = !finalizationLocked
+  const [drafts, setDrafts] = useState(() => Object.fromEntries(
+    products.map((product) => [product.codigo_produto, createFstdTableDraft(product)]),
+  ))
+  const persistedObservation = products.find((product) => product.persisted?.observacao)?.persisted?.observacao ?? ''
+  const [observation, setObservation] = useState(() => getEditableObservation(persistedObservation))
+  const observationTouchedRef = useRef(false)
+  const [globalPhotos, setGlobalPhotos] = useState([])
+
+  useEffect(() => {
+    if (observationTouchedRef.current) return
+    setObservation(getEditableObservation(persistedObservation))
+  }, [persistedObservation])
+
+  function updateDraft(productCode, updater) {
+    setDrafts((current) => ({
+      ...current,
+      [productCode]: updater(current[productCode]),
+    }))
+  }
+
+  function updateRow(product, rowId, patch) {
+    updateDraft(product.codigo_produto, (draft) => ({
+      ...draft,
+      rows: draft.rows.map((row) => row.id === rowId ? { ...row, ...patch } : row),
+    }))
+  }
+
+  function updateFaturado(product, row, value) {
+    const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
+
+    updateDraft(product.codigo_produto, (draft) => {
+      const otherRowsBilled = draft.rows
+        .filter((candidate) => candidate.id !== row.id)
+        .reduce((total, candidate) => total + normalizeQuantity(candidate.faturado), 0)
+
+      if (!row.isAdditional && value !== '' && normalizeQuantity(value) >= databaseBilled) {
+        return {
+          ...draft,
+          rows: draft.rows
+            .filter((candidate) => !candidate.isAdditional)
+            .map((candidate) => candidate.id === row.id
+              ? { ...candidate, faturado: String(databaseBilled), otherMotivoId: '' }
+              : candidate),
+        }
+      }
+
+      const remainingBilled = Math.max(0, databaseBilled - otherRowsBilled)
+      const rowLimit = row.isAdditional
+        ? remainingBilled
+        : Math.min(normalizeQuantity(row.initialFaturado), remainingBilled)
+      const nextValue = value === '' ? value : String(Math.min(normalizeQuantity(value), rowLimit))
+
+      return {
+        ...draft,
+        rows: draft.rows.map((candidate) => candidate.id === row.id
+          ? {
+            ...candidate,
+            faturado: nextValue,
+            ...(candidate.isAdditional ? {} : { otherMotivoId: nextValue === candidate.initialFaturado ? '' : candidate.otherMotivoId }),
+          }
+          : candidate),
+      }
+    })
+  }
+
+  function getFaturadoLimit(product, row, rows) {
+    const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
+    const hasAdditionalRows = rows.some((candidate) => candidate.isAdditional)
+    const otherRowsBilled = rows
+      .filter((candidate) => candidate.id !== row.id)
+      .reduce((total, candidate) => total + normalizeQuantity(candidate.faturado), 0)
+    const remainingBilled = Math.max(0, databaseBilled - otherRowsBilled)
+
+    if (!row.isAdditional && hasAdditionalRows) return databaseBilled
+
+    return row.isAdditional
+      ? remainingBilled
+      : Math.min(normalizeQuantity(row.initialFaturado), remainingBilled)
+  }
+
+  function updateRetorno(product, row, value) {
+    const faturado = normalizeQuantity(row.faturado)
+    const nextValue = value === ''
+      ? value
+      : String(Math.min(normalizeNonNegativeQuantity(value), faturado))
+
+    updateRow(product, row.id, { retorno: nextValue })
+  }
+
+  async function updateRowPhotos(product, rowId, files) {
+    const previews = await createFstdPhotoPreviews(files)
+    updateRow(product, rowId, { fotos: files, fotosPreviews: previews })
+  }
+
+  function addAdditionalRow(product) {
+    updateDraft(product.codigo_produto, (draft) => ({
+      ...draft,
+      rows: [
+        ...draft.rows,
+        {
+          ...createFstdTableRow(product, {
+            motivoId: '',
+            faturado: String(Math.max(
+              0,
+              getProductBilledQuantity(product, 'galinha')
+                + getProductBilledQuantity(product, 'codorna')
+                - draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0),
+            )),
+            retorno: '',
+            }, draft.rows.length),
+          id: `${product.codigo_produto}-extra-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+        },
+      ],
+    }))
+  }
+
+  function removeAdditionalRow(product, rowId) {
+    updateDraft(product.codigo_produto, (draft) => ({
+      ...draft,
+      rows: draft.rows.filter((row) => row.id !== rowId),
+    }))
+  }
+
+  async function updateGlobalPhotos(files) {
+    setGlobalPhotos(await createFstdPhotoPreviews(files))
+  }
+
+  function removeGlobalPhoto(indexToRemove) {
+    setGlobalPhotos((current) => current.filter((_, index) => index !== indexToRemove))
+  }
+
+  function removeRowPhoto(product, rowId, indexToRemove) {
+    updateDraft(product.codigo_produto, (draft) => ({
+      ...draft,
+      rows: draft.rows.map((row) => row.id === rowId
+        ? {
+          ...row,
+          fotos: row.fotos.filter((_, index) => index !== indexToRemove),
+          fotosPreviews: row.fotosPreviews.filter((_, index) => index !== indexToRemove),
+        }
+        : row),
+    }))
+  }
+
+  function removeStoredPhoto(product, pathToRemove) {
+    updateDraft(product.codigo_produto, (draft) => ({
+      ...draft,
+      rows: draft.rows.map((row) => ({
+        ...row,
+        fotosExistentes: row.fotosExistentes.filter((path) => path !== pathToRemove),
+      })),
+    }))
+  }
+
+  function getRowMotivoId(row) {
+    return row.otherMotivoId || row.motivoId
+  }
+
+  function isRowValid(row, rows) {
+    const faturado = normalizeQuantity(row.faturado)
+    const retorno = normalizeNonNegativeQuantity(row.retorno)
+    const motivoIsUnique = rows.every((otherRow) => otherRow.id === row.id || getRowMotivoId(otherRow) !== getRowMotivoId(row))
+
+    return Boolean(
+      getRowMotivoId(row)
+        && faturado > 0
+        && String(row.retorno).trim() !== ''
+        && retorno <= faturado
+        && motivoIsUnique
+    )
+  }
+
+  function getProductValidation(product) {
+    const draft = drafts[product.codigo_produto]
+    if (!draft) return false
+
+    const rowsBilled = draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0)
+    const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
+    const productPhotosCount = draft.rows.reduce((total, row) => total + row.fotos.length + row.fotosExistentes.length, 0)
+    const targetBilledIsValid = rowsBilled === databaseBilled
+
+    return Boolean(
+      draft.rows.length > 0
+        && draft.rows.every((row) => isRowValid(row, draft.rows))
+        && targetBilledIsValid
+        && productPhotosCount >= draft.rows.length,
+    )
+  }
+
+  const canSubmit = Boolean(
+    canEdit
+      && !busy
+      && products.length > 0
+      && products.every((product) => getProductValidation(product)),
+  )
+  const storedPhotoCount = products.reduce((total, product) => {
+    const draft = drafts[product.codigo_produto]
+    return total + (draft?.rows ?? []).reduce((rowTotal, row) => rowTotal + row.fotosExistentes.length, 0)
+  }, 0)
+  const photoCount = storedPhotoCount + products.reduce((total, product) => {
+    const draft = drafts[product.codigo_produto]
+    return total + (draft?.rows ?? []).reduce((rowTotal, row) => rowTotal + row.fotos.length, 0)
+  }, 0)
+  const totalFaturado = products.reduce((total, product) => {
+    const draft = drafts[product.codigo_produto]
+    return total + (draft?.rows ?? []).reduce((rowTotal, row) => rowTotal + normalizeQuantity(row.faturado), 0)
+  }, 0)
+  const totalRetorno = products.reduce((total, product) => {
+    const draft = drafts[product.codigo_produto]
+    return total + (draft?.rows ?? []).reduce((rowTotal, row) => rowTotal + normalizeNonNegativeQuantity(row.retorno), 0)
+  }, 0)
+  const hasAdditionalRows = products.some((product) => (drafts[product.codigo_produto]?.rows ?? []).some((row) => row.isAdditional))
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (!canSubmit) return
+
+    const payloads = products.map((product) => {
+      const draft = drafts[product.codigo_produto]
+      const totalBilled = draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0)
+      const billedSplit = product.is_avulsa || product.persisted?.status === 'concluido'
+        ? getFstdTableBilledSplit(product, totalBilled)
+        : {
+          galinha: getProductBilledQuantity(product, 'galinha'),
+          codorna: getProductBilledQuantity(product, 'codorna'),
+        }
+      const rowPhotos = draft.rows.flatMap((row) => row.fotos)
+      const existingPhotos = [...new Set(draft.rows.flatMap((row) => row.fotosExistentes))]
+
+      return {
+        product,
+        divisoes: draft.rows.map((row) => ({
+          motivoId: getRowMotivoId(row),
+          faturado: normalizeQuantity(row.faturado),
+          retorno: normalizeNonNegativeQuantity(row.retorno),
+        })),
+        observacao: observation.trim() || null,
+        fotos: rowPhotos,
+        fotosExistentes: existingPhotos,
+        faturadoGalinha: billedSplit.galinha,
+        faturadoCodorna: billedSplit.codorna,
+      }
+    })
+
+    await onSubmit(payloads)
+  }
+
+  function renderMotivoOptions(row, rows) {
+    const selectedIds = rows
+      .filter((otherRow) => otherRow.id !== row.id)
+      .map((otherRow) => getRowMotivoId(otherRow))
+      .filter(Boolean)
+
+    return motivos
+      .filter((motivo) => motivo.ativo || motivo.id === row.motivoId || motivo.id === row.otherMotivoId)
+      .map((motivo) => (
+        <option disabled={selectedIds.includes(motivo.id)} key={motivo.id} value={motivo.id}>
+          {motivo.nome}
+        </option>
+      ))
+  }
+
+  return (
+    <form className="fstd-table-form" onSubmit={handleSubmit}>
+      <div className="fstd-table-scroll">
+        <table className={`fstd-product-table${hasAdditionalRows ? ' has-other-motivo' : ''}`}>
+          <thead>
+            <tr>
+              <th scope="col">Produto <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+              <th scope="col">Motivo <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+              <th scope="col">Fat <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+              <th scope="col">Ret <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+              <th scope="col">Foto <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.length === 0 && (
+              <tr>
+                <td className="fstd-table-empty" colSpan="5">Esta NFD não possui produtos detalhados para realizar a FSTD.</td>
+              </tr>
+            )}
+            {products.flatMap((product) => {
+              const draft = drafts[product.codigo_produto] ?? createFstdTableDraft(product)
+              const productCompleted = product.persisted?.status === 'concluido'
+              const rowsBilled = draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0)
+              const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
+              const billedMatchesDatabase = rowsBilled === databaseBilled
+              const productHasRequiredPhotos = draft.rows.reduce((total, row) => total + row.fotos.length + row.fotosExistentes.length, 0) >= draft.rows.length
+              return draft.rows.map((row) => {
+                const rowCompleted = isRowValid(row, draft.rows) && billedMatchesDatabase && productHasRequiredPhotos
+                const billedWasReduced = !row.isAdditional
+                  && normalizeQuantity(row.faturado) < normalizeQuantity(row.initialFaturado)
+                const canAddAdditional = (row.isAdditional || billedWasReduced) && rowsBilled < databaseBilled
+                const rowDisabled = !canEdit || (processFinalized && !productCompleted)
+                const rowHasPhoto = row.fotos.length > 0 || row.fotosExistentes.length > 0
+                return (
+                  <tr className={`${row.isAdditional ? 'is-additional ' : ''}${rowCompleted ? 'is-complete' : 'is-pending'}`} key={row.id}>
+                    <th className="fstd-table-product" scope="row">
+                      <span>{product.nome}</span>
+                    </th>
+                    <td className="fstd-spreadsheet-cell fstd-motivo-spreadsheet-cell">
+                      <div className="fstd-motivo-cell">
+                        <select
+                          aria-label={`Motivo de ${product.nome}`}
+                          disabled={rowDisabled}
+                          required
+                          value={row.motivoId}
+                          onChange={(event) => updateRow(product, row.id, { motivoId: event.target.value })}
+                        >
+                          <option value="">Selecione</option>
+                          {renderMotivoOptions(row, draft.rows)}
+                        </select>
+                        {(row.isAdditional || canAddAdditional) && <div className="fstd-motivo-actions">
+                          <button
+                          aria-label={row.isAdditional
+                            ? `Remover motivo adicional de ${product.nome}`
+                            : `Adicionar outro motivo para ${product.nome}`}
+                          className="fstd-table-add-button"
+                          disabled={rowDisabled}
+                          onClick={() => row.isAdditional
+                            ? removeAdditionalRow(product, row.id)
+                            : addAdditionalRow(product)}
+                          type="button"
+                        >
+                          {row.isAdditional ? '−' : '+'}
+                          </button>
+                          {row.isAdditional && canAddAdditional && <button
+                          aria-label={`Adicionar outro motivo para ${product.nome}`}
+                          className="fstd-table-add-button"
+                          disabled={rowDisabled}
+                          onClick={() => addAdditionalRow(product)}
+                          type="button"
+                        >
+                          +
+                          </button>}
+                        </div>}
+                      </div>
+                    </td>
+                    <td className="fstd-spreadsheet-cell fstd-number-spreadsheet-cell">
+                      <input
+                        aria-label={`Faturado de ${product.nome}`}
+                        disabled={rowDisabled}
+                        inputMode="numeric"
+                        max={getFaturadoLimit(product, row, draft.rows)}
+                        min="1"
+                        required
+                        type="number"
+                        value={row.faturado}
+                        onChange={(event) => updateFaturado(product, row, event.target.value)}
+                      />
+                    </td>
+                    <td className="fstd-spreadsheet-cell fstd-number-spreadsheet-cell">
+                      <input
+                        aria-label={`Retorno de ${product.nome}`}
+                        disabled={rowDisabled}
+                        inputMode="numeric"
+                        max={Math.max(0, normalizeQuantity(row.faturado))}
+                        min="0"
+                        required
+                        type="number"
+                        value={row.retorno}
+                        onChange={(event) => updateRetorno(product, row, event.target.value)}
+                      />
+                    </td>
+                    <td className={`fstd-spreadsheet-cell fstd-photo-spreadsheet-cell${rowHasPhoto ? ' has-photo' : ''}`}>
+                      <label className="fstd-table-camera fstd-spreadsheet-camera" title={`Adicionar foto de ${product.nome}`}>
+                        <input
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={rowDisabled}
+                          multiple
+                          onChange={(event) => { void updateRowPhotos(product, row.id, Array.from(event.target.files ?? [])) }}
+                          type="file"
+                        />
+                        <img src={cameraIcon} alt="" aria-hidden="true" />
+                        {rowHasPhoto && <span aria-label="Foto adicionada" className="fstd-photo-cell-check">✓</span>}
+                      </label>
+                    </td>
+                  </tr>
+                )
+              })
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="fstd-table-total-row">
+              <th colSpan="2" scope="row">Total</th>
+              <td>{totalFaturado}</td>
+              <td>{totalRetorno}</td>
+              <td aria-label="Total de fotos">{photoCount}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <section className="fstd-table-section fstd-observation-section">
+        <label htmlFor="fstd-general-observation">
+          Observação Geral <small className="fstd-optional-label">Não obrigatório</small>
+        </label>
+        <div className="fstd-observation-field">
+          <textarea
+            id="fstd-general-observation"
+            disabled={!canEdit}
+            maxLength="500"
+            placeholder="Digite suas observações aqui..."
+            value={observation}
+            onChange={(event) => {
+              observationTouchedRef.current = true
+              setObservation(event.target.value)
+            }}
+            rows="4"
+          />
+          <span>{observation.length}/500</span>
+        </div>
+      </section>
+
+      <section className="fstd-table-section fstd-sent-photos-section">
+          <h2>Fotos Enviadas ({photoCount})</h2>
+          <div className="fstd-sent-photos">
+            {photoCount === 0 && (
+              <div className="fstd-empty-photos" role="status">
+                <img src={cameraIcon} alt="" aria-hidden="true" />
+                <span>Nenhuma foto enviada</span>
+              </div>
+            )}
+            {products.map((product) => {
+            const storedPaths = (drafts[product.codigo_produto]?.rows ?? []).flatMap((row) => row.fotosExistentes)
+            if (storedPaths.length === 0) return null
+            return (
+              <FstdStoredPhotos
+                key={`stored-${product.codigo_produto}`}
+                paths={[...new Set(storedPaths)]}
+                onRemove={(path) => removeStoredPhoto(product, path)}
+                removable={canEdit}
+                associationLabel={`Produto: ${product.nome}`}
+              />
+            )
+          })}
+          {products.flatMap((product) => (drafts[product.codigo_produto]?.rows ?? []).flatMap((row) => (
+            row.fotosPreviews.map((preview, index) => ({ product, row, preview, index }))
+          ))).map(({ product, row, preview, index }) => (
+            <div
+              className="fstd-photo-preview"
+              key={`${product.codigo_produto}-${row.id}-${preview.file.name}-${index}`}
+              onClick={(event) => {
+                if (event.target.closest('button')) return
+                setSelectedPhoto({
+                associationLabel: `Produto: ${product.nome}`,
+                url: preview.url,
+                })
+              }}
+            >
+              <img alt={`Pré-visualização de ${preview.file.name}`} src={preview.url} />
+              <button aria-label={`Remover ${preview.file.name}`} onClick={() => removeRowPhoto(product, row.id, index)} type="button">×</button>
+            </div>
+          ))}
+          {globalPhotos.map((preview, index) => (
+            <div
+              className="fstd-photo-preview"
+              key={`global-${preview.file.name}-${index}`}
+              onClick={(event) => {
+                if (event.target.closest('button')) return
+                setSelectedPhoto({
+                associationLabel: 'Foto geral da NFD',
+                url: preview.url,
+                })
+              }}
+            >
+              <img alt={`Pré-visualização de ${preview.file.name}`} src={preview.url} />
+              <button aria-label={`Remover ${preview.file.name}`} onClick={() => removeGlobalPhoto(index)} type="button">×</button>
+            </div>
+          ))}
+          <label className="fstd-add-photo-tile">
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              disabled={!canEdit}
+              multiple
+              onChange={(event) => { void updateGlobalPhotos(Array.from(event.target.files ?? [])) }}
+              type="file"
+            />
+            <img src={cameraIcon} alt="" aria-hidden="true" />
+            <span>Adicionar foto</span>
+          </label>
+        </div>
+      </section>
+
+      {!finalizationLocked && (
+        <button
+        aria-disabled={finalizationLocked}
+        className="fstd-send-button"
+        disabled={!canSubmit || finalizationLocked}
+        tabIndex={finalizationLocked ? -1 : undefined}
+        type="submit"
+      >
+        <span aria-hidden="true">⌁</span>
+        {busy ? 'Salvando...' : 'Finalizar'}
+        </button>
+      )}
+      <FstdPhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+    </form>
+  )
+}
+
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onClose, hideBack = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
   const [documentPreview, setDocumentPreview] = useState(null)
   const processProducts = process?.produtos ?? []
   const persistedByKey = new Map(processProducts.map((product) => [getProductGroupKey(product), product]))
@@ -2367,184 +2963,62 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
   const allCompleted = products.length > 0 && products.every((product) => product.persisted?.status === 'concluido')
   const processFinalized = process?.status === 'concluida'
   const isAvulsa = Boolean(nfd?.is_avulsa)
-  const selectedProduct = products.find((product) => product.codigo_produto === selectedProductCode)
-
-  if (selectedProduct && selectedProductMode === 'view') {
-    return (
-      <FstdProductSummary
-        store={store}
-        nfd={nfd}
-        product={selectedProduct}
-        motivos={motivos}
-        canEdit={!processFinalized || allowFinalizedEdit}
-        editingFinalized={allowFinalizedEdit}
-        error={error}
-        onBack={() => {
-          setSelectedProductCode(null)
-          setSelectedProductMode(null)
-        }}
-        onEdit={() => setSelectedProductMode('edit')}
-      />
-    )
-  }
-
-  if (selectedProduct) {
-    return (
-      <FstdProductForm
-        product={selectedProduct}
-        motivos={motivos}
-        busy={busy}
-        error={error}
-        embeddedFstd={embeddedFstd}
-        allowFinalizedEdit={allowFinalizedEdit}
-        initialDraft={quickDrafts[selectedProductCode] ?? null}
-        onClose={onClose}
-        onBack={() => {
-          if (selectedProduct.persisted?.status === 'concluido') {
-            setSelectedProductMode('view')
-          } else {
-            setSelectedProductCode(null)
-            setSelectedProductMode(null)
-          }
-        }}
-        onSubmit={async (payload) => {
-          await onSubmitProduct(payload)
-          setQuickDrafts((current) => {
-            const next = { ...current }
-            delete next[selectedProductCode]
-            return next
-          })
-          if (selectedProduct.persisted?.status === 'concluido') {
-            setSelectedProductMode('view')
-          } else {
-            setSelectedProductCode(null)
-            setSelectedProductMode(null)
-          }
-        }}
-      />
-    )
-  }
 
   async function handleViewDocument() {
     const preview = await onViewDocument()
     if (preview) setDocumentPreview(preview)
   }
 
+  async function handleSubmitProducts(payloads) {
+    for (const payload of payloads) {
+      await onSubmitProduct(payload)
+    }
+    await onFinalize()
+  }
+
   return (
     <>
       <main className={`promotor-app fstd-app fstd-list-page${isAvulsa ? ' is-avulsa' : ''}`}>
-      <header className="fstd-list-topbar">
-        {hideBack ? <button type="button" onClick={onClose} aria-label="Fechar preenchimento">‹</button> : <button type="button" onClick={onBack}>‹</button>}
-        <strong>{hideBack ? allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD' : 'FSTD'}</strong>
-        {hideBack
-          ? <button className="fstd-list-close" type="button" onClick={onClose} aria-label="Fechar FSTD">×</button>
-          : <span />}
-      </header>
+        <header className="fstd-list-topbar">
+          {hideBack ? <button type="button" onClick={onClose} aria-label="Fechar preenchimento">‹</button> : <button type="button" onClick={onBack}>‹</button>}
+          <strong>{hideBack ? allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD' : 'FSTD'}</strong>
+          {hideBack
+            ? <button className="fstd-list-close" type="button" onClick={onClose} aria-label="Fechar FSTD">×</button>
+            : <span />}
+        </header>
 
-      <section className="fstd-list-hero">
-        <img src={avineLogo} alt="Avine" />
-        <div>
-          <h1>{getStoreTitle(store)}</h1>
-          <p>NFD: {getNfdNumber(nfd)} / CÓD: {getStoreCode(store, nfd)}</p>
-        </div>
-      </section>
+        <section className="fstd-list-hero">
+          <img src={avineLogo} alt="Avine" />
+          <div>
+            <h1>{getStoreTitle(store)}</h1>
+            <p>NFD: {getNfdNumber(nfd)} / CÓD: {getStoreCode(store, nfd)}</p>
+          </div>
+        </section>
 
-      <div className="fstd-product-list">
-        {products.length === 0 && <p className="fstd-empty">Esta NFD não possui produtos detalhados para realizar a FSTD.</p>}
-        {products.map((product) => {
-          const completed = product.persisted?.status === 'concluido'
-          const expanded = expandedProductCode === product.codigo_produto
-          return (
-            <div className={`fstd-product-item${expanded ? ' is-expanded' : ''}`} key={product.codigo_produto}>
-              <button
-                className="fstd-product-row"
-                disabled={processFinalized && !completed}
-                onClick={() => {
-                  if (completed) {
-                    setSelectedProductCode(product.codigo_produto)
-                    setSelectedProductMode('view')
-                    return
-                  }
+        <FstdTableEditor
+          key={products.map((product) => product.codigo_produto).join('|')}
+          allowFinalizedEdit={allowFinalizedEdit}
+          busy={busy || finalizeBusy}
+          motivos={motivos}
+          onSubmit={handleSubmitProducts}
+          processFinalized={processFinalized}
+          products={products}
+        />
 
-                  setExpandedProductCode((current) => current === product.codigo_produto ? null : product.codigo_produto)
-                }}
-                type="button"
-              >
-                <span className={`fstd-status-dot ${completed ? 'is-complete' : ''}`} aria-label={completed ? 'Produto concluído' : 'Produto pendente'} />
-                <span className="fstd-product-row-copy">
-                  <strong>{product.nome}</strong>
-                  <small>
-                    Fat: {getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')} ovos
-                    {' · '}Ret: {completed ? product.persisted.quantidade_retorno : '?'}
-                  </small>
-                </span>
-                <span className={`fstd-product-arrow${expanded ? ' is-expanded' : ''}`} aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </span>
-              </button>
-              {expanded && (
-                <FstdQuickProductForm
-                  product={product}
-                  motivos={motivos}
-                  busy={busy}
-                  error={error}
-                  initialDraft={quickDrafts[product.codigo_produto] ?? null}
-                  onOpenDetailed={(draft) => {
-                    setQuickDrafts((current) => ({
-                      ...current,
-                      [product.codigo_produto]: draft,
-                    }))
-                    setExpandedProductCode(null)
-                    setSelectedProductCode(product.codigo_produto)
-                    setSelectedProductMode('edit')
-                  }}
-                  onSubmit={async (payload) => {
-                    await onSubmitProduct(payload)
-                    setQuickDrafts((current) => {
-                      const next = { ...current }
-                      delete next[product.codigo_produto]
-                      return next
-                    })
-                    setExpandedProductCode(null)
-                  }}
-                />
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {(error || documentError) && <strong className="promotor-error fstd-list-error">{error || documentError}</strong>}
-      {allCompleted && processFinalized && !isAvulsa && (
-        <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
-          <span>{documentBusy ? 'Abrindo...' : 'Ver FSTD'}</span>
-          <img src={pdfIcon} alt="" aria-hidden="true" />
-        </button>
-      )}
-      {isAvulsa && !processFinalized && (
-        <div className="fstd-avulsa-actions">
-          <button className="fstd-add-products-button" onClick={onAddProducts} type="button">
-            + Adicionar mais produtos
+        {(error || documentError) && <strong className="promotor-error fstd-list-error">{error || documentError}</strong>}
+        {allCompleted && processFinalized && !isAvulsa && (
+          <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
+            <span>{documentBusy ? 'Abrindo...' : 'Ver FSTD'}</span>
+            <img src={pdfIcon} alt="" aria-hidden="true" />
           </button>
-          {products.length > 0 && (
-            <button
-              className="fstd-finalize-button fstd-avulsa-finalize-button"
-              disabled={!allCompleted || finalizeBusy}
-              onClick={onFinalize}
-              type="button"
-            >
-              {finalizeBusy ? 'Finalizando...' : 'Finalizar FSTD avulsa'}
+        )}
+        {isAvulsa && !processFinalized && (
+          <div className="fstd-avulsa-actions">
+            <button className="fstd-add-products-button" onClick={onAddProducts} type="button">
+              + Adicionar mais produtos
             </button>
-          )}
-        </div>
-      )}
-      {!isAvulsa && allCompleted && !processFinalized && (
-        <button className="fstd-finalize-button" disabled={finalizeBusy} onClick={onFinalize} type="button">
-          {finalizeBusy ? 'Finalizando...' : 'Finalizar'}
-        </button>
-      )}
+          </div>
+        )}
       </main>
       <FstdDocumentPreview document={documentPreview} onClose={() => setDocumentPreview(null)} />
     </>
@@ -2824,7 +3298,9 @@ function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFi
         .is('reconhecida_em', null)
         .order('created_at', { ascending: false })
 
-      if (profile.perfil !== 'Gerencial') query = query.eq('promotor_id', profile.id)
+      if (profile.perfil !== 'Gerencial' && profile.perfil !== 'Supervisor') {
+        query = query.eq('promotor_id', profile.id)
+      }
 
       const { data, error } = await query
 
@@ -3139,9 +3615,16 @@ function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFi
       if (error) throw error
       return data
     },
-    onSuccess: async (completedProcess) => {
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] })
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
+    onSuccess: (completedProcess) => {
+      const refreshQueries = Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] }),
+        queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] }),
+      ])
+
+      void refreshQueries.catch((refreshError) => {
+        console.error('NÃ£o foi possÃ­vel atualizar a lista apÃ³s finalizar a FSTD.', refreshError)
+      })
+
       if (embeddedFstd) {
         if (onEmbeddedComplete) {
           onEmbeddedComplete(completedProcess)

@@ -91,7 +91,7 @@ function RoleAccessScreen() {
     return <Navigate to="/" replace />
   }
 
-  if (auth.profile.perfil === 'Gerencial') {
+  if (auth.profile.perfil === 'Gerencial' || auth.profile.perfil === 'Supervisor') {
     return <Navigate to="/gerencial" replace />
   }
 

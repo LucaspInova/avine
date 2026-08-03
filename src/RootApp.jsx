@@ -29,7 +29,7 @@ function RootApp() {
           <Route
             path="/gerencial/*"
             element={(
-              <RequireRole profile="Gerencial">
+              <RequireRole profile={['Gerencial', 'Supervisor']}>
                 <GerencialApp />
               </RequireRole>
             )}

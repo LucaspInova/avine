@@ -25,19 +25,26 @@ import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
-const perfis = ['Promotor', 'Entregador']
-const perfisFiltro = ['Gerencial', ...perfis]
+const perfisOperacionais = ['Promotor', 'Entregador']
+const perfisCadastro = ['Gerencial', 'Supervisor', 'Entregador', 'Promotor']
+const perfisEditaveis = ['Supervisor', 'Entregador', 'Promotor']
+const perfisCadastroUi = [
+  { value: 'Gerencial', label: 'Gerencial' },
+  { value: 'Supervisor', label: 'Supervisor' },
+  { value: 'Promotor', label: 'Promotor' },
+  { value: 'Entregador', label: 'Entregador' },
+]
 const PASSWORD_MIN_LENGTH = 8
 const emptyPromotorSlots = [1, 2, 3]
+const USERS_PAGE_SIZE = 10
 
 const navItems = [
-  { id: 'usuarios', label: 'Usuários', icon: 'users' },
+  { id: 'usuarios', label: 'Cadastro de Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
   { id: 'notas', label: 'Notas fiscais', icon: 'notes' },
-  { id: 'configuracoes', label: 'Gerenciais', icon: 'gear', separated: true },
 ]
 
-const gerencialScreenIds = ['usuarios', 'lojas', 'notas', 'configuracoes']
+const gerencialScreenIds = ['usuarios', 'lojas', 'notas']
 const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
 
 function getInitialGerencialScreen() {
@@ -45,6 +52,7 @@ function getInitialGerencialScreen() {
 
   try {
     const savedScreen = window.localStorage.getItem(gerencialScreenStorageKey)
+    if (savedScreen === 'configuracoes') return 'usuarios'
     return gerencialScreenIds.includes(savedScreen) ? savedScreen : 'lojas'
   } catch {
     return 'lojas'
@@ -67,14 +75,34 @@ const initialLojaForm = {
   cidade: '',
 }
 
-const initialGerencialForm = {
-  nome: '',
-  email: '',
-  senha: '',
-}
-
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const NOTES_PAGE_SIZE = 10
+
+function getProfileLabel(profile) {
+  return profile
+}
+
+function isManagerProfile(profile) {
+  return profile === 'Gerencial' || profile === 'Supervisor'
+}
+
+function getUserInitials(name) {
+  return String(name ?? '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join('')
+    .toUpperCase() || 'US'
+}
+
+function isUserActive(user) {
+  return user.ativo === true && user.acesso_habilitado === true
+}
+
+function getSupervisorName(user) {
+  return user.supervisor_nome ?? user.supervisor?.nome ?? '-'
+}
 
 function formatNoteDate(value) {
   const date = String(value ?? '').slice(0, 10)
@@ -176,6 +204,36 @@ function Icon({ name, className = '' }) {
       <svg {...props}>
         <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
         <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+      </svg>
+    )
+  }
+
+  if (name === 'user-plus') {
+    return (
+      <svg {...props}>
+        <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="8.5" cy="7" r="4" />
+        <path d="M19 8v6" />
+        <path d="M22 11h-6" />
+      </svg>
+    )
+  }
+
+  if (name === 'shield') {
+    return (
+      <svg {...props}>
+        <path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3Z" />
+        <path d="m9 12 2 2 4-4" />
+      </svg>
+    )
+  }
+
+  if (name === 'more') {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="5" r="1" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="19" r="1" fill="currentColor" stroke="none" />
       </svg>
     )
   }
@@ -468,18 +526,24 @@ function PhotoSwitch({ checked, disabled = false, onChange, label }) {
   )
 }
 
-function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmit }) {
+export function CadastroModal({ form, usuarios, currentUser, busy, error, onChange, onClose, onSubmit }) {
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
   const password = form.senha
+  const isGerencial = form.perfil === 'Gerencial'
+  const isSupervisor = form.perfil === 'Supervisor'
+  const currentUserIsSupervisor = currentUser?.perfil === 'Supervisor'
+  const isOperationalProfile = perfisOperacionais.includes(form.perfil)
+  const requiresState = isOperationalProfile || isSupervisor
+  const allowedStates = currentUserIsSupervisor ? [currentUser.estado] : estados
   const hasEmailInput = trimmedEmail.length > 0
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
   const isNameValid = trimmedName.length >= 4
   const isPasswordValid = password.length >= PASSWORD_MIN_LENGTH
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
-  const isProfileValid = perfis.includes(form.perfil)
-  const isEstadoValid = estados.includes(form.estado)
+  const isProfileValid = perfisCadastro.includes(form.perfil)
+  const isEstadoValid = isGerencial || (requiresState && allowedStates.includes(form.estado))
   const canSubmit =
     isEmailValid &&
     isNameValid &&
@@ -493,7 +557,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
     <div className="modal-backdrop" role="presentation">
       <form className="user-modal" onSubmit={onSubmit}>
         <div className="modal-titlebar">
-          <h3>Cadastro de Usuário</h3>
+          <h3>Cadastrar Usuário</h3>
           <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar cadastro">
             <Icon name="x" />
           </button>
@@ -501,32 +565,53 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
 
         <div className="modal-grid">
           <div className="modal-main">
+            <fieldset className="user-profile-field">
+              <legend>Perfil</legend>
+              <div className="chip-group">
+                {perfisCadastroUi.map((perfil) => (
+                  <button
+                    key={perfil.value}
+                    className={`choice-chip ${form.perfil === perfil.value ? 'is-selected' : ''}`}
+                    type="button"
+                    disabled={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)}
+                    title={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)
+                      ? 'Supervisor só pode cadastrar perfis operacionais.'
+                      : undefined}
+                    onClick={() => onChange({ perfil: form.perfil === perfil.value ? '' : perfil.value })}
+                  >
+                    {perfil.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="form-row">
+              <span>Nome</span>
+              <input
+                value={form.nome}
+                onChange={(event) => onChange({ nome: event.target.value })}
+                minLength={4}
+                placeholder="Digite o nome completo"
+                type="text"
+                required
+              />
+              {hasNomeDuplicado && (
+                <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
+              )}
+            </label>
+
             <label className="form-row">
               <span>E-mail</span>
               <input
                 className={isEmailInvalid ? 'is-invalid' : ''}
                 value={form.email}
                 onChange={(event) => onChange({ email: event.target.value })}
-                placeholder="Ex: test@gmail.com"
-                type="text"
+                placeholder="nome@empresa.com"
+                type="email"
                 required
               />
               {isEmailInvalid && (
                 <strong className="field-error">Insira um endereço de e-mail válido.</strong>
-              )}
-            </label>
-
-            <label className="form-row">
-              <span>Nome de Usuário</span>
-              <input
-                value={form.nome}
-                onChange={(event) => onChange({ nome: event.target.value })}
-                minLength={4}
-                type="text"
-                required
-              />
-              {hasNomeDuplicado && (
-                <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
               )}
             </label>
 
@@ -537,6 +622,7 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
                 value={password}
                 onChange={(event) => onChange({ senha: event.target.value })}
                 minLength={PASSWORD_MIN_LENGTH}
+                placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
                 type="password"
                 autoComplete="new-password"
                 required
@@ -546,48 +632,53 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
               )}
             </label>
 
-            <div className="form-inline">
-              <fieldset>
-                <legend>Perfil de Acesso</legend>
-                <div className="chip-group">
-                  {perfis.map((perfil) => (
-                    <button
-                      key={perfil}
-                      className={`choice-chip ${form.perfil === perfil ? 'is-selected' : ''}`}
-                      type="button"
-                      onClick={() => onChange({ perfil: form.perfil === perfil ? '' : perfil })}
+            {requiresState && (
+              <>
+                <fieldset>
+                  <legend>UF</legend>
+                  <div className="chip-group state-chips">
+                    {allowedStates.map((estado) => (
+                      <button
+                        key={estado}
+                        className={`choice-chip ${form.estado === estado ? 'is-selected' : ''}`}
+                        type="button"
+                        disabled={currentUserIsSupervisor}
+                        onClick={() => onChange({ estado: form.estado === estado ? '' : estado })}
+                      >
+                        {estado}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+
+                {form.perfil === 'Promotor' && (
+                  <label className="form-row" htmlFor="cadastro-supervisor">
+                    <span>Supervisor responsável</span>
+                    <select
+                      id="cadastro-supervisor"
+                      value=""
+                      disabled
+                      aria-label="Supervisor responsável"
+                      aria-describedby="supervisor-unavailable-hint"
                     >
-                      {perfil}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
+                      <option value="">Nenhum supervisor disponível</option>
+                    </select>
+                    <small id="supervisor-unavailable-hint">
+                      O vínculo será habilitado quando o perfil Supervisor existir no sistema.
+                    </small>
+                  </label>
+                )}
 
-              <label className="switch-field">
-                <span>Habilitar Fotos?</span>
-                <PhotoSwitch
-                  checked={form.fotos_habilitadas}
-                  label="Habilitar fotos"
-                  onChange={() => onChange({ fotos_habilitadas: !form.fotos_habilitadas })}
-                />
-              </label>
-            </div>
-
-            <fieldset>
-              <legend>Estado</legend>
-              <div className="chip-group state-chips">
-                {estados.map((estado) => (
-                  <button
-                    key={estado}
-                    className={`choice-chip ${form.estado === estado ? 'is-selected' : ''}`}
-                    type="button"
-                    onClick={() => onChange({ estado: form.estado === estado ? '' : estado })}
-                  >
-                    {estado}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+                <label className="switch-field">
+                  <span>Habilitar fotos?</span>
+                  <PhotoSwitch
+                    checked={form.fotos_habilitadas}
+                    label="Habilitar fotos"
+                    onChange={() => onChange({ fotos_habilitadas: !form.fotos_habilitadas })}
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           <div className="modal-hints" aria-hidden="true">
@@ -611,10 +702,12 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
               <Icon name={isProfileValid ? 'check' : 'gear'} />
               {isProfileValid ? 'Perfil de acesso escolhido' : 'Escolha o perfil de acesso'}
             </span>
-            <span className={isEstadoValid ? 'is-success' : ''}>
-              <Icon name={isEstadoValid ? 'check' : 'pin'} />
-              {isEstadoValid ? 'Estado escolhido' : 'Preencha a UF'}
-            </span>
+            {isProfileValid && (
+              <span className={isEstadoValid ? 'is-success' : ''}>
+                <Icon name={isEstadoValid ? 'check' : 'pin'} />
+                {isGerencial ? 'UF não exigida para Gerencial' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -629,13 +722,13 @@ function CadastroModal({ form, usuarios, busy, error, onChange, onClose, onSubmi
   )
 }
 
-function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubmit }) {
+function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, error, onChange, onClose, onSubmit }) {
   const codigo = normalizaTexto(form.codigo)
   const nome = normalizaTexto(form.nome)
   const cidade = normalizaTexto(form.cidade)
   const isCodigoValid = codigo.length > 0 && !isCodigoDuplicado(codigo, lojas)
   const isNomeValid = nome.length > 0
-  const isUfValid = estadosLojas.includes(form.uf)
+  const isUfValid = allowedStates.includes(form.uf)
   const isCidadeValid = cidade.length > 0
   const canSubmit = isCodigoValid && isNomeValid && isUfValid && isCidadeValid && !busy
 
@@ -678,7 +771,7 @@ function CadastroLojaModal({ form, lojas, busy, error, onChange, onClose, onSubm
             <fieldset>
               <legend>UF Estado</legend>
               <div className="chip-group state-chips">
-                {estadosLojas.map((estado) => (
+                {allowedStates.map((estado) => (
                   <button
                     key={estado}
                     className={`choice-chip ${form.uf === estado ? 'is-selected' : ''}`}
@@ -805,7 +898,7 @@ function EditarUsuarioModal({
   const isNameValid = trimmedName.length >= 4
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
   const isPasswordValid = !form.senha || form.senha.length >= PASSWORD_MIN_LENGTH
-  const isProfileValid = perfis.includes(form.perfil)
+  const isProfileValid = perfisEditaveis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
     isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy && !deleting && isPasswordValid
@@ -883,14 +976,14 @@ function EditarUsuarioModal({
               <small>Necessário</small>
             </legend>
             <div className="chip-group">
-              {perfis.map((perfil) => (
+              {perfisEditaveis.map((perfil) => (
                 <button
                   key={perfil}
                   className={`choice-chip ${form.perfil === perfil ? 'is-selected' : ''}`}
                   type="button"
                   onClick={() => onChange({ perfil: form.perfil === perfil ? '' : perfil })}
                 >
-                  {perfil}
+                  {getProfileLabel(perfil)}
                 </button>
               ))}
             </div>
@@ -939,57 +1032,6 @@ function EditarUsuarioModal({
           </button>
         </div>
       </form>
-    </div>
-  )
-}
-
-function UserFilterPopover({ selectedEstados, selectedPerfis, onToggleEstado, onTogglePerfil, onClear, onClose }) {
-  return (
-    <div className="filter-popover">
-      <div className="filter-title">
-        <strong>Filtrar por Estado</strong>
-        <span className="filter-chevron" />
-      </div>
-
-      <div className="filter-options">
-        {estados.map((estado) => (
-          <label key={estado} className="filter-option">
-            <span>{estado}</span>
-            <input
-              checked={selectedEstados.includes(estado)}
-              onChange={() => onToggleEstado(estado)}
-              type="checkbox"
-            />
-          </label>
-        ))}
-      </div>
-
-      <div className="filter-title profile-filter-title">
-        <strong>Filtrar por Perfil</strong>
-        <span className="filter-chevron" />
-      </div>
-
-      <div className="filter-options profile-filter-options">
-        {perfisFiltro.map((perfil) => (
-          <label key={perfil} className="filter-option">
-            <span>{perfil}</span>
-            <input
-              checked={selectedPerfis.includes(perfil)}
-              onChange={() => onTogglePerfil(perfil)}
-              type="checkbox"
-            />
-          </label>
-        ))}
-      </div>
-
-      <div className="filter-footer">
-        <button className="secondary-button" type="button" onClick={onClear}>
-          Limpar tudo
-        </button>
-        <button className="primary-button" type="button" onClick={onClose}>
-          Fechar
-        </button>
-      </div>
     </div>
   )
 }
@@ -1424,197 +1466,351 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
   )
 }
 
-function GerenciaisScreen({
+export function UsuariosScreen({
   currentUser,
   usuarios,
   loading,
   error,
   busy,
-  form,
   editId,
   editForm,
   search,
   onSearch,
-  onFormChange,
+  onOpenCadastro,
+  onOpenUsuario,
   onEditChange,
-  onCreate,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
   onDelete,
 }) {
-  const gerenciais = usuarios.filter((usuario) => usuario.perfil === 'Gerencial')
-  const activeCount = gerenciais.filter((usuario) => usuario.ativo).length
-  const query = search.trim().toLowerCase()
-  const filtered = gerenciais.filter((usuario) =>
-    `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query),
+  const [profileFilter, setProfileFilter] = useState('all')
+  const [ufFilter, setUfFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const activeGerencialCount = usuarios.filter(
+    (usuario) => usuario.perfil === 'Gerencial' && usuario.ativo,
+  ).length
+  const counts = useMemo(() => ({
+    all: usuarios.length,
+    Gerencial: usuarios.filter((usuario) => usuario.perfil === 'Gerencial').length,
+    Supervisor: usuarios.filter((usuario) => usuario.perfil === 'Supervisor').length,
+    Entregador: usuarios.filter((usuario) => usuario.perfil === 'Entregador').length,
+    Promotor: usuarios.filter((usuario) => usuario.perfil === 'Promotor').length,
+  }), [usuarios])
+  const availableUfs = useMemo(
+    () => [...new Set(usuarios.map((usuario) => usuario.estado).filter(Boolean))]
+      .sort((first, second) => first.localeCompare(second, 'pt-BR')),
+    [usuarios],
   )
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return usuarios.filter((usuario) => {
+      const matchesSearch = !query || `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query)
+      const matchesProfile = profileFilter === 'all' || usuario.perfil === profileFilter
+      const matchesUf = ufFilter === 'all' || usuario.estado === ufFilter
+      const matchesStatus = statusFilter === 'all'
+        || (statusFilter === 'active' ? isUserActive(usuario) : !isUserActive(usuario))
+
+      return matchesSearch && matchesProfile && matchesUf && matchesStatus
+    })
+  }, [profileFilter, search, statusFilter, ufFilter, usuarios])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pageUsers = filtered.slice((safePage - 1) * USERS_PAGE_SIZE, safePage * USERS_PAGE_SIZE)
+  const pageItems = useMemo(() => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1)
+
+    const candidates = [...new Set([1, safePage - 1, safePage, safePage + 1, totalPages])]
+      .filter((item) => item >= 1 && item <= totalPages)
+      .sort((first, second) => first - second)
+    const items = []
+
+    candidates.forEach((item, index) => {
+      if (index > 0 && item - candidates[index - 1] > 1) items.push(`ellipsis-${item}`)
+      items.push(item)
+    })
+
+    return items
+  }, [safePage, totalPages])
+
+  function handleEdit(usuario) {
+    if (usuario.perfil === 'Gerencial') {
+      onStartEdit(usuario)
+      return
+    }
+
+    onOpenUsuario(usuario)
+  }
+
+  const summaryCards = [
+    { key: 'all', label: 'Total de usuários', value: counts.all, detail: 'Todos os perfis', icon: 'users' },
+    { key: 'Gerencial', label: 'Gerenciais', value: counts.Gerencial, detail: 'Usuários', icon: 'shield' },
+    { key: 'Supervisor', label: 'Supervisores', value: counts.Supervisor, detail: 'Em preparação', icon: 'shield' },
+    { key: 'Promotor', label: 'Promotores', value: counts.Promotor, detail: 'Usuários', icon: 'users' },
+  ]
 
   return (
-    <section className="users-card gerenciais-card">
-      <div className="card-toolbar">
-        <h2>Usuários Gerenciais</h2>
-
-        <label className="search-field">
+    <section className="users-card user-registration-card">
+      <div className="user-filter-bar">
+        <label className="user-search-field">
           <Icon name="search" />
           <input
             value={search}
-            onChange={(event) => onSearch(event.target.value)}
-            placeholder="Nome ou e-mail"
+            onChange={(event) => {
+              onSearch(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Pesquisar por nome ou e-mail..."
             type="search"
+            aria-label="Pesquisar por nome ou e-mail"
           />
         </label>
+
+        <label className="user-select-field">
+          <span>Perfil</span>
+          <select
+            value={profileFilter}
+            onChange={(event) => {
+              setProfileFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="all">Todos</option>
+            <option value="Gerencial">Gerencial</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Promotor">Promotor</option>
+            <option value="Entregador">Entregador</option>
+          </select>
+          <span className="select-chevron" />
+        </label>
+
+        <label className="user-select-field">
+          <span>UF</span>
+          <select
+            value={ufFilter}
+            onChange={(event) => {
+              setUfFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="all">Todas</option>
+            {availableUfs.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+          </select>
+          <span className="select-chevron" />
+        </label>
+
+        <label className="user-select-field">
+          <span>Status</span>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="all">Todos</option>
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+          </select>
+          <span className="select-chevron" />
+        </label>
+
+        <button className="create-button user-create-button" type="button" onClick={onOpenCadastro}>
+          <Icon name="plus" />
+          <span>Cadastrar Usuário</span>
+        </button>
       </div>
 
-      <form className="gerencial-create" onSubmit={onCreate} noValidate>
-        <label className="form-row">
-          <span>Nome</span>
-          <input
-            value={form.nome}
-            onChange={(event) => onFormChange({ nome: event.target.value })}
-            type="text"
-            minLength={4}
-            required
-          />
-        </label>
-        <label className="form-row">
-          <span>E-mail</span>
-          <input
-            value={form.email}
-            onChange={(event) => onFormChange({ email: event.target.value })}
-            type="email"
-            required
-          />
-        </label>
-        <label className="form-row">
-          <span>Senha inicial</span>
-          <input
-            value={form.senha}
-            onChange={(event) => onFormChange({ senha: event.target.value })}
-            type="password"
-            minLength={PASSWORD_MIN_LENGTH}
-            required
-            aria-describedby="gerencial-password-hint"
-          />
-          <small id="gerencial-password-hint">Mínimo {PASSWORD_MIN_LENGTH} caracteres.</small>
-        </label>
-        <button className="create-button" type="submit" disabled={busy}>
-          <Icon name="plus" />
-          <span>{busy ? 'Criando...' : 'Criar Gerencial'}</span>
-        </button>
-      </form>
+      <div className="user-summary-grid" aria-label="Resumo de usuários">
+        {summaryCards.map((card) => (
+          <article className={`user-summary-card is-${String(card.key).toLowerCase()}`} key={card.key}>
+            <span className="user-summary-icon"><Icon name={card.icon} /></span>
+            <span>
+              <small>{card.label}</small>
+              <strong>{card.value.toLocaleString('pt-BR')}</strong>
+              <em>{card.detail}</em>
+            </span>
+          </article>
+        ))}
+      </div>
 
-      {error && <p className="table-message is-error">{error}</p>}
-      {loading && <p className="table-message">Carregando gerenciais...</p>}
+      <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
+        {[
+          ['all', 'Todos', counts.all],
+          ['Gerencial', 'Gerenciais', counts.Gerencial],
+          ['Supervisor', 'Supervisores', counts.Supervisor],
+          ['Promotor', 'Promotores', counts.Promotor],
+        ].map(([value, label, count]) => (
+          <button
+            className={profileFilter === value ? 'is-active' : ''}
+            key={value}
+            type="button"
+            aria-pressed={profileFilter === value}
+            onClick={() => {
+              setProfileFilter(value)
+              setPage(1)
+            }}
+          >
+            {label} ({count.toLocaleString('pt-BR')})
+          </button>
+        ))}
+      </nav>
 
-      {!loading && (
-        <div className="users-table gerenciais-table" role="table" aria-label="Usuários Gerenciais">
-          <div className="table-row table-head" role="row">
-            <span role="columnheader">NOME</span>
-            <span role="columnheader">EMAIL</span>
-            <span role="columnheader">NOVA SENHA</span>
-            <span role="columnheader">STATUS</span>
-            <span role="columnheader">AÇÕES</span>
-          </div>
+      {(error) && <p className="table-message is-error">{error}</p>}
+      <section className="registration-table-card" aria-label="Lista de usuários">
+        {loading && <p className="table-message user-loading-message">Carregando usuários...</p>}
 
-          {filtered.map((usuario) => {
-            const isEditing = editId === usuario.id
-            const isLegacyUser = ['admin@avine.com.br', 'avinegerencial@gmail.com'].includes(usuario.email.toLowerCase())
-            const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
-            const cannotDeactivate = isSelf || (usuario.ativo && activeCount <= 1)
+        {!loading && (
+          <div className="users-table unified-users-table" role="table" aria-label="Cadastro de Usuários">
+            <div className="table-row table-head" role="row">
+              <span role="columnheader">NOME</span>
+              <span role="columnheader">PERFIL</span>
+              <span role="columnheader">SUPERVISOR</span>
+              <span role="columnheader">E-MAIL</span>
+              <span role="columnheader">UF</span>
+              <span role="columnheader">STATUS</span>
+              <span role="columnheader">AÇÕES</span>
+            </div>
 
-            return (
-              <div className="table-row gerencial-row" role="row" key={usuario.id}>
-                <div className="name-cell" role="cell">
-                  <span className="avatar-mini">
-                    <Icon name="gear" />
-                  </span>
-                  {isEditing ? (
-                    <input
-                      value={editForm.nome}
-                      onChange={(event) => onEditChange({ nome: event.target.value })}
-                      type="text"
-                    />
-                  ) : (
-                    <strong>{usuario.nome}</strong>
-                  )}
-                </div>
+            {pageUsers.map((usuario) => {
+              const isEditing = editId === usuario.id
+              const isLegacyUser = ['admin@avine.com.br', 'avinegerencial@gmail.com'].includes(usuario.email.toLowerCase())
+              const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
+              const cannotDeactivate = isSelf || (usuario.ativo && activeGerencialCount <= 1)
+              const profileClass = usuario.perfil.toLowerCase()
 
-                <span className="email-cell" role="cell">
-                  {isEditing ? (
-                    <input
-                      value={editForm.email}
-                      onChange={(event) => onEditChange({ email: event.target.value })}
-                      type="email"
-                    />
-                  ) : (
-                    usuario.email
-                  )}
-                </span>
-
-                <span className="password-cell" role="cell">
-                  {isEditing ? (
-                    <input
-                      value={editForm.senha}
-                      onChange={(event) => onEditChange({ senha: event.target.value })}
-                      placeholder="Opcional"
-                      type="password"
-                      minLength={PASSWORD_MIN_LENGTH}
-                      autoComplete="new-password"
-                    />
-                  ) : (
-                    '—'
-                  )}
-                </span>
-
-                <span className="status-cell" role="cell">
-                  {isEditing ? (
-                    <label className="status-toggle">
+              return (
+                <div className={`table-row user-registration-row ${isEditing ? 'is-editing' : ''}`} role="row" key={usuario.id}>
+                  <div className="name-cell" role="cell">
+                    <span className="avatar-mini">{getUserInitials(usuario.nome)}</span>
+                    {isEditing ? (
                       <input
-                        checked={editForm.ativo}
-                        disabled={cannotDeactivate}
-                        onChange={(event) => onEditChange({ ativo: event.target.checked })}
-                        type="checkbox"
+                        value={editForm.nome}
+                        onChange={(event) => onEditChange({ nome: event.target.value })}
+                        type="text"
+                        aria-label="Nome"
                       />
-                      <span>{editForm.ativo ? 'Ativo' : 'Inativo'}</span>
-                    </label>
-                  ) : (
-                    <span className={`status-pill ${usuario.ativo ? 'is-active' : 'is-inactive'}`}>
-                      {usuario.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
-                  )}
-                </span>
+                    ) : (
+                      <strong>{usuario.nome}</strong>
+                    )}
+                  </div>
 
-                <span className="actions-cell" role="cell">
-                  {isEditing ? (
-                    <>
-                      <button className="secondary-button" type="button" onClick={onCancelEdit}>
-                        Cancelar
-                      </button>
-                      <button className="primary-button" type="button" disabled={busy} onClick={onSaveEdit}>
-                        Salvar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="secondary-button" type="button" onClick={() => onStartEdit(usuario)}>
-                        Editar
-                      </button>
-                      {isLegacyUser && (
-                        <button className="danger-button" type="button" onClick={() => onDelete(usuario)}>
-                          Excluir
+                  <span role="cell" data-label="Perfil">
+                    <span className={`profile-pill is-${profileClass}`}>{getProfileLabel(usuario.perfil)}</span>
+                  </span>
+
+                  <span className="supervisor-cell" role="cell" data-label="Supervisor">{getSupervisorName(usuario)}</span>
+
+                  <div className="email-cell" role="cell" data-label="E-mail">
+                    {isEditing ? (
+                      <>
+                        <input
+                          value={editForm.email}
+                          onChange={(event) => onEditChange({ email: event.target.value })}
+                          type="email"
+                          aria-label="E-mail"
+                        />
+                        <input
+                          value={editForm.senha}
+                          onChange={(event) => onEditChange({ senha: event.target.value })}
+                          placeholder="Nova senha (opcional)"
+                          type="password"
+                          minLength={PASSWORD_MIN_LENGTH}
+                          autoComplete="new-password"
+                          aria-label="Nova senha"
+                        />
+                      </>
+                    ) : usuario.email}
+                  </div>
+
+                  <span className="uf-cell" role="cell" data-label="UF">{usuario.estado || '-'}</span>
+
+                  <span className="status-cell" role="cell" data-label="Status">
+                    {isEditing ? (
+                      <label className="status-toggle">
+                        <input
+                          checked={editForm.ativo}
+                          disabled={cannotDeactivate}
+                          onChange={(event) => onEditChange({ ativo: event.target.checked })}
+                          type="checkbox"
+                        />
+                        <span>{editForm.ativo ? 'Ativo' : 'Inativo'}</span>
+                      </label>
+                    ) : (
+                      <span className={`status-pill ${isUserActive(usuario) ? 'is-active' : 'is-inactive'}`}>
+                        <span className="status-dot" aria-hidden="true" />
+                        {isUserActive(usuario) ? 'Ativo' : 'Inativo'}
+                      </span>
+                    )}
+                  </span>
+
+                  <span className="actions-cell" role="cell">
+                    {isEditing ? (
+                      <>
+                        <button className="secondary-button" type="button" onClick={onCancelEdit}>Cancelar</button>
+                        <button className="primary-button" type="button" disabled={busy} onClick={onSaveEdit}>Salvar</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="secondary-button edit-user-button" type="button" onClick={() => handleEdit(usuario)}>
+                          Editar
                         </button>
-                      )}
-                    </>
-                  )}
-                </span>
-              </div>
-            )
-          })}
+                        <details className="user-actions-menu">
+                          <summary aria-label={`Mais ações para ${usuario.nome}`}><Icon name="more" /></summary>
+                          <div className="user-actions-popover">
+                            <button type="button" onClick={() => handleEdit(usuario)}>Editar</button>
+                            <button type="button" disabled>Resetar senha</button>
+                            <button type="button" disabled>{isUserActive(usuario) ? 'Desativar' : 'Ativar'}</button>
+                            <button
+                              className={isLegacyUser ? 'is-danger' : ''}
+                              type="button"
+                              disabled={!isLegacyUser}
+                              onClick={() => onDelete(usuario)}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </details>
+                      </>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
 
-          {filtered.length === 0 && <p className="table-message">Nenhum gerencial encontrado.</p>}
-        </div>
-      )}
+            {filtered.length === 0 && <p className="table-message user-empty-message">Nenhum usuário encontrado.</p>}
+
+            <footer className="user-table-footer">
+              <span>
+                {filtered.length === 0
+                  ? 'Mostrando 0 usuários'
+                  : `Mostrando ${(safePage - 1) * USERS_PAGE_SIZE + 1} a ${Math.min(safePage * USERS_PAGE_SIZE, filtered.length)} de ${filtered.length} usuários`}
+              </span>
+              {filtered.length > USERS_PAGE_SIZE && (
+                <nav className="user-pagination" aria-label="Paginação de usuários">
+                  <button type="button" aria-label="Página anterior" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>‹</button>
+                  {pageItems.map((item) => typeof item === 'number' ? (
+                    <button
+                      className={safePage === item ? 'is-active' : ''}
+                      type="button"
+                      key={item}
+                      aria-current={safePage === item ? 'page' : undefined}
+                      onClick={() => setPage(item)}
+                    >
+                      {item}
+                    </button>
+                  ) : (
+                    <button type="button" key={item} disabled>…</button>
+                  ))}
+                  <button type="button" aria-label="Próxima página" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}>›</button>
+                </nav>
+              )}
+            </footer>
+          </div>
+        )}
+      </section>
     </section>
   )
 }
@@ -2569,8 +2765,6 @@ function App() {
   const [updatingId, setUpdatingId] = useState('')
   const [isCadastroOpen, setCadastroOpen] = useState(false)
   const [isFilterOpen, setFilterOpen] = useState(false)
-  const [selectedEstados, setSelectedEstados] = useState([])
-  const [selectedPerfis, setSelectedPerfis] = useState([])
   const [form, setForm] = useState(initialUserForm)
   const [selectedUsuario, setSelectedUsuario] = useState(null)
   const [editForm, setEditForm] = useState(initialUserForm)
@@ -2590,7 +2784,6 @@ function App() {
   const [savingLoja, setSavingLoja] = useState(false)
   const [storeSelectedUfs, setStoreSelectedUfs] = useState([])
   const [storeSelectedCidades, setStoreSelectedCidades] = useState([])
-  const [gerencialForm, setGerencialForm] = useState(initialGerencialForm)
   const [gerencialEditId, setGerencialEditId] = useState('')
   const [gerencialEditForm, setGerencialEditForm] = useState({
     nome: '',
@@ -2603,7 +2796,7 @@ function App() {
   const [profilePhoto, setProfilePhoto] = useState('')
 
   useEffect(() => {
-    if (currentUser?.perfil !== 'Gerencial') return
+    if (!isManagerProfile(currentUser?.perfil)) return
 
     try {
       window.localStorage.setItem(gerencialScreenStorageKey, selectedItem)
@@ -2693,7 +2886,7 @@ function App() {
       if (
         authLoading ||
         !session ||
-        currentUser?.perfil !== 'Gerencial' ||
+        !isManagerProfile(currentUser?.perfil) ||
         currentUser.ativo !== true ||
         currentUser.acesso_habilitado !== true
       ) {
@@ -2731,19 +2924,6 @@ function App() {
     session?.user?.id,
   ])
 
-  const filteredUsers = useMemo(() => {
-    const query = search.trim().toLowerCase()
-
-    return usuarios.filter((usuario) => {
-      const searchText = `${usuario.nome} ${usuario.email} ${usuario.estado} ${usuario.perfil}`.toLowerCase()
-      const matchesSearch = !query || searchText.includes(query)
-      const matchesEstado = selectedEstados.length === 0 || selectedEstados.includes(usuario.estado)
-      const matchesPerfil = selectedPerfis.length === 0 || selectedPerfis.includes(usuario.perfil)
-
-      return matchesSearch && matchesEstado && matchesPerfil
-    })
-  }, [search, selectedEstados, selectedPerfis, usuarios])
-
   const vinculosPorLoja = useMemo(() => {
     return lojaPromotores.reduce((acc, vinculo) => {
       if (!acc[vinculo.loja_id]) acc[vinculo.loja_id] = {}
@@ -2752,14 +2932,9 @@ function App() {
     }, {})
   }, [lojaPromotores])
 
-  const activeFilterParts = []
-  if (selectedEstados.length) activeFilterParts.push(`${selectedEstados.length} UF`)
-  if (selectedPerfis.length) activeFilterParts.push(`${selectedPerfis.length} perfil${selectedPerfis.length > 1 ? 'is' : ''}`)
-  const activeFilterLabel = activeFilterParts.length ? activeFilterParts.join(' · ') : 'Filtrar'
   const isPerfil = selectedItem === 'perfil'
   const isLojas = selectedItem === 'lojas'
   const isUsuarios = selectedItem === 'usuarios'
-  const isConfiguracoes = selectedItem === 'configuracoes'
   const isDashboard = selectedItem === 'dashboard'
   const isNotas = selectedItem === 'notas'
   const isMotivos = selectedItem === 'motivos'
@@ -2769,9 +2944,7 @@ function App() {
     ? 'Perfil'
     : isLojas
     ? 'Lojas'
-    : isConfiguracoes
-        ? 'Configurações'
-        : isDashboard
+    : isDashboard
           ? 'Dashboard'
           : isNotas
             ? 'Nota Fiscal'
@@ -2781,15 +2954,12 @@ function App() {
                 ? 'Recolhimento'
           : isRelatorios
             ? 'Relatório'
-            : 'Cadastro de Usuário'
-  const tableTitle = 'Usuários'
+            : 'Cadastro de Usuários'
   const pageSubtitle = isPerfil
     ? 'Dados da conta gerencial.'
     : isLojas
     ? 'Roteirização dos promotores.'
-    : isConfiguracoes
-        ? 'Usuários com acesso ao painel gerencial.'
-        : isDashboard
+    : isDashboard
           ? 'Visão geral do painel Avine.'
           : isNotas
             ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
@@ -2799,23 +2969,57 @@ function App() {
                 ? 'Fila logística de recolhimentos.'
           : isRelatorios
             ? 'Relatório Solicitante BI.'
-            : 'Lista de cadastro de usuários (promotores e motoristas).'
+            : 'Gerencie todos os usuários do sistema.'
   const heroIcon = isPerfil
     ? 'users'
     : isLojas
     ? 'pin'
-    : isConfiguracoes
-        ? 'gear'
-        : isNotas || isMotivos
+    : isNotas || isMotivos
           ? 'notes'
           : isRecolhimento
             ? 'logs'
         : isRelatorios || isDashboard
           ? 'chart'
-          : 'users'
+          : 'user-plus'
 
   async function handleCreateUsuario(event) {
     event.preventDefault()
+
+    if (form.perfil === 'Gerencial') {
+      const gerencialPayload = {
+        nome: normalizaTexto(form.nome),
+        email: form.email.trim().toLowerCase(),
+        password: form.senha,
+      }
+
+      if (
+        gerencialPayload.nome.length < 4 ||
+        !emailPattern.test(gerencialPayload.email) ||
+        gerencialPayload.password.length < PASSWORD_MIN_LENGTH
+      ) {
+        setFormError('Revise nome, email e senha antes de criar.')
+        return
+      }
+
+      setSaving(true)
+      setFormError('')
+
+      try {
+        await createGerencialUser(gerencialPayload)
+      } catch (createError) {
+        setFormError(createError instanceof Error ? createError.message : 'Não foi possível criar o Gerencial.')
+        setSaving(false)
+        return
+      }
+
+      setForm(initialUserForm)
+      setCadastroOpen(false)
+      setSaving(false)
+      await loadUsuarios()
+      return
+    }
+
+    const supervisorUf = currentUser?.perfil === 'Supervisor' ? currentUser.estado : ''
     const payload = {
       email: form.email.trim().toLowerCase(),
       nome: form.nome.trim().toUpperCase(),
@@ -2830,8 +3034,10 @@ function App() {
       payload.nome.length < 4 ||
       payload.password.length < PASSWORD_MIN_LENGTH ||
       isNomeDuplicado(payload.nome, usuarios) ||
-      !perfis.includes(payload.perfil) ||
-      !estados.includes(payload.estado)
+      !perfisOperacionais.includes(payload.perfil) && payload.perfil !== 'Supervisor' ||
+      (currentUser?.perfil === 'Supervisor'
+        ? payload.estado !== supervisorUf
+        : !estados.includes(payload.estado))
     ) {
       setFormError(
         isNomeDuplicado(payload.nome, usuarios)
@@ -2884,7 +3090,9 @@ function App() {
       !payload.codigo ||
       isCodigoDuplicado(payload.codigo, lojas) ||
       !payload.nome ||
-      !estadosLojas.includes(payload.uf) ||
+      !(currentUser?.perfil === 'Supervisor'
+        ? payload.uf === currentUser.estado
+        : estadosLojas.includes(payload.uf)) ||
       !payload.cidade
     ) {
       setLojaFormError(
@@ -3047,8 +3255,10 @@ function App() {
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
       isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id) ||
-      !perfis.includes(payload.perfil) ||
-      !estados.includes(payload.estado)
+      !perfisEditaveis.includes(payload.perfil) ||
+      (currentUser?.perfil === 'Supervisor'
+        ? payload.estado !== currentUser.estado
+        : !estados.includes(payload.estado))
     ) {
       setEditError(
         isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id)
@@ -3116,40 +3326,6 @@ function App() {
     setPromotores([])
     setLojaPromotores([])
     navigate('/', { replace: true })
-  }
-
-  async function handleCreateGerencial(event) {
-    event.preventDefault()
-
-    const payload = {
-      nome: normalizaTexto(gerencialForm.nome),
-      email: gerencialForm.email.trim().toLowerCase(),
-      password: gerencialForm.senha,
-    }
-
-    if (
-      payload.nome.length < 4 ||
-      !emailPattern.test(payload.email) ||
-      payload.password.length < PASSWORD_MIN_LENGTH
-    ) {
-      setGerencialError('Revise nome, email e senha antes de criar.')
-      return
-    }
-
-    setGerencialBusy(true)
-    setGerencialError('')
-
-    try {
-      await createGerencialUser(payload)
-    } catch (rpcError) {
-      setGerencialError(rpcError instanceof Error ? rpcError.message : 'Não foi possível criar o Gerencial.')
-      setGerencialBusy(false)
-      return
-    }
-
-    setGerencialForm(initialGerencialForm)
-    setGerencialBusy(false)
-    await loadUsuarios()
   }
 
   function startEditGerencial(usuario) {
@@ -3247,18 +3423,6 @@ function App() {
     await loadUsuarios()
   }
 
-  function toggleEstado(estado) {
-    setSelectedEstados((current) =>
-      current.includes(estado) ? current.filter((item) => item !== estado) : [...current, estado],
-    )
-  }
-
-  function togglePerfil(perfil) {
-    setSelectedPerfis((current) =>
-      current.includes(perfil) ? current.filter((item) => item !== perfil) : [...current, perfil],
-    )
-  }
-
   function toggleStoreUf(estado) {
     setStoreSelectedUfs((current) =>
       current.includes(estado) ? current.filter((item) => item !== estado) : [...current, estado],
@@ -3346,7 +3510,7 @@ function App() {
         onToggle={() => setSidebarExpanded((open) => !open)}
       />
 
-      <main className={`workspace ${sidebarExpanded ? 'sidebar-open' : ''}`}>
+      <main className={`workspace ${sidebarExpanded ? 'sidebar-open' : ''} ${isUsuarios ? 'registration-workspace' : ''}`}>
         <header className="page-hero">
           <div className="page-hero-inner">
             <div className="hero-user-icon">
@@ -3365,21 +3529,20 @@ function App() {
             profilePhoto={profilePhoto}
             onSave={handleProfileSave}
           />
-        ) : isConfiguracoes ? (
-          <GerenciaisScreen
+        ) : isUsuarios ? (
+          <UsuariosScreen
             currentUser={currentUser}
             usuarios={usuarios}
             loading={loading}
-            error={gerencialError}
+            error={error || gerencialError}
             busy={gerencialBusy}
-            form={gerencialForm}
             editId={gerencialEditId}
             editForm={gerencialEditForm}
             search={search}
             onSearch={setSearch}
-            onFormChange={(patch) => setGerencialForm((current) => ({ ...current, ...patch }))}
+            onOpenCadastro={() => setCadastroOpen(true)}
+            onOpenUsuario={openInfoModal}
             onEditChange={(patch) => setGerencialEditForm((current) => ({ ...current, ...patch }))}
-            onCreate={handleCreateGerencial}
             onStartEdit={startEditGerencial}
             onCancelEdit={cancelEditGerencial}
             onSaveEdit={handleSaveGerencial}
@@ -3413,111 +3576,6 @@ function App() {
             onOpenCadastro={() => setCadastroOpen(true)}
             onChangePromotor={handlePromotorChange}
           />
-        ) : isUsuarios ? (
-          <section className="users-card">
-            <div className="card-toolbar">
-              <h2>{tableTitle}</h2>
-
-              <div className="toolbar-actions">
-                <label className="search-field">
-                  <Icon name="search" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Procurar"
-                    type="search"
-                  />
-                </label>
-
-                <div className="filter-wrap">
-                  <button
-                    className={`filter-trigger ${isFilterOpen ? 'is-open' : ''}`}
-                    type="button"
-                    onClick={() => setFilterOpen((open) => !open)}
-                  >
-                    <Icon name="filter" />
-                    <span>{activeFilterLabel}</span>
-                    <span className="select-chevron" />
-                  </button>
-
-                  {isFilterOpen && (
-                    <UserFilterPopover
-                      selectedEstados={selectedEstados}
-                      selectedPerfis={selectedPerfis}
-                      onToggleEstado={toggleEstado}
-                      onTogglePerfil={togglePerfil}
-                      onClear={() => {
-                        setSelectedEstados([])
-                        setSelectedPerfis([])
-                      }}
-                      onClose={() => setFilterOpen(false)}
-                    />
-                  )}
-                </div>
-
-                <button className="create-button" type="button" onClick={() => setCadastroOpen(true)}>
-                  <Icon name="plus" />
-                  <span>Cadastrar Usuário</span>
-                </button>
-              </div>
-            </div>
-
-            {error && <p className="table-message is-error">{error}</p>}
-            {loading && <p className="table-message">Carregando usuários...</p>}
-
-            {!loading && (
-              <div className="users-table" role="table" aria-label="Usuários">
-                <div className="table-row table-head" role="row">
-                  <span role="columnheader">NOME</span>
-                  <span role="columnheader">EMAIL</span>
-                  <span role="columnheader">PERFIL</span>
-                  <span role="columnheader">UF</span>
-                  <span role="columnheader">FOTOS</span>
-                </div>
-
-                {filteredUsers.map((usuario) => (
-                  <div
-                    className="table-row"
-                    role="row"
-                    key={usuario.id}
-                    tabIndex={0}
-                    onClick={() => openInfoModal(usuario)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') openInfoModal(usuario)
-                    }}
-                  >
-                    <div className="name-cell" role="cell">
-                      <span className="avatar-mini">
-                        <Icon name="users" />
-                      </span>
-                      <strong>{usuario.nome}</strong>
-                    </div>
-                    <span className="email-cell" role="cell">
-                      {usuario.email}
-                    </span>
-                    <span className="profile-pill" role="cell">
-                      {usuario.perfil}
-                    </span>
-                    <span className="uf-cell" role="cell">
-                      {usuario.estado}
-                    </span>
-                    <span className="photos-cell" role="cell">
-                      <PhotoSwitch
-                        checked={usuario.fotos_habilitadas}
-                        disabled={updatingId === usuario.id}
-                        label={`Alternar fotos de ${usuario.nome}`}
-                        onChange={() => handlePhotoToggle(usuario)}
-                      />
-                    </span>
-                  </div>
-                ))}
-
-                {filteredUsers.length === 0 && (
-                  <p className="table-message">Nenhum usuário encontrado.</p>
-                )}
-              </div>
-            )}
-          </section>
         ) : (
           <PlaceholderScreen title={pageTitle} />
         )}
@@ -3527,6 +3585,7 @@ function App() {
         <CadastroModal
           form={form}
           usuarios={usuarios}
+          currentUser={currentUser}
           busy={saving}
           error={formError}
           onChange={(patch) => setForm((current) => ({ ...current, ...patch }))}
@@ -3539,6 +3598,7 @@ function App() {
         <CadastroLojaModal
           form={lojaForm}
           lojas={lojas}
+          allowedStates={currentUser?.perfil === 'Supervisor' ? [currentUser.estado] : estadosLojas}
           busy={savingLoja}
           error={lojaFormError}
           onChange={(patch) => setLojaForm((current) => ({ ...current, ...patch }))}

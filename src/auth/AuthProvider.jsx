@@ -17,7 +17,7 @@ const profileSelect =
 const AuthContext = createContext(null)
 
 function routeForProfile(profile) {
-  if (profile?.perfil === 'Gerencial') return '/gerencial'
+  if (profile?.perfil === 'Gerencial' || profile?.perfil === 'Supervisor') return '/gerencial'
   if (profile?.perfil === 'Promotor') return '/acesso/promotor'
   if (profile?.perfil === 'Entregador') return '/acesso/entregador'
   return '/'

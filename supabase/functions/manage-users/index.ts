@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const allowedRoles = new Set(["Promotor", "Entregador", "Gerencial"]);
+const allowedRoles = new Set(["Promotor", "Entregador", "Gerencial", "Supervisor"]);
 const PASSWORD_MIN_LENGTH = 8;
 const legacyGerencialEmails = new Set([
   "admin@avine.com.br",
@@ -176,30 +176,45 @@ Deno.serve(async (request) => {
 
   const { data: callerProfile, error: callerProfileError } = await adminClient
     .from("usuarios")
-    .select("id, perfil, ativo, acesso_habilitado")
+    .select("id, perfil, estado, ativo, acesso_habilitado")
     .eq("auth_user_id", caller.id)
     .maybeSingle();
 
   if (
     callerProfileError ||
-    callerProfile?.perfil !== "Gerencial" ||
+    !["Gerencial", "Supervisor"].includes(callerProfile?.perfil ?? "") ||
     callerProfile?.ativo !== true ||
     callerProfile?.acesso_habilitado !== true
   ) {
     return jsonResponse(403, {
-      error: "Apenas Gerenciais com acesso ativo podem administrar usuarios.",
+      error: "Apenas Gerenciais ou Supervisores com acesso ativo podem administrar usuarios.",
     });
+  }
+
+  const isSupervisor = callerProfile.perfil === "Supervisor";
+
+  function canManageTarget(target: { perfil?: string; estado?: string }) {
+    if (!isSupervisor) return true;
+    return ["Promotor", "Entregador"].includes(target.perfil ?? "") &&
+      target.estado === callerProfile.estado;
   }
 
   const action = text(body.action) || "create";
 
   if (action === "list") {
-    const { data, error } = await adminClient
+    let listQuery = adminClient
       .from("usuarios")
       .select(
         "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
-      )
-      .order("nome", { ascending: true });
+      );
+
+    if (isSupervisor) {
+      listQuery = listQuery
+        .in("perfil", ["Promotor", "Entregador"])
+        .eq("estado", callerProfile.estado);
+    }
+
+    const { data, error } = await listQuery.order("nome", { ascending: true });
 
     if (error) return jsonResponse(400, { error: error.message });
     return jsonResponse(200, {
@@ -265,6 +280,14 @@ Deno.serve(async (request) => {
     } catch (error) {
       return jsonResponse(400, {
         error: error instanceof Error ? error.message : "Dados invalidos.",
+      });
+    }
+
+    if (isSupervisor &&
+      (!["Promotor", "Entregador"].includes(profileInput.perfil) ||
+        profileInput.estado !== callerProfile.estado)) {
+      return jsonResponse(403, {
+        error: "O Supervisor somente pode cadastrar perfis operacionais na sua UF.",
       });
     }
 
@@ -359,6 +382,12 @@ Deno.serve(async (request) => {
       return jsonResponse(404, { error: "Usuario nao encontrado." });
     }
 
+    if (!canManageTarget(target)) {
+      return jsonResponse(403, {
+        error: "O Supervisor somente pode administrar perfis operacionais da sua UF.",
+      });
+    }
+
     let nextProfile: ReturnType<typeof validateProfile>;
     try {
       nextProfile = action === "update"
@@ -367,6 +396,14 @@ Deno.serve(async (request) => {
     } catch (error) {
       return jsonResponse(400, {
         error: error instanceof Error ? error.message : "Dados invalidos.",
+      });
+    }
+
+    if (isSupervisor &&
+      (!["Promotor", "Entregador"].includes(nextProfile.perfil) ||
+        nextProfile.estado !== callerProfile.estado)) {
+      return jsonResponse(403, {
+        error: "O Supervisor somente pode manter perfis operacionais na sua UF.",
       });
     }
 
