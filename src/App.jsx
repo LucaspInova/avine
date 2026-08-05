@@ -28,11 +28,11 @@ import './App.css'
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
 const perfisOperacionais = ['Promotor']
-const perfisCadastro = ['Gerencial', 'Supervisor', 'Promotor']
-const perfisEditaveis = ['Supervisor', 'Promotor']
+const perfisCadastro = ['Admin', 'Gerencial', 'Promotor']
+const perfisEditaveis = ['Promotor']
 const perfisCadastroUi = [
-  { value: 'Gerencial', label: 'Admin' },
-  { value: 'Supervisor', label: 'Gerenciais' },
+  { value: 'Admin', label: 'Admin', authRole: 'admin' },
+  { value: 'Gerencial', label: 'Gerencial', authRole: 'gerencial' },
   { value: 'Promotor', label: 'Promotor' },
 ]
 const emptyPromotorSlots = [1, 2, 3]
@@ -64,6 +64,7 @@ const initialUserForm = {
   nome: '',
   senha: '',
   perfil: '',
+  auth_role: 'admin',
   estado: '',
   fotos_habilitadas: false,
 }
@@ -78,8 +79,12 @@ const initialLojaForm = {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const NOTES_PAGE_SIZE = 10
 
-function isAdminProfile(profile) {
-  return profile === 'Gerencial'
+function isAdministrativeProfile(user) {
+  return user?.perfil === 'Admin' || user?.perfil === 'Gerencial'
+}
+
+function isScopedGerencial(user) {
+  return user?.perfil === 'Gerencial' && user.auth_role === 'gerencial'
 }
 
 function getUserInitials(name) {
@@ -96,8 +101,20 @@ function isUserActive(user) {
   return user.ativo === true && user.acesso_habilitado === true
 }
 
-function getSupervisorName(user) {
-  return user.supervisor_nome ?? user.supervisor?.nome ?? '-'
+function getGerencialName(user) {
+  return user.gerencial_nome ?? user.gerencial?.nome ?? '-'
+}
+
+function getManagedRoleLabel(user) {
+  if (user?.auth_role === 'admin') return 'Admin'
+  if (user?.auth_role === 'gerencial') return 'Gerencial'
+  return getProfileLabel(user?.perfil)
+}
+
+function getManagedRoleKey(user) {
+  if (user?.auth_role === 'admin') return 'Admin'
+  if (user?.auth_role === 'gerencial') return 'Gerencial'
+  return user?.perfil ?? ''
 }
 
 function formatNoteDate(value) {
@@ -373,7 +390,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [isLoggingOut, setLoggingOut] = useState(false)
   const profileName = currentUser?.nome ?? 'Usuário'
-  const profileRole = getProfileLabel(currentUser?.perfil ?? 'Gerencial')
+  const profileRole = getManagedRoleLabel(currentUser)
   const profileState = currentUser?.estado || 'Não informado'
   useEffect(() => {
     if (!profileMenuOpen) return undefined
@@ -400,7 +417,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
-        <button className="brand-button" type="button" aria-label="Avine Admin">
+        <button className="brand-button" type="button" aria-label={`Avine ${profileRole}`}>
           <img className="brand-logo" src={avineLogo} alt="Avine" />
         </button>
 
@@ -526,12 +543,12 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
   const password = form.senha
+  const isAdmin = form.perfil === 'Admin'
   const isGerencial = form.perfil === 'Gerencial'
-  const isSupervisor = form.perfil === 'Supervisor'
-  const currentUserIsSupervisor = currentUser?.perfil === 'Supervisor'
+  const currentUserIsGerencial = isScopedGerencial(currentUser)
   const isOperationalProfile = perfisOperacionais.includes(form.perfil)
-  const requiresState = isOperationalProfile || isSupervisor
-  const allowedStates = currentUserIsSupervisor ? [currentUser.estado] : estados
+  const requiresState = isOperationalProfile || isGerencial
+  const allowedStates = currentUserIsGerencial ? [currentUser.estado] : estados
   const hasEmailInput = trimmedEmail.length > 0
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
@@ -539,8 +556,11 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const passwordError = getPasswordValidationMessage(password)
   const isPasswordValid = !passwordError
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
-  const isProfileValid = perfisCadastro.includes(form.perfil)
-  const isEstadoValid = isGerencial || (requiresState && allowedStates.includes(form.estado))
+  const expectedAuthRole = isAdmin ? 'admin' : isGerencial ? 'gerencial' : 'promotor'
+  const isAuthRoleValid = form.auth_role === expectedAuthRole
+  const isProfileValid = perfisCadastro.includes(form.perfil) && isAuthRoleValid &&
+    (!currentUserIsGerencial || form.perfil === 'Promotor')
+  const isEstadoValid = isAdmin || (requiresState && allowedStates.includes(form.estado))
   const canSubmit =
     isEmailValid &&
     isNameValid &&
@@ -565,16 +585,23 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
             <fieldset className="user-profile-field">
               <legend>Perfil</legend>
               <div className="chip-group">
-                {perfisCadastroUi.map((perfil) => (
+                {perfisCadastroUi
+                  .filter((perfil) => !currentUserIsGerencial || perfil.value === 'Promotor')
+                  .map((perfil) => (
                   <button
-                    key={perfil.value}
-                    className={`choice-chip ${form.perfil === perfil.value ? 'is-selected' : ''}`}
+                    key={`${perfil.value}-${perfil.authRole ?? perfil.label}`}
+                    className={`choice-chip ${form.perfil === perfil.value && (!perfil.authRole || form.auth_role === perfil.authRole) ? 'is-selected' : ''}`}
                     type="button"
-                    disabled={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)}
-                    title={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)
-                      ? 'Gerenciais só pode cadastrar perfis operacionais.'
+                    disabled={currentUserIsGerencial && !perfisOperacionais.includes(perfil.value)}
+                    title={currentUserIsGerencial && !perfisOperacionais.includes(perfil.value)
+                      ? 'Gerencial só pode cadastrar perfis operacionais.'
                       : undefined}
-                    onClick={() => onChange({ perfil: form.perfil === perfil.value ? '' : perfil.value })}
+                    onClick={() => onChange({
+                      perfil: form.perfil === perfil.value && (!perfil.authRole || form.auth_role === perfil.authRole)
+                        ? ''
+                        : perfil.value,
+                      auth_role: perfil.authRole ?? '',
+                    })}
                   >
                     {perfil.label}
                   </button>
@@ -639,7 +666,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                         key={estado}
                         className={`choice-chip ${form.estado === estado ? 'is-selected' : ''}`}
                         type="button"
-                        disabled={currentUserIsSupervisor}
+                        disabled={currentUserIsGerencial}
                         onClick={() => onChange({ estado: form.estado === estado ? '' : estado })}
                       >
                         {estado}
@@ -649,19 +676,19 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                 </fieldset>
 
                 {form.perfil === 'Promotor' && (
-                  <label className="form-row" htmlFor="cadastro-supervisor">
-                    <span>Gerenciais responsável</span>
+                  <label className="form-row" htmlFor="cadastro-gerencial">
+                    <span>Gerencial responsável</span>
                     <select
-                      id="cadastro-supervisor"
+                      id="cadastro-gerencial"
                       value=""
                       disabled
-                      aria-label="Gerenciais responsável"
-                      aria-describedby="supervisor-unavailable-hint"
+                      aria-label="Gerencial responsável"
+                      aria-describedby="gerencial-unavailable-hint"
                     >
-                      <option value="">Nenhum supervisor disponível</option>
+                      <option value="">Nenhum gerencial disponível</option>
                     </select>
-                    <small id="supervisor-unavailable-hint">
-                      O vínculo será habilitado quando o perfil Gerenciais existir no sistema.
+                    <small id="gerencial-unavailable-hint">
+                      O vínculo será habilitado quando o perfil Gerencial existir no sistema.
                     </small>
                   </label>
                 )}
@@ -702,7 +729,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
             {isProfileValid && (
               <span className={isEstadoValid ? 'is-success' : ''}>
                 <Icon name={isEstadoValid ? 'check' : 'pin'} />
-                {isGerencial ? 'UF não exigida para Admin' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
+                {isAdmin ? 'UF não exigida para Admin' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
               </span>
             )}
           </div>
@@ -823,7 +850,7 @@ function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, er
   )
 }
 
-function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, photoBusy }) {
+function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
   if (!usuario) return null
 
   return (
@@ -837,7 +864,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
         </div>
 
         <div className="info-hero">
-          <button className="info-person" type="button" onClick={onEdit}>
+          <button className="info-person" type="button" onClick={onEdit} disabled={!canManage}>
             <span className="info-avatar">
               <Icon name="users" />
             </span>
@@ -854,7 +881,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
             <span>Habilitar fotos</span>
             <PhotoSwitch
               checked={usuario.fotos_habilitadas}
-              disabled={photoBusy}
+              disabled={photoBusy || !canManage}
               label="Fotos habilitadas"
               onChange={() => onTogglePhotos(usuario)}
             />
@@ -863,7 +890,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
           <dl className="info-data">
             <div>
               <dt>Perfil de Acesso</dt>
-              <dd>{getProfileLabel(usuario.perfil)}</dd>
+              <dd>{getManagedRoleLabel(usuario)}</dd>
             </div>
             <div>
               <dt>Estado</dt>
@@ -1481,18 +1508,19 @@ export function UsuariosScreen({
   onCancelEdit,
   onSaveEdit,
   onDelete,
+  restrictedUf = '',
 }) {
   const [profileFilter, setProfileFilter] = useState('all')
   const [ufFilter, setUfFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
-  const activeGerencialCount = usuarios.filter(
-    (usuario) => usuario.perfil === 'Gerencial' && usuario.ativo,
+  const activeAdminCount = usuarios.filter(
+    (usuario) => usuario.perfil === 'Admin' && usuario.ativo,
   ).length
   const counts = useMemo(() => ({
     all: usuarios.length,
-    Gerencial: usuarios.filter((usuario) => usuario.perfil === 'Gerencial').length,
-    Supervisor: usuarios.filter((usuario) => usuario.perfil === 'Supervisor').length,
+    Admin: usuarios.filter((usuario) => getManagedRoleKey(usuario) === 'Admin').length,
+    Gerencial: usuarios.filter((usuario) => getManagedRoleKey(usuario) === 'Gerencial').length,
     Promotor: usuarios.filter((usuario) => usuario.perfil === 'Promotor').length,
   }), [usuarios])
   const availableUfs = useMemo(
@@ -1505,14 +1533,16 @@ export function UsuariosScreen({
 
     return usuarios.filter((usuario) => {
       const matchesSearch = !query || `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query)
-      const matchesProfile = profileFilter === 'all' || usuario.perfil === profileFilter
-      const matchesUf = ufFilter === 'all' || usuario.estado === ufFilter
+      const matchesProfile = profileFilter === 'all' || getManagedRoleKey(usuario) === profileFilter
+      const matchesUf = restrictedUf
+        ? usuario.estado === restrictedUf
+        : ufFilter === 'all' || usuario.estado === ufFilter
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' ? isUserActive(usuario) : !isUserActive(usuario))
 
       return matchesSearch && matchesProfile && matchesUf && matchesStatus
     })
-  }, [profileFilter, search, statusFilter, ufFilter, usuarios])
+  }, [profileFilter, restrictedUf, search, statusFilter, ufFilter, usuarios])
   const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pageUsers = filtered.slice((safePage - 1) * USERS_PAGE_SIZE, safePage * USERS_PAGE_SIZE)
@@ -1533,7 +1563,11 @@ export function UsuariosScreen({
   }, [safePage, totalPages])
 
   function handleEdit(usuario) {
-    if (usuario.perfil === 'Gerencial') {
+    if (restrictedUf && usuario.perfil !== 'Promotor') {
+      onOpenUsuario(usuario)
+      return
+    }
+    if (usuario.perfil === 'Admin' || usuario.perfil === 'Gerencial') {
       onStartEdit(usuario)
       return
     }
@@ -1543,8 +1577,7 @@ export function UsuariosScreen({
 
   const summaryCards = [
     { key: 'all', label: 'Total de usuários', value: counts.all, detail: 'Todos os perfis', icon: 'users' },
-    { key: 'Gerencial', label: 'Gerenciais', value: counts.Gerencial, detail: 'Usuários', icon: 'shield' },
-    { key: 'Supervisor', label: 'Supervisores', value: counts.Supervisor, detail: 'Em preparação', icon: 'shield' },
+    { key: 'Gerencial', label: 'Gerencial', value: counts.Gerencial, detail: 'Usuários', icon: 'shield' },
     { key: 'Promotor', label: 'Promotores', value: counts.Promotor, detail: 'Usuários', icon: 'users' },
   ]
 
@@ -1575,8 +1608,8 @@ export function UsuariosScreen({
             }}
           >
             <option value="all">Todos</option>
-            <option value="Gerencial">Admin</option>
-            <option value="Supervisor">Gerenciais</option>
+            <option value="Admin">Admin</option>
+            <option value="Gerencial">Gerencial</option>
             <option value="Promotor">Promotor</option>
           </select>
           <span className="select-chevron" />
@@ -1585,7 +1618,8 @@ export function UsuariosScreen({
         <label className="user-select-field">
           <span>UF</span>
           <select
-            value={ufFilter}
+            value={restrictedUf || ufFilter}
+            disabled={Boolean(restrictedUf)}
             onChange={(event) => {
               setUfFilter(event.target.value)
               setPage(1)
@@ -1624,7 +1658,7 @@ export function UsuariosScreen({
           <article className={`user-summary-card is-${String(card.key).toLowerCase()}`} key={card.key}>
             <span className="user-summary-icon"><Icon name={card.icon} /></span>
             <span>
-              <small>{card.key === 'all' ? card.label : getProfileLabel(card.key)}</small>
+              <small>{card.label}</small>
               <strong>{card.value.toLocaleString('pt-BR')}</strong>
               <em>{card.detail}</em>
             </span>
@@ -1635,8 +1669,8 @@ export function UsuariosScreen({
       <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
         {[
           ['all', 'Todos', counts.all],
-          ['Gerencial', 'Admin', counts.Gerencial],
-          ['Supervisor', 'Gerenciais', counts.Supervisor],
+          ['Admin', 'Admin', counts.Admin],
+          ['Gerencial', 'Gerencial', counts.Gerencial],
           ['Promotor', 'Promotor', counts.Promotor],
         ].map(([value, label, count]) => (
           <button
@@ -1663,7 +1697,7 @@ export function UsuariosScreen({
             <div className="table-row table-head" role="row">
               <span role="columnheader">NOME</span>
               <span role="columnheader">PERFIL</span>
-              <span role="columnheader">GERENCIAIS</span>
+              <span role="columnheader">GERENCIAL</span>
               <span role="columnheader">E-MAIL</span>
               <span role="columnheader">UF</span>
               <span role="columnheader">STATUS</span>
@@ -1674,8 +1708,8 @@ export function UsuariosScreen({
               const isEditing = editId === usuario.id
               const isLegacyUser = ['admin@avine.com.br', 'avinegerencial@gmail.com'].includes(usuario.email.toLowerCase())
               const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
-              const cannotDeactivate = isSelf || (usuario.ativo && activeGerencialCount <= 1)
-              const profileClass = usuario.perfil.toLowerCase()
+              const cannotDeactivate = isSelf || (usuario.ativo && activeAdminCount <= 1 && usuario.perfil === 'Admin')
+              const profileClass = getManagedRoleKey(usuario).toLowerCase()
 
               return (
                 <div className={`table-row user-registration-row ${isEditing ? 'is-editing' : ''}`} role="row" key={usuario.id}>
@@ -1694,10 +1728,10 @@ export function UsuariosScreen({
                   </div>
 
                   <span role="cell" data-label="Perfil">
-                    <span className={`profile-pill is-${profileClass}`}>{getProfileLabel(usuario.perfil)}</span>
+                    <span className={`profile-pill is-${profileClass}`}>{getManagedRoleLabel(usuario)}</span>
                   </span>
 
-                  <span className="supervisor-cell" role="cell" data-label="Gerenciais">{getSupervisorName(usuario)}</span>
+                  <span className="gerencial-cell" role="cell" data-label="Gerencial">{getGerencialName(usuario)}</span>
 
                   <div className="email-cell" role="cell" data-label="E-mail">
                     {isEditing ? (
@@ -1751,13 +1785,15 @@ export function UsuariosScreen({
                     ) : (
                       <>
                         <button className="secondary-button edit-user-button" type="button" onClick={() => handleEdit(usuario)}>
-                          Editar
+                          {restrictedUf && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
                         </button>
                         <details className="user-actions-menu">
                           <summary aria-label={`Mais ações para ${usuario.nome}`}><Icon name="more" /></summary>
                           <div className="user-actions-popover">
-                            <button type="button" onClick={() => handleEdit(usuario)}>Editar</button>
-                            <button type="button" disabled>Resetar senha</button>
+                            <button type="button" onClick={() => handleEdit(usuario)}>
+                              {restrictedUf && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
+                            </button>
+                            <button type="button" disabled={Boolean(restrictedUf && usuario.perfil !== 'Promotor')}>Resetar senha</button>
                             <button type="button" disabled>{isUserActive(usuario) ? 'Desativar' : 'Ativar'}</button>
                             <button
                               className={isLegacyUser ? 'is-danger' : ''}
@@ -2324,7 +2360,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   )
 }
 
-function NotasScreen({ search, onSearch, lojas, currentUser }) {
+function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }) {
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -2348,12 +2384,16 @@ function NotasScreen({ search, onSearch, lojas, currentUser }) {
 
       try {
         const [importedNotes, fstdProcesses, unknownNfds, noteLocations] = await Promise.all([
-          listAllRows((from, to) => supabase
-            .from('nfd_notas')
-            .select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')
-            .order('data_referencia', { ascending: false })
-            .order('nota_fiscal', { ascending: false })
-            .range(from, to)),
+          listAllRows((from, to) => {
+            let queryBuilder = supabase
+              .from('nfd_notas')
+              .select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')
+            if (restrictedUf) queryBuilder = queryBuilder.eq('uf', restrictedUf)
+            return queryBuilder
+              .order('data_referencia', { ascending: false })
+              .order('nota_fiscal', { ascending: false })
+              .range(from, to)
+          }),
           listAllRows((from, to) => supabase
             .from('fstd_processos')
             .select('id, nfd_chave_acesso, status, created_at')
@@ -2365,11 +2405,15 @@ function NotasScreen({ search, onSearch, lojas, currentUser }) {
             .is('reconhecida_em', null)
             .order('created_at', { ascending: false })
             .range(from, to)),
-          listAllRows((from, to) => supabase
-            .from('nfd_itens')
-            .select('chave_acesso, uf, cidade')
-            .order('chave_acesso', { ascending: true })
-            .range(from, to)),
+          listAllRows((from, to) => {
+            let queryBuilder = supabase
+              .from('nfd_itens')
+              .select('chave_acesso, uf, cidade')
+            if (restrictedUf) queryBuilder = queryBuilder.eq('uf', restrictedUf)
+            return queryBuilder
+              .order('chave_acesso', { ascending: true })
+              .range(from, to)
+          }),
         ])
 
         const statusByKey = new Map(
@@ -2417,7 +2461,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser }) {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [restrictedUf])
 
   const filteredGroups = useMemo(() => {
     const groups = new Map()
@@ -2491,11 +2535,12 @@ function NotasScreen({ search, onSearch, lojas, currentUser }) {
 
     let store = (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
     if (!store) {
-      const { data, error } = await supabase
+      let storeQuery = supabase
         .from('lojas')
         .select('id, codigo, nome, uf, cidade')
         .eq('codigo', note.codigo_cliente)
-        .maybeSingle()
+      if (restrictedUf) storeQuery = storeQuery.eq('uf', restrictedUf)
+      const { data, error } = await storeQuery.maybeSingle()
       if (error) throw error
       store = data
     }
@@ -2736,7 +2781,7 @@ function PlaceholderScreen({ title }) {
   return (
     <section className="users-card placeholder-card">
       <h2>{title}</h2>
-      <p className="table-message">Módulo protegido para gerenciais ativos.</p>
+      <p className="table-message">Módulo protegido para gerencial ativo.</p>
     </section>
   )
 }
@@ -2792,14 +2837,14 @@ function App() {
   const [profilePhoto, setProfilePhoto] = useState('')
 
   useEffect(() => {
-    if (!isAdminProfile(currentUser?.perfil)) return
+    if (!isAdministrativeProfile(currentUser)) return
 
     try {
       window.localStorage.setItem(gerencialScreenStorageKey, selectedItem)
     } catch {
       // A navegaÃ§Ã£o continua funcionando mesmo sem persistÃªncia local.
     }
-  }, [currentUser?.perfil, selectedItem])
+  }, [currentUser, selectedItem])
 
   async function loadUsuarios() {
     setLoading(true)
@@ -2815,15 +2860,17 @@ function App() {
     setLoading(false)
   }
 
-  async function listAllLojas() {
+  async function listAllLojas(allowedUf = '') {
     const pageSize = 1000
     const allLojas = []
 
     for (let page = 0; ; page += 1) {
       const from = page * pageSize
-      const { data, error } = await supabase
+      let query = supabase
         .from('lojas')
         .select('id, codigo, nome, uf, cidade, created_at')
+      if (allowedUf) query = query.eq('uf', allowedUf)
+      const { data, error } = await query
         .order('codigo', { ascending: true })
         .range(from, from + pageSize - 1)
 
@@ -2837,9 +2884,10 @@ function App() {
   async function loadLojas() {
     setLojasLoading(true)
     setLojasError('')
+    const scopedUf = isScopedGerencial(currentUser) ? currentUser.estado : ''
 
     const [lojasResult, usuariosResult, vinculosResult] = await Promise.all([
-      listAllLojas()
+      listAllLojas(scopedUf)
         .then((data) => ({ data, error: null }))
         .catch((error) => ({ data: [], error })),
       listManagedUsers()
@@ -2865,7 +2913,10 @@ function App() {
           (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,
         ),
       )
-      setLojaPromotores(vinculosResult.data ?? [])
+      const visibleStoreIds = new Set((lojasResult.data ?? []).map((loja) => loja.id))
+      setLojaPromotores(
+        (vinculosResult.data ?? []).filter((vinculo) => visibleStoreIds.has(vinculo.loja_id)),
+      )
     }
 
     setLojasLoading(false)
@@ -2882,7 +2933,7 @@ function App() {
       if (
         authLoading ||
         !session ||
-        !isAdminProfile(currentUser?.perfil) ||
+        !isAdministrativeProfile(currentUser) ||
         currentUser.ativo !== true ||
         currentUser.acesso_habilitado !== true
       ) {
@@ -2915,6 +2966,7 @@ function App() {
     currentUser?.acesso_habilitado,
     currentUser?.ativo,
     currentUser?.auth_user_id,
+    currentUser?.auth_role,
     currentUser?.foto_url,
     currentUser?.perfil,
     session?.user?.id,
@@ -2952,7 +3004,7 @@ function App() {
             ? 'Relatório'
             : 'Cadastro de Usuários'
   const pageSubtitle = isPerfil
-     ? 'Dados da conta Admin.'
+     ? `Dados da conta ${getManagedRoleLabel(currentUser)}.`
     : isLojas
     ? 'Roteirização dos promotores.'
     : isDashboard
@@ -2981,11 +3033,12 @@ function App() {
   async function handleCreateUsuario(event) {
     event.preventDefault()
 
-    if (form.perfil === 'Gerencial') {
+    if (form.perfil === 'Admin' && !isScopedGerencial(currentUser)) {
       const gerencialPayload = {
         nome: normalizaTexto(form.nome),
         email: form.email.trim().toLowerCase(),
         password: form.senha,
+        auth_role: form.auth_role,
       }
 
       if (
@@ -3015,7 +3068,7 @@ function App() {
       return
     }
 
-    const supervisorUf = currentUser?.perfil === 'Supervisor' ? currentUser.estado : ''
+    const restrictedUf = isScopedGerencial(currentUser) ? currentUser.estado : ''
     const payload = {
       email: form.email.trim().toLowerCase(),
       nome: form.nome.trim().toUpperCase(),
@@ -3030,10 +3083,9 @@ function App() {
       payload.nome.length < 4 ||
       getPasswordValidationMessage(payload.password) ||
       isNomeDuplicado(payload.nome, usuarios) ||
-      !perfisOperacionais.includes(payload.perfil) && payload.perfil !== 'Supervisor' ||
-      (currentUser?.perfil === 'Supervisor'
-        ? payload.estado !== supervisorUf
-        : !estados.includes(payload.estado))
+      !perfisCadastro.includes(payload.perfil) ||
+      (restrictedUf ? payload.estado !== restrictedUf : !estados.includes(payload.estado)) ||
+      (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
       setFormError(
         isNomeDuplicado(payload.nome, usuarios)
@@ -3086,7 +3138,7 @@ function App() {
       !payload.codigo ||
       isCodigoDuplicado(payload.codigo, lojas) ||
       !payload.nome ||
-      !(currentUser?.perfil === 'Supervisor'
+      (isScopedGerencial(currentUser)
         ? payload.uf === currentUser.estado
         : estadosLojas.includes(payload.uf)) ||
       !payload.cidade
@@ -3253,9 +3305,10 @@ function App() {
       isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id) ||
       getPasswordValidationMessage(editForm.senha, { optional: true }) ||
       !perfisEditaveis.includes(payload.perfil) ||
-      (currentUser?.perfil === 'Supervisor'
+      (isScopedGerencial(currentUser)
         ? payload.estado !== currentUser.estado
-        : !estados.includes(payload.estado))
+        : !estados.includes(payload.estado)) ||
+      (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
       setEditError(
         isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id)
@@ -3377,11 +3430,12 @@ function App() {
         usuario_id: target.id,
         nome: payload.nome,
         email: payload.email,
-        perfil: 'Gerencial',
+        perfil: target.perfil === 'Admin' ? 'Admin' : 'Gerencial',
         estado: target.estado,
         fotos_habilitadas: target.fotos_habilitadas,
         ativo: payload.ativo,
         acesso_habilitado: payload.ativo,
+        auth_role: target.perfil === 'Admin' ? 'admin' : 'gerencial',
         password: payload.senha || undefined,
       })
     } catch (updateError) {
@@ -3544,11 +3598,18 @@ function App() {
             onCancelEdit={cancelEditGerencial}
             onSaveEdit={handleSaveGerencial}
             onDelete={handleDeleteGerencial}
+            restrictedUf={isScopedGerencial(currentUser) ? currentUser.estado : ''}
           />
         ) : isRelatorios ? (
           <ReportScreen />
         ) : isNotas ? (
-          <NotasScreen search={search} onSearch={setSearch} lojas={lojas} currentUser={currentUser} />
+          <NotasScreen
+            search={search}
+            onSearch={setSearch}
+            lojas={lojas}
+            currentUser={currentUser}
+            restrictedUf={isScopedGerencial(currentUser) ? currentUser.estado : ''}
+          />
         ) : isLojas ? (
           <LojasScreen
             search={search}
@@ -3595,7 +3656,9 @@ function App() {
         <CadastroLojaModal
           form={lojaForm}
           lojas={lojas}
-          allowedStates={currentUser?.perfil === 'Supervisor' ? [currentUser.estado] : estadosLojas}
+          allowedStates={isScopedGerencial(currentUser)
+              ? [currentUser.estado]
+              : estadosLojas}
           busy={savingLoja}
           error={lojaFormError}
           onChange={(patch) => setLojaForm((current) => ({ ...current, ...patch }))}
@@ -3611,6 +3674,7 @@ function App() {
           onEdit={openEditModal}
           onTogglePhotos={handlePhotoToggle}
           photoBusy={updatingId === selectedUsuario.id}
+          canManage={!isScopedGerencial(currentUser) || selectedUsuario.perfil === 'Promotor'}
         />
       )}
 

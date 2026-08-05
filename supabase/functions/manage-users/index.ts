@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const allowedRoles = new Set(["Promotor", "Gerencial", "Supervisor"]);
+const allowedRoles = new Set(["Promotor", "Gerencial", "Admin"]);
 const allowedAuthRoles = new Set(["admin", "gerencial", "promotor"]);
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_POLICY_ERROR =
@@ -97,8 +97,16 @@ function validatePassword(password: string) {
 }
 
 function validateAuthRole(input: JsonRecord, profile: string) {
-  const requested = text(input.auth_role) || profile.toLowerCase();
-  if (!allowedAuthRoles.has(requested)) {
+  const requested = text(input.auth_role) ||
+    (profile === "Admin" ? "admin" : profile.toLowerCase());
+  const expected = profile === "Admin"
+    ? "admin"
+    : profile === "Gerencial"
+    ? "gerencial"
+    : profile === "Promotor"
+    ? "promotor"
+    : "";
+  if (!allowedAuthRoles.has(requested) || requested !== expected) {
     throw new Error("Role Auth invalida.");
   }
   return requested;
@@ -124,7 +132,7 @@ function validateProfile(input: JsonRecord) {
   };
 }
 
-function publicProfile(profile: UserProfile) {
+function publicProfile(profile: UserProfile, authRole: string | null = null) {
   return {
     id: profile.id,
     auth_user_id: profile.auth_user_id,
@@ -137,6 +145,7 @@ function publicProfile(profile: UserProfile) {
     acesso_habilitado: profile.acesso_habilitado,
     foto_url: profile.foto_url,
     created_at: profile.created_at,
+    auth_role: authRole,
   };
 }
 
@@ -194,6 +203,8 @@ Deno.serve(async (request) => {
     return jsonResponse(401, { error: "Sessao invalida. Entre novamente." });
   }
 
+  const callerAuthRole = text(caller.app_metadata?.role);
+
   const { data: callerProfile, error: callerProfileError } = await adminClient
     .from("usuarios")
     .select("id, perfil, estado, ativo, acesso_habilitado")
@@ -202,20 +213,26 @@ Deno.serve(async (request) => {
 
   if (
     callerProfileError ||
-    !["Gerencial", "Supervisor"].includes(callerProfile?.perfil ?? "") ||
+    !["Admin", "Gerencial"].includes(callerProfile?.perfil ?? "") ||
     callerProfile?.ativo !== true ||
     callerProfile?.acesso_habilitado !== true
   ) {
     return jsonResponse(403, {
-      error: "Apenas Gerenciais ou Supervisores com acesso ativo podem administrar usuarios.",
+      error: "Apenas Admins ou Gerenciais com acesso ativo podem administrar usuarios.",
     });
   }
 
-  const isSupervisor = callerProfile.perfil === "Supervisor";
+  const isAdmin = callerProfile.perfil === "Admin" && callerAuthRole === "admin";
+  const isScopedGerencial = callerProfile.perfil === "Gerencial" &&
+    callerAuthRole === "gerencial";
+
+  if (!isAdmin && !isScopedGerencial) {
+    return jsonResponse(403, { error: "Role Auth inconsistente com o perfil operacional." });
+  }
 
   function canManageTarget(target: { perfil?: string; estado?: string }) {
-    if (!isSupervisor) return true;
-    return ["Promotor"].includes(target.perfil ?? "") &&
+    if (isAdmin) return true;
+    return target.perfil === "Promotor" &&
       target.estado === callerProfile.estado;
   }
 
@@ -228,17 +245,29 @@ Deno.serve(async (request) => {
         "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
       );
 
-    if (isSupervisor) {
-      listQuery = listQuery
-        .in("perfil", ["Promotor"])
-        .eq("estado", callerProfile.estado);
+    if (isScopedGerencial) {
+      listQuery = listQuery.eq("estado", callerProfile.estado);
     }
 
     const { data, error } = await listQuery.order("nome", { ascending: true });
 
     if (error) return jsonResponse(400, { error: error.message });
+    const { data: authUsersData, error: authUsersError } =
+      await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+
+    if (authUsersError) return jsonResponse(400, { error: authUsersError.message });
+
+    const authRoles = new Map(
+      (authUsersData.users ?? []).map((user) => [
+        user.id,
+        typeof user.app_metadata?.role === "string" ? user.app_metadata.role : null,
+      ]),
+    );
+
     return jsonResponse(200, {
-      usuarios: (data as UserProfile[]).map(publicProfile),
+      usuarios: (data as UserProfile[]).map((profile) =>
+        publicProfile(profile, profile.auth_user_id ? authRoles.get(profile.auth_user_id) ?? null : null)
+      ),
     });
   }
 
@@ -259,7 +288,7 @@ Deno.serve(async (request) => {
     }
 
     if (
-      target.perfil !== "Gerencial" ||
+      target.perfil !== "Admin" ||
       !legacyGerencialEmails.has(email(target.email))
     ) {
       return jsonResponse(400, {
@@ -303,11 +332,10 @@ Deno.serve(async (request) => {
       });
     }
 
-    if (isSupervisor &&
-      (!["Promotor"].includes(profileInput.perfil) ||
-        profileInput.estado !== callerProfile.estado)) {
+    if (isScopedGerencial &&
+      (profileInput.perfil !== "Promotor" || profileInput.estado !== callerProfile.estado)) {
       return jsonResponse(403, {
-        error: "O Supervisor somente pode cadastrar perfis operacionais na sua UF.",
+        error: "O Gerencial somente pode cadastrar Promotores da sua UF.",
       });
     }
 
@@ -390,7 +418,7 @@ Deno.serve(async (request) => {
       });
     }
 
-    return jsonResponse(200, { usuario: publicProfile(profile as UserProfile) });
+    return jsonResponse(200, { usuario: publicProfile(profile as UserProfile, authRole) });
   }
 
   if (action === "update" || action === "set_access") {
@@ -413,7 +441,7 @@ Deno.serve(async (request) => {
 
     if (!canManageTarget(target)) {
       return jsonResponse(403, {
-        error: "O Supervisor somente pode administrar perfis operacionais da sua UF.",
+        error: "O Gerencial somente pode administrar Promotores da sua UF.",
       });
     }
 
@@ -425,14 +453,6 @@ Deno.serve(async (request) => {
     } catch (error) {
       return jsonResponse(400, {
         error: error instanceof Error ? error.message : "Dados invalidos.",
-      });
-    }
-
-    if (isSupervisor &&
-      (!["Promotor"].includes(nextProfile.perfil) ||
-        nextProfile.estado !== callerProfile.estado)) {
-      return jsonResponse(403, {
-        error: "O Supervisor somente pode manter perfis operacionais na sua UF.",
       });
     }
 
@@ -450,15 +470,15 @@ Deno.serve(async (request) => {
     }
 
     if (
-      target.perfil === "Gerencial" &&
+      target.perfil === "Admin" &&
       target.ativo &&
       target.acesso_habilitado &&
-      (!nextActive || !nextAccess || nextProfile.perfil !== "Gerencial")
+      (!nextActive || !nextAccess || nextProfile.perfil !== "Admin")
     ) {
       const { count, error: countError } = await adminClient
         .from("usuarios")
         .select("id", { count: "exact", head: true })
-        .eq("perfil", "Gerencial")
+        .eq("perfil", "Admin")
         .eq("ativo", true)
         .eq("acesso_habilitado", true)
         .neq("id", target.id);
@@ -466,7 +486,7 @@ Deno.serve(async (request) => {
       if (countError) return jsonResponse(400, { error: countError.message });
       if ((count ?? 0) === 0) {
         return jsonResponse(400, {
-          error: "Nao e permitido bloquear o ultimo Gerencial com acesso.",
+          error: "Nao e permitido bloquear o ultimo Admin com acesso.",
         });
       }
     }
@@ -546,7 +566,7 @@ Deno.serve(async (request) => {
           email: target.email,
           user_metadata: { nome: target.nome },
           app_metadata: {
-            role: target.perfil.toLowerCase(),
+            role: target.perfil === "Admin" ? "admin" : target.perfil.toLowerCase(),
             access_enabled: target.acesso_habilitado && target.ativo,
           },
           ban_duration: target.acesso_habilitado && target.ativo
@@ -561,7 +581,7 @@ Deno.serve(async (request) => {
     }
 
     return jsonResponse(200, {
-      usuario: publicProfile(updated as UserProfile),
+      usuario: publicProfile(updated as UserProfile, authRole),
     });
   }
 

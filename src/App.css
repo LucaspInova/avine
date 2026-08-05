@@ -2112,6 +2112,11 @@ select:focus-visible {
   background: #e3f1e1;
 }
 
+.profile-pill.is-admin {
+  color: #8a5a00;
+  background: #fff1c7;
+}
+
 .profile-pill.is-supervisor {
   color: #1e5fae;
   background: #e1edfb;

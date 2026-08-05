@@ -37,9 +37,17 @@ function RootApp() {
           <Route path="/esqueci-senha" element={<ForgotPasswordScreen />} />
           <Route path="/redefinir-senha" element={<ResetPasswordScreen />} />
           <Route
+            path="/admin/*"
+            element={(
+              <RequireRole profile={["Admin", "Gerencial"]} authRole="admin">
+                <GerencialApp />
+              </RequireRole>
+            )}
+          />
+          <Route
             path="/gerencial/*"
             element={(
-              <RequireRole profile="Gerencial">
+              <RequireRole profile="Gerencial" authRole="gerencial">
                 <GerencialApp />
               </RequireRole>
             )}

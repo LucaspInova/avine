@@ -93,7 +93,7 @@ function RoleAccessScreen() {
   }
 
   if (auth.profile.perfil === 'Gerencial') {
-    return <Navigate to="/gerencial" replace />
+    return <Navigate to={routeForProfile(auth.profile)} replace />
   }
 
   if (requestedRole && requestedRole !== auth.profile.perfil.toLowerCase()) {
@@ -105,9 +105,6 @@ function RoleAccessScreen() {
       <p className="role-access-message">
         Seu usuário está associado à role <strong>{getProfileLabel(auth.profile.perfil)}</strong>.
       </p>
-      {auth.profile.perfil === 'Supervisor' && (
-        <p className="role-access-message">A tela de Gerenciais ainda está em preparação.</p>
-      )}
     </main>
   )
 }

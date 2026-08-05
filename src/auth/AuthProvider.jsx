@@ -17,8 +17,10 @@ const profileSelect =
 const AuthContext = createContext(null)
 
 function routeForProfile(profile) {
+  if (profile?.auth_role === 'admin') return '/admin'
+  if (profile?.auth_role === 'gerencial') return '/gerencial'
+  if (profile?.perfil === 'Admin') return '/admin'
   if (profile?.perfil === 'Gerencial') return '/gerencial'
-  if (profile?.perfil === 'Supervisor') return '/acesso/supervisor'
   if (profile?.perfil === 'Promotor') return '/acesso/promotor'
   return '/'
 }
@@ -57,7 +59,12 @@ export function AuthProvider({ children }) {
       .eq('auth_user_id', userId)
       .maybeSingle()
 
-    if (version !== requestVersion.current) return data
+    const profileWithAuthRole = data ? {
+      ...data,
+      auth_role: activeSession.user.app_metadata?.role ?? null,
+    } : null
+
+    if (version !== requestVersion.current) return profileWithAuthRole
 
     if (profileError) {
       setSession(activeSession)
@@ -68,10 +75,10 @@ export function AuthProvider({ children }) {
     }
 
     setSession(activeSession)
-    setProfile(data)
+    setProfile(profileWithAuthRole)
     setError('')
     setLoading(false)
-    return data
+    return profileWithAuthRole
   }, [])
 
   useEffect(() => {
@@ -166,7 +173,7 @@ export function useAuth() {
   return context
 }
 
-export function RequireRole({ profile: requiredProfile, children }) {
+export function RequireRole({ profile: requiredProfile, authRole: requiredAuthRole, children }) {
   const auth = useAuth()
 
   if (auth.loading) {
@@ -178,7 +185,15 @@ export function RequireRole({ profile: requiredProfile, children }) {
   }
 
   const allowedProfiles = Array.isArray(requiredProfile) ? requiredProfile : [requiredProfile]
-  if (!allowedProfiles.includes(auth.profile.perfil)) {
+  const allowedAuthRoles = Array.isArray(requiredAuthRole)
+    ? requiredAuthRole
+    : requiredAuthRole ? [requiredAuthRole] : []
+
+  if (allowedAuthRoles.length > 0 && !allowedAuthRoles.includes(auth.profile.auth_role)) {
+    return <Navigate to={routeForProfile(auth.profile)} replace />
+  }
+
+  if (allowedProfiles.length > 0 && !allowedProfiles.includes(auth.profile.perfil)) {
     return <Navigate to={routeForProfile(auth.profile)} replace />
   }
 

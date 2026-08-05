@@ -86,7 +86,7 @@ Deno.serve(async (request) => {
   const perfil = typeof body.perfil === 'string' ? body.perfil : 'Gerencial'
   const estado = typeof body.estado === 'string' ? body.estado : 'CE'
   const fotosHabilitadas = body.fotos_habilitadas === true
-  const perfisPermitidos = ['Promotor', 'Gerencial']
+  const perfisPermitidos = ['Promotor', 'Gerencial', 'Admin']
   const estadosPermitidos = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 
   if (nome.length < 4) return jsonResponse(400, { error: 'Informe um nome valido.' })
@@ -125,20 +125,20 @@ Deno.serve(async (request) => {
     .from('usuarios')
     .select('id')
     .eq('auth_user_id', caller.id)
-    .eq('perfil', 'Gerencial')
+    .in('perfil', ['Admin', 'Gerencial'])
     .eq('ativo', true)
     .eq('acesso_habilitado', true)
     .maybeSingle()
 
   if (permissionError || !callerProfile) {
-    return jsonResponse(403, { error: 'Apenas Gerenciais ativos podem criar Gerenciais.' })
+    return jsonResponse(403, { error: 'Apenas Admins ou Gerenciais ativos podem criar usuarios.' })
   }
 
   const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    app_metadata: { role: perfil.toLowerCase() },
+    app_metadata: { role: perfil === 'Admin' ? 'admin' : perfil.toLowerCase() },
     user_metadata: { nome },
   })
 

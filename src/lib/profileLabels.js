@@ -1,6 +1,6 @@
 const profileLabels = {
-  Gerencial: 'Admin',
-  Supervisor: 'Gerenciais',
+  Admin: 'Admin',
+  Gerencial: 'Gerencial',
   Promotor: 'Promotor',
 }
 

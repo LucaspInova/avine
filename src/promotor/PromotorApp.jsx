@@ -3299,7 +3299,7 @@ function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFi
         .is('reconhecida_em', null)
         .order('created_at', { ascending: false })
 
-      if (profile.perfil !== 'Gerencial' && profile.perfil !== 'Supervisor') {
+      if (profile.perfil !== 'Admin' && profile.perfil !== 'Gerencial') {
         query = query.eq('promotor_id', profile.id)
       }
 

@@ -5,13 +5,14 @@ export type ManagedUser = {
   auth_user_id: string | null
   email: string
   nome: string
-  perfil: 'Promotor' | 'Gerencial' | 'Supervisor'
+  perfil: 'Promotor' | 'Gerencial' | 'Admin'
   estado: string
   fotos_habilitadas: boolean
   ativo: boolean
   acesso_habilitado: boolean
   foto_url: string | null
   created_at: string
+  auth_role: 'admin' | 'gerencial' | 'promotor' | null
 }
 
 export type CreateGerencialUserPayload = {
@@ -25,7 +26,7 @@ export type CreateOperationalUserPayload = {
   nome: string
   email: string
   password: string
-  perfil: 'Promotor' | 'Supervisor'
+  perfil: 'Promotor' | 'Gerencial' | 'Admin'
   estado: string
   fotos_habilitadas: boolean
 }
@@ -34,7 +35,7 @@ export type UpdateManagedUserPayload = {
   usuario_id: string
   nome: string
   email: string
-  perfil: 'Promotor' | 'Gerencial' | 'Supervisor'
+  perfil: 'Promotor' | 'Gerencial' | 'Admin'
   estado: string
   fotos_habilitadas: boolean
   ativo: boolean
@@ -94,7 +95,7 @@ export async function createGerencialUser(payload: CreateGerencialUserPayload): 
   await invokeManageUsers({
     action: 'create',
     ...payload,
-    perfil: 'Gerencial',
+    perfil: 'Admin',
     estado: 'CE',
     fotos_habilitadas: false,
   })

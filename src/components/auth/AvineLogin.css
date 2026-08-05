@@ -419,14 +419,11 @@
     transform 160ms ease;
 }
 
-.avine-login-credit svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: #ee3e32;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.2;
+.avine-login-credit-logo {
+  display: block;
+  width: 36px;
+  height: 19px;
+  object-fit: contain;
 }
 
 .avine-login-credit:hover {

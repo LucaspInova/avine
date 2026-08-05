@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import avineLogo from '../../assets/foto_logoavine.png'
+import masterInovaLogo from '../../assets/master-inova-logo.png'
 import aviaryImageAvif from '../../assets/avine-egg-factory.avif'
 import aviaryImageWebp from '../../assets/avine-egg-factory.webp'
 import { supabase } from '../../lib/supabaseClient'
@@ -113,9 +114,7 @@ function RecoveryLayout({ children, title, subtitle, icon = 'lock' }) {
           rel="noreferrer"
           target="_blank"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="m7.4 7.1 2.2 2.2-2.2 2.2-2.2-2.2 2.2-2.2Zm9.2 5.4 2.2 2.2-2.2 2.2-2.2-2.2 2.2-2.2Zm-6.2-2.1 3.2 3.2m0-3.2-3.2 3.2" />
-          </svg>
+          <img className="avine-login-credit-logo" src={masterInovaLogo} alt="Master Inova" />
           <span>Desenvolvido por Master Inova</span>
         </a>
       </section>

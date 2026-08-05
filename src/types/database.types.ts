@@ -19,7 +19,7 @@ export type Estado =
   | 'RN'
   | 'AL'
 
-export type PerfilUsuario = 'Promotor' | 'Gerencial' | 'Supervisor'
+export type PerfilUsuario = 'Promotor' | 'Gerencial' | 'Admin'
 export type StatusFstd = 'solicitada' | 'validada' | 'cancelada' | 'recolhida'
 export type OrigemFstd = 'mobile' | 'gerencial' | 'importacao'
 

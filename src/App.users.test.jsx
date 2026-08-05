@@ -88,7 +88,7 @@ describe('Cadastro de Usuários', () => {
     })
 
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Gerenciais (0)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerencial (1)' }))
     expect(within(table).getByText('Nenhum usuário encontrado.')).toBeInTheDocument()
   })
 
@@ -113,7 +113,7 @@ describe('Cadastro de Usuários', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Gerenciais' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Gerencial' })).not.toBeDisabled()
 
     rerender(
       <CadastroModal
@@ -128,15 +128,15 @@ describe('Cadastro de Usuários', () => {
     )
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Gerenciais responsável')).toBeDisabled()
+    expect(screen.getByLabelText('Gerencial responsável')).toBeDisabled()
   })
 
   it('aplica os novos nomes visuais e rotas por perfil', () => {
-    expect(getProfileLabel('Gerencial')).toBe('Admin')
-    expect(getProfileLabel('Supervisor')).toBe('Gerenciais')
+    expect(getProfileLabel('Gerencial')).toBe('Gerencial')
+    expect(getProfileLabel('Supervisor')).toBe('Supervisor')
     expect(getProfileLabel('Promotor')).toBe('Promotor')
     expect(routeForProfile({ perfil: 'Gerencial' })).toBe('/gerencial')
-    expect(routeForProfile({ perfil: 'Supervisor' })).toBe('/acesso/supervisor')
+    expect(routeForProfile({ perfil: 'Supervisor' })).toBe('/')
     expect(routeForProfile({ perfil: 'Promotor' })).toBe('/acesso/promotor')
   })
 })
