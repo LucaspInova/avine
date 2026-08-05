@@ -1,16 +1,30 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ForgotPasswordScreen } from './PasswordRecovery.jsx'
+import { ForgotPasswordScreen, ResetPasswordScreen } from './PasswordRecovery.jsx'
 
-const { resetPasswordForEmail } = vi.hoisted(() => ({
+const {
+  getSession,
+  onAuthStateChange,
+  resetPasswordForEmail,
+  signOut,
+  updateUser,
+} = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  onAuthStateChange: vi.fn(),
   resetPasswordForEmail: vi.fn(),
+  signOut: vi.fn(),
+  updateUser: vi.fn(),
 }))
 
 vi.mock('../../lib/supabaseClient', () => ({
   supabase: {
     auth: {
+      getSession,
+      onAuthStateChange,
       resetPasswordForEmail,
+      signOut,
+      updateUser,
     },
   },
 }))
@@ -18,13 +32,17 @@ vi.mock('../../lib/supabaseClient', () => ({
 describe('PasswordRecovery', () => {
   beforeEach(() => {
     resetPasswordForEmail.mockReset()
+    getSession.mockReset()
+    onAuthStateChange.mockReset()
+    signOut.mockReset()
+    updateUser.mockReset()
+    getSession.mockResolvedValue({ data: { session: null }, error: null })
+    onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } })
     window.history.replaceState({}, '', '/esqueci-senha')
   })
 
-  it('usa o Site URL do Supabase quando a origem atual ainda não está no allowlist', async () => {
-    resetPasswordForEmail
-      .mockResolvedValueOnce({ error: { message: 'Invalid redirect URL' } })
-      .mockResolvedValueOnce({ error: null })
+  it('envia o link usando a origem atual da aplicacao', async () => {
+    resetPasswordForEmail.mockResolvedValue({ error: null })
 
     render(
       <MemoryRouter initialEntries={['/esqueci-senha']}>
@@ -35,19 +53,18 @@ describe('PasswordRecovery', () => {
     fireEvent.change(screen.getByLabelText('E-mail'), {
       target: { value: 'Pessoa@Exemplo.com' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar link de recuperação' }))
+    fireEvent.click(screen.getByRole('button', { name: /Enviar link de recupera/ }))
 
     await waitFor(() => expect(screen.getByText('Confira seu e-mail')).toBeInTheDocument())
 
-    expect(resetPasswordForEmail).toHaveBeenNthCalledWith(
-      1,
+    expect(resetPasswordForEmail).toHaveBeenCalledWith(
       'pessoa@exemplo.com',
       { redirectTo: `${window.location.origin}/redefinir-senha` },
     )
-    expect(resetPasswordForEmail).toHaveBeenNthCalledWith(2, 'pessoa@exemplo.com')
+    expect(resetPasswordForEmail).toHaveBeenCalledTimes(1)
   })
 
-  it('não repete a solicitação para erros de envio', async () => {
+  it('nao repete a solicitacao para erros de envio', async () => {
     resetPasswordForEmail.mockResolvedValue({ error: { message: 'Error sending recovery email' } })
 
     render(
@@ -59,7 +76,7 @@ describe('PasswordRecovery', () => {
     fireEvent.change(screen.getByLabelText('E-mail'), {
       target: { value: 'pessoa@exemplo.com' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar link de recuperação' }))
+    fireEvent.click(screen.getByRole('button', { name: /Enviar link de recupera/ }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
     expect(resetPasswordForEmail).toHaveBeenCalledTimes(1)
@@ -82,5 +99,78 @@ describe('PasswordRecovery', () => {
     fireEvent.click(screen.getByRole('button', { name: /Enviar link de recupera/ }))
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('limite de envio'))
+  })
+
+  it('aguarda a sessao de recuperacao antes de exibir o formulario', async () => {
+    window.history.replaceState({}, '', '/redefinir-senha#access_token=token&type=recovery')
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null })
+
+    render(
+      <MemoryRouter initialEntries={['/redefinir-senha']}>
+        <ResetPasswordScreen />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(screen.getByLabelText('Nova senha')).toBeInTheDocument())
+    expect(screen.getByLabelText('Confirmar nova senha')).toBeInTheDocument()
+  })
+
+  it('recusa acesso direto sem sessao de recuperacao', async () => {
+    render(
+      <MemoryRouter initialEntries={['/redefinir-senha']}>
+        <ResetPasswordScreen />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(screen.getByText(/Link indispon/)).toBeInTheDocument())
+  })
+
+  it('trata otp_expired na query e limpa os parametros sensiveis da URL', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/redefinir-senha?error=access_denied&error_code=otp_expired&error_description=Email%20link%20is%20invalid%20or%20has%20expired',
+    )
+
+    render(
+      <MemoryRouter initialEntries={['/redefinir-senha']}>
+        <ResetPasswordScreen />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/Este link de redefini/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/redefinir-senha')
+      expect(window.location.search).toBe('')
+      expect(window.location.hash).toBe('')
+    })
+  })
+
+  it('valida confirmacao e atualiza a senha com a sessao de recuperacao', async () => {
+    window.history.replaceState({}, '', '/redefinir-senha#access_token=token&type=recovery')
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null })
+    updateUser.mockResolvedValue({ error: null })
+    signOut.mockResolvedValue({ error: null })
+
+    render(
+      <MemoryRouter initialEntries={['/redefinir-senha']}>
+        <ResetPasswordScreen />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(screen.getByLabelText('Nova senha')).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText('Nova senha'), { target: { value: 'NovaSenha1!' } })
+    fireEvent.change(screen.getByLabelText('Confirmar nova senha'), { target: { value: 'OutraSenha1!' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar senha' }))
+
+    expect(await screen.findByText(/As senhas/)).toBeInTheDocument()
+    expect(updateUser).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByPlaceholderText('Digite a senha novamente'), { target: { value: 'NovaSenha1!' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar senha' }))
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: 'NovaSenha1!' }))
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(await screen.findByText('Senha atualizada')).toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import avineLogo from '../../assets/foto_logoavine.png'
 import masterInovaLogo from '../../assets/master-inova-logo.png'
 import aviaryImageAvif from '../../assets/avine-egg-factory.avif'
@@ -10,14 +10,6 @@ import './AvineLogin.css'
 import './PasswordRecovery.css'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const recoveryPath = '/redefinir-senha'
-
-function getRecoveryRedirectTo() {
-  if (typeof window === 'undefined') return recoveryPath
-
-  const configuredUrl = import.meta.env.VITE_PASSWORD_RECOVERY_REDIRECT_URL?.trim()
-  return configuredUrl || `${window.location.origin}${recoveryPath}`
-}
 
 function isRedirectConfigurationError(error) {
   const message = String(error?.message ?? error ?? '').toLowerCase()
@@ -143,18 +135,10 @@ function ForgotPasswordScreen() {
 
     setBusy(true)
     try {
-      const redirectTo = getRecoveryRedirectTo()
-      let { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      const redirectTo = `${window.location.origin}/redefinir-senha`
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo,
       })
-
-      // A production hostname may not have been added to Supabase's redirect
-      // allowlist yet. Retrying without redirectTo lets Auth use the project's
-      // configured Site URL, where RootApp also understands recovery hashes.
-      if (resetError && isRedirectConfigurationError(resetError)) {
-        const fallbackResult = await supabase.auth.resetPasswordForEmail(normalizedEmail)
-        resetError = fallbackResult.error
-      }
 
       if (resetError) {
         setError(getRecoveryErrorMessage(resetError))
@@ -226,20 +210,32 @@ function ForgotPasswordScreen() {
   )
 }
 
-function isRecoveryHash() {
-  if (typeof window === 'undefined') return false
+function getRecoveryUrlParams() {
+  if (typeof window === 'undefined') return new URLSearchParams()
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  return params.get('type') === 'recovery'
+  const searchParams = new URLSearchParams(window.location.search)
+  searchParams.forEach((value, key) => {
+    if (!params.has(key)) params.set(key, value)
+  })
+  return params
+}
+
+function isRecoveryHash() {
+  const params = getRecoveryUrlParams()
+  return params.get('type') === 'recovery' && Boolean(params.get('access_token') || params.get('code'))
 }
 
 function hasRecoveryError() {
-  if (typeof window === 'undefined') return false
-  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  return Boolean(params.get('error') || params.get('error_code'))
+  const params = getRecoveryUrlParams()
+  return Boolean(params.get('error') || params.get('error_code') || params.get('error_description'))
+}
+
+function clearRecoveryUrl() {
+  if (typeof window === 'undefined') return
+  window.history.replaceState({}, document.title, window.location.pathname)
 }
 
 function ResetPasswordScreen() {
-  const navigate = useNavigate()
   const [phase, setPhase] = useState(() => (hasRecoveryError() ? 'invalid' : 'checking'))
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -250,20 +246,29 @@ function ResetPasswordScreen() {
 
   useEffect(() => {
     let mounted = true
-    let recoveryEventReceived = false
-    let fallbackTimer
-    const recoveryHash = isRecoveryHash()
+    let recoveryTimer
+    const recoveryTokenInUrl = isRecoveryHash()
+    const redirectHasError = hasRecoveryError()
+
+    function markReady() {
+      if (!mounted) return
+      clearRecoveryUrl()
+      setPhase('ready')
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return
 
-      if (event === 'PASSWORD_RECOVERY' && session) {
-        recoveryEventReceived = true
-        setPhase('ready')
+      if (session && (event === 'PASSWORD_RECOVERY' || (recoveryTokenInUrl && event === 'SIGNED_IN'))) {
+        markReady()
       }
     })
 
-    if (!hasRecoveryError()) {
+    if (redirectHasError) {
+      // The initial state already reflects an invalid recovery redirect.
+      // Remove error details and any tokens from the address bar after reading them.
+      clearRecoveryUrl()
+    } else {
       supabase.auth.getSession()
         .then(({ data, error: sessionError }) => {
           if (!mounted) return
@@ -273,19 +278,20 @@ function ResetPasswordScreen() {
             return
           }
 
-          if (!data.session) {
+          if (data.session && recoveryTokenInUrl) {
+            markReady()
+            return
+          }
+
+          if (!recoveryTokenInUrl) {
             setPhase('invalid')
             return
           }
 
-          if (recoveryHash) {
-            setPhase('ready')
-            return
-          }
-
-          fallbackTimer = window.setTimeout(() => {
-            if (mounted && !recoveryEventReceived) setPhase('invalid')
-          }, 800)
+          // The client may still be exchanging the recovery hash for a session.
+          recoveryTimer = window.setTimeout(() => {
+            if (mounted) setPhase('invalid')
+          }, 5000)
         })
         .catch(() => {
           if (mounted) setPhase('error')
@@ -294,7 +300,7 @@ function ResetPasswordScreen() {
 
     return () => {
       mounted = false
-      if (fallbackTimer) window.clearTimeout(fallbackTimer)
+      if (recoveryTimer) window.clearTimeout(recoveryTimer)
       authListener.subscription.unsubscribe()
     }
   }, [])
@@ -303,11 +309,11 @@ function ResetPasswordScreen() {
     if (!success) return undefined
 
     const redirectTimer = window.setTimeout(() => {
-      navigate('/', { replace: true })
-    }, 1400)
+      window.location.replace('/')
+    }, 1500)
 
     return () => window.clearTimeout(redirectTimer)
-  }, [navigate, success])
+  }, [success])
 
   const passwordError = submitted ? getPasswordValidationMessage(password) : ''
   const confirmationError = submitted && password !== confirmation
@@ -333,7 +339,7 @@ function ResetPasswordScreen() {
       }
 
       try {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: 'local' })
       } catch {
         // A senha já foi atualizada; o login ainda será reaberto ao final do fluxo.
       }
@@ -364,7 +370,7 @@ function ResetPasswordScreen() {
         subtitle="Este link expirou, já foi utilizado ou não é válido."
       >
         <p className="avine-recovery-status avine-recovery-status-error" role="alert">
-          Solicite um novo link para redefinir sua senha.
+          Este link de redefinição expirou ou já foi utilizado. Solicite um novo e-mail.
         </p>
         <Link className="avine-login-primary avine-recovery-link-button" to="/esqueci-senha">
           Solicitar novo link
@@ -398,6 +404,9 @@ function ResetPasswordScreen() {
         <p className="avine-recovery-status avine-recovery-status-success" role="status">
           Você será redirecionado para o login em instantes.
         </p>
+        <Link className="avine-login-secondary avine-recovery-link-button" to="/">
+          Ir para o login agora
+        </Link>
       </RecoveryLayout>
     )
   }
