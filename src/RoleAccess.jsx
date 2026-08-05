@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { routeForProfile, useAuth } from './auth/AuthProvider.jsx'
+import { getProfileLabel } from './lib/profileLabels.js'
 import AvineLogin from './components/auth/AvineLogin.jsx'
 import './RoleAccess.css'
 
@@ -91,7 +92,7 @@ function RoleAccessScreen() {
     return <Navigate to="/" replace />
   }
 
-  if (auth.profile.perfil === 'Gerencial' || auth.profile.perfil === 'Supervisor') {
+  if (auth.profile.perfil === 'Gerencial') {
     return <Navigate to="/gerencial" replace />
   }
 
@@ -102,8 +103,11 @@ function RoleAccessScreen() {
   return (
     <main className="role-access-screen">
       <p className="role-access-message">
-        Seu usuário está associado à role <strong>{auth.profile.perfil}</strong>.
+        Seu usuário está associado à role <strong>{getProfileLabel(auth.profile.perfil)}</strong>.
       </p>
+      {auth.profile.perfil === 'Supervisor' && (
+        <p className="role-access-message">A tela de Gerenciais ainda está em preparação.</p>
+      )}
     </main>
   )
 }

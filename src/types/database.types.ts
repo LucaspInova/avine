@@ -19,7 +19,7 @@ export type Estado =
   | 'RN'
   | 'AL'
 
-export type PerfilUsuario = 'Promotor' | 'Entregador' | 'Gerencial' | 'Supervisor'
+export type PerfilUsuario = 'Promotor' | 'Gerencial' | 'Supervisor'
 export type StatusFstd = 'solicitada' | 'validada' | 'cancelada' | 'recolhida'
 export type OrigemFstd = 'mobile' | 'gerencial' | 'importacao'
 
@@ -693,6 +693,64 @@ export type Database = {
         }
         Relationships: []
       }
+      fstd_relatorio: {
+        Row: {
+          nfd: string | null
+          fstd: number | null
+          id: string | null
+          data_emissao: string | null
+          data_baixa: string | null
+          valor: number | null
+          vl_galinha: number | null
+          vl_codorna: number | null
+          motorista: string | null
+          motivo_emissao: string | null
+          nome_abreviado: string | null
+          responsavel_fstd: string | null
+          galinha_nfd: number | null
+          codorna_nfd: number | null
+          galinha_retorno: number | null
+          codorna_retorno: number | null
+        }
+        Relationships: []
+      }
+      fstd_relatorio_produtos: {
+        Row: {
+          nfd: string | null
+          fstd: number | null
+          id: string | null
+          data_emissao: string | null
+          data_baixa: string | null
+          valor: number | null
+          vl_galinha: number | null
+          vl_codorna: number | null
+          motorista: string | null
+          motivo_emissao: string | null
+          nome_abreviado: string | null
+          responsavel_fstd: string | null
+          galinha_nfd: number | null
+          codorna_nfd: number | null
+          galinha_retorno: number | null
+          codorna_retorno: number | null
+          nome_produto: string | null
+        }
+        Relationships: []
+      }
+      produtos_precos_unitarios: {
+        Row: {
+          codigo_produto: string | null
+          nome_produto: string | null
+          categoria: string | null
+          ovos_por_embalagem: number | null
+          tipo_ovo: string | null
+          data_preco: string | null
+          registros_analisados: number | null
+          quantidade_analisada: number | null
+          preco_unitario: number | null
+          valor_analisado: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_gerencial_user: {
@@ -784,6 +842,10 @@ export type Database = {
           p_processo_id: string
         }
         Returns: Database['public']['Tables']['fstd_documentos']['Row']
+      }
+      recuperar_fstd_documentos: {
+        Args: Record<string, never>
+        Returns: number
       }
       set_fstd_document_pdf: {
         Args: {

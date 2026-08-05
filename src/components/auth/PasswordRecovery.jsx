@@ -4,13 +4,45 @@ import avineLogo from '../../assets/foto_logoavine.png'
 import aviaryImageAvif from '../../assets/avine-egg-factory.avif'
 import aviaryImageWebp from '../../assets/avine-egg-factory.webp'
 import { supabase } from '../../lib/supabaseClient'
+import { getPasswordValidationMessage } from '../../lib/passwordPolicy'
 import './AvineLogin.css'
 import './PasswordRecovery.css'
 
-const PASSWORD_MIN_LENGTH = 8
-
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const recoveryPath = '/redefinir-senha'
+
+function getRecoveryRedirectTo() {
+  if (typeof window === 'undefined') return recoveryPath
+
+  const configuredUrl = import.meta.env.VITE_PASSWORD_RECOVERY_REDIRECT_URL?.trim()
+  return configuredUrl || `${window.location.origin}${recoveryPath}`
+}
+
+function isRedirectConfigurationError(error) {
+  const message = String(error?.message ?? error ?? '').toLowerCase()
+  return message.includes('redirect') || (message.includes('url') && message.includes('allow'))
+}
+
+function getRecoveryErrorMessage(error) {
+  const message = String(error?.message ?? error ?? '').toLowerCase()
+  const code = String(error?.code ?? '').toLowerCase()
+  const status = Number(error?.status ?? 0)
+
+  if (
+    status === 429 ||
+    code === 'over_email_send_rate_limit' ||
+    message.includes('email rate limit') ||
+    message.includes('rate limit exceeded')
+  ) {
+    return 'O limite de envio de e-mails foi atingido. Aguarde a liberação do limite ou peça ao administrador para configurar o SMTP do sistema.'
+  }
+
+  if (isRedirectConfigurationError(error)) {
+    return 'O endereço de recuperação não está configurado no Supabase. Peça ao administrador para adicionar esta URL nas Redirect URLs.'
+  }
+
+  return 'Não foi possível enviar o e-mail agora. Tente novamente em instantes.'
+}
 
 function RecoveryIcon({ name }) {
   const props = {
@@ -112,12 +144,21 @@ function ForgotPasswordScreen() {
 
     setBusy(true)
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: `${window.location.origin}${recoveryPath}`,
+      const redirectTo = getRecoveryRedirectTo()
+      let { error: resetError } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo,
       })
 
+      // A production hostname may not have been added to Supabase's redirect
+      // allowlist yet. Retrying without redirectTo lets Auth use the project's
+      // configured Site URL, where RootApp also understands recovery hashes.
+      if (resetError && isRedirectConfigurationError(resetError)) {
+        const fallbackResult = await supabase.auth.resetPasswordForEmail(normalizedEmail)
+        resetError = fallbackResult.error
+      }
+
       if (resetError) {
-        setError('Não foi possível enviar o e-mail agora. Tente novamente em instantes.')
+        setError(getRecoveryErrorMessage(resetError))
       } else {
         setSuccess(true)
       }
@@ -269,9 +310,7 @@ function ResetPasswordScreen() {
     return () => window.clearTimeout(redirectTimer)
   }, [navigate, success])
 
-  const passwordError = submitted && password.length < PASSWORD_MIN_LENGTH
-    ? `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`
-    : ''
+  const passwordError = submitted ? getPasswordValidationMessage(password) : ''
   const confirmationError = submitted && password !== confirmation
     ? 'As senhas não coincidem.'
     : ''
@@ -281,7 +320,7 @@ function ResetPasswordScreen() {
     setSubmitted(true)
     setError('')
 
-    if (password.length < PASSWORD_MIN_LENGTH || password !== confirmation || busy) return
+    if (getPasswordValidationMessage(password) || password !== confirmation || busy) return
 
     setBusy(true)
     try {
@@ -382,7 +421,6 @@ function ResetPasswordScreen() {
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 autoComplete="new-password"
-                minLength={PASSWORD_MIN_LENGTH}
                 placeholder="Digite sua nova senha"
                 aria-invalid={Boolean(passwordError)}
                 aria-describedby={passwordError ? 'new-password-error' : undefined}
@@ -403,7 +441,6 @@ function ResetPasswordScreen() {
                 onChange={(event) => setConfirmation(event.target.value)}
                 type="password"
                 autoComplete="new-password"
-                minLength={PASSWORD_MIN_LENGTH}
                 placeholder="Digite a senha novamente"
                 aria-invalid={Boolean(confirmationError)}
                 aria-describedby={confirmationError ? 'confirm-password-error' : undefined}

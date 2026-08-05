@@ -5,7 +5,7 @@ export type ManagedUser = {
   auth_user_id: string | null
   email: string
   nome: string
-  perfil: 'Promotor' | 'Entregador' | 'Gerencial' | 'Supervisor'
+  perfil: 'Promotor' | 'Gerencial' | 'Supervisor'
   estado: string
   fotos_habilitadas: boolean
   ativo: boolean
@@ -18,13 +18,14 @@ export type CreateGerencialUserPayload = {
   nome: string
   email: string
   password: string
+  auth_role?: 'admin' | 'gerencial'
 }
 
 export type CreateOperationalUserPayload = {
   nome: string
   email: string
   password: string
-  perfil: 'Promotor' | 'Entregador' | 'Supervisor'
+  perfil: 'Promotor' | 'Supervisor'
   estado: string
   fotos_habilitadas: boolean
 }
@@ -33,12 +34,13 @@ export type UpdateManagedUserPayload = {
   usuario_id: string
   nome: string
   email: string
-  perfil: 'Promotor' | 'Entregador' | 'Gerencial' | 'Supervisor'
+  perfil: 'Promotor' | 'Gerencial' | 'Supervisor'
   estado: string
   fotos_habilitadas: boolean
   ativo: boolean
   acesso_habilitado: boolean
   password?: string
+  auth_role?: 'admin' | 'gerencial' | 'promotor'
 }
 
 type ManageUsersResponse = {

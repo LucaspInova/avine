@@ -45,7 +45,15 @@ As quatro operacoes transacionais atuais sao:
 - `editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb)`;
 - `finalizar_fstd_produtos(uuid)`.
 - `get_or_create_fstd_document(uuid)` e `set_fstd_document_pdf(uuid, text, jsonb)`
-  criam/recuperam o documento PDF sem recalcular o número de controle.
+  recuperam o documento/PDF sem recalcular o número de controle.
+- A transição de `fstd_processos.status` para `concluida` cria, na mesma
+  transação, exatamente um registro em `fstd_documentos`. A unicidade por
+  `processo_id` e a operação idempotente protegem contra retries e concorrência;
+  `numero_controle` continua vindo de `fstd_numero_controle_seq`.
+- Processos concluídos antes dessa garantia podem ser recuperados manualmente
+  executando `select public.recuperar_fstd_documentos();` com um usuário
+  Gerencial ativo (ou em uma sessão SQL privilegiada). A função retorna a
+  quantidade de documentos criados e não é executada automaticamente.
 
 Elas usam `SECURITY DEFINER`, `search_path = ''`, referencias qualificadas e
 validacao explicita de `auth.uid()`. A RPC v2 deriva numero, produtos e

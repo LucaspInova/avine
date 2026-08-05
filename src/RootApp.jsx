@@ -8,6 +8,16 @@ import { supabaseConfigError } from './lib/supabaseClient.ts'
 const GerencialApp = lazy(() => import('./App.jsx'))
 const PromotorApp = lazy(() => import('./promotor/PromotorApp.jsx'))
 
+function isPasswordRecoveryRedirect() {
+  if (typeof window === 'undefined') return false
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  return Boolean(
+    hashParams.get('type') === 'recovery' ||
+      hashParams.get('error') ||
+      hashParams.get('error_code'),
+  )
+}
+
 function RootApp() {
   if (supabaseConfigError) {
     return (
@@ -23,13 +33,13 @@ function RootApp() {
     <AuthProvider>
       <Suspense fallback={<main className="route-loading" aria-busy="true">Carregando...</main>}>
         <Routes>
-          <Route path="/" element={<RoleEntry />} />
+          <Route path="/" element={isPasswordRecoveryRedirect() ? <ResetPasswordScreen /> : <RoleEntry />} />
           <Route path="/esqueci-senha" element={<ForgotPasswordScreen />} />
           <Route path="/redefinir-senha" element={<ResetPasswordScreen />} />
           <Route
             path="/gerencial/*"
             element={(
-              <RequireRole profile={['Gerencial', 'Supervisor']}>
+              <RequireRole profile="Gerencial">
                 <GerencialApp />
               </RequireRole>
             )}
@@ -44,7 +54,6 @@ function RootApp() {
           />
           <Route path="/acesso/:role" element={<RoleAccessScreen />} />
           <Route path="/promotor/*" element={<Navigate to="/acesso/promotor" replace />} />
-          <Route path="/entregador/*" element={<RoleAccessScreen />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

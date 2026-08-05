@@ -16,6 +16,8 @@ import {
   validateProfilePhoto,
 } from './lib/profilePhoto'
 import { sortStoresByCode } from './lib/storeSorting'
+import { getProfileLabel } from './lib/profileLabels'
+import { getPasswordValidationMessage, PASSWORD_MIN_LENGTH } from './lib/passwordPolicy'
 import { GerencialFinalizedNfdModal, GerencialFstdModal, InvoiceIcon } from './promotor/PromotorApp.jsx'
 import avineLogo from './assets/foto_logoavine.png'
 import profileUserIcon from './assets/ui-icons/do-utilizador.png'
@@ -25,16 +27,14 @@ import './App.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
-const perfisOperacionais = ['Promotor', 'Entregador']
-const perfisCadastro = ['Gerencial', 'Supervisor', 'Entregador', 'Promotor']
-const perfisEditaveis = ['Supervisor', 'Entregador', 'Promotor']
+const perfisOperacionais = ['Promotor']
+const perfisCadastro = ['Gerencial', 'Supervisor', 'Promotor']
+const perfisEditaveis = ['Supervisor', 'Promotor']
 const perfisCadastroUi = [
-  { value: 'Gerencial', label: 'Gerencial' },
-  { value: 'Supervisor', label: 'Supervisor' },
+  { value: 'Gerencial', label: 'Admin' },
+  { value: 'Supervisor', label: 'Gerenciais' },
   { value: 'Promotor', label: 'Promotor' },
-  { value: 'Entregador', label: 'Entregador' },
 ]
-const PASSWORD_MIN_LENGTH = 8
 const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
 
@@ -78,12 +78,8 @@ const initialLojaForm = {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const NOTES_PAGE_SIZE = 10
 
-function getProfileLabel(profile) {
-  return profile
-}
-
-function isManagerProfile(profile) {
-  return profile === 'Gerencial' || profile === 'Supervisor'
+function isAdminProfile(profile) {
+  return profile === 'Gerencial'
 }
 
 function getUserInitials(name) {
@@ -377,7 +373,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [isLoggingOut, setLoggingOut] = useState(false)
   const profileName = currentUser?.nome ?? 'Usuário'
-  const profileRole = currentUser?.perfil ?? 'Gerencial'
+  const profileRole = getProfileLabel(currentUser?.perfil ?? 'Gerencial')
   const profileState = currentUser?.estado || 'Não informado'
   useEffect(() => {
     if (!profileMenuOpen) return undefined
@@ -404,7 +400,7 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
   return (
     <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
       <div className="sidebar-brand">
-        <button className="brand-button" type="button" aria-label="Avine Gerencial">
+        <button className="brand-button" type="button" aria-label="Avine Admin">
           <img className="brand-logo" src={avineLogo} alt="Avine" />
         </button>
 
@@ -540,7 +536,8 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
   const isNameValid = trimmedName.length >= 4
-  const isPasswordValid = password.length >= PASSWORD_MIN_LENGTH
+  const passwordError = getPasswordValidationMessage(password)
+  const isPasswordValid = !passwordError
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
   const isProfileValid = perfisCadastro.includes(form.perfil)
   const isEstadoValid = isGerencial || (requiresState && allowedStates.includes(form.estado))
@@ -575,7 +572,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                     type="button"
                     disabled={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)}
                     title={currentUserIsSupervisor && !perfisOperacionais.includes(perfil.value)
-                      ? 'Supervisor só pode cadastrar perfis operacionais.'
+                      ? 'Gerenciais só pode cadastrar perfis operacionais.'
                       : undefined}
                     onClick={() => onChange({ perfil: form.perfil === perfil.value ? '' : perfil.value })}
                   >
@@ -627,8 +624,8 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                 autoComplete="new-password"
                 required
               />
-              {password && !isPasswordValid && (
-                <strong className="field-error">A senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.</strong>
+              {passwordError && (
+                <strong className="field-error">{passwordError}</strong>
               )}
             </label>
 
@@ -653,18 +650,18 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
 
                 {form.perfil === 'Promotor' && (
                   <label className="form-row" htmlFor="cadastro-supervisor">
-                    <span>Supervisor responsável</span>
+                    <span>Gerenciais responsável</span>
                     <select
                       id="cadastro-supervisor"
                       value=""
                       disabled
-                      aria-label="Supervisor responsável"
+                      aria-label="Gerenciais responsável"
                       aria-describedby="supervisor-unavailable-hint"
                     >
                       <option value="">Nenhum supervisor disponível</option>
                     </select>
                     <small id="supervisor-unavailable-hint">
-                      O vínculo será habilitado quando o perfil Supervisor existir no sistema.
+                      O vínculo será habilitado quando o perfil Gerenciais existir no sistema.
                     </small>
                   </label>
                 )}
@@ -705,7 +702,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
             {isProfileValid && (
               <span className={isEstadoValid ? 'is-success' : ''}>
                 <Icon name={isEstadoValid ? 'check' : 'pin'} />
-                {isGerencial ? 'UF não exigida para Gerencial' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
+                {isGerencial ? 'UF não exigida para Admin' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
               </span>
             )}
           </div>
@@ -866,7 +863,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
           <dl className="info-data">
             <div>
               <dt>Perfil de Acesso</dt>
-              <dd>{usuario.perfil}</dd>
+              <dd>{getProfileLabel(usuario.perfil)}</dd>
             </div>
             <div>
               <dt>Estado</dt>
@@ -897,7 +894,8 @@ function EditarUsuarioModal({
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isNameValid = trimmedName.length >= 4
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
-  const isPasswordValid = !form.senha || form.senha.length >= PASSWORD_MIN_LENGTH
+  const passwordError = getPasswordValidationMessage(form.senha, { optional: true })
+  const isPasswordValid = !passwordError
   const isProfileValid = perfisEditaveis.includes(form.perfil)
   const isEstadoValid = estados.includes(form.estado)
   const canSubmit =
@@ -965,8 +963,8 @@ function EditarUsuarioModal({
               autoComplete="new-password"
               placeholder="Deixe vazio para manter"
             />
-            {form.senha && !isPasswordValid && (
-              <strong className="field-error">A nova senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.</strong>
+            {passwordError && (
+              <strong className="field-error">{passwordError.replace(/^A senha/, 'A nova senha')}</strong>
             )}
           </label>
 
@@ -1495,7 +1493,6 @@ export function UsuariosScreen({
     all: usuarios.length,
     Gerencial: usuarios.filter((usuario) => usuario.perfil === 'Gerencial').length,
     Supervisor: usuarios.filter((usuario) => usuario.perfil === 'Supervisor').length,
-    Entregador: usuarios.filter((usuario) => usuario.perfil === 'Entregador').length,
     Promotor: usuarios.filter((usuario) => usuario.perfil === 'Promotor').length,
   }), [usuarios])
   const availableUfs = useMemo(
@@ -1578,10 +1575,9 @@ export function UsuariosScreen({
             }}
           >
             <option value="all">Todos</option>
-            <option value="Gerencial">Gerencial</option>
-            <option value="Supervisor">Supervisor</option>
+            <option value="Gerencial">Admin</option>
+            <option value="Supervisor">Gerenciais</option>
             <option value="Promotor">Promotor</option>
-            <option value="Entregador">Entregador</option>
           </select>
           <span className="select-chevron" />
         </label>
@@ -1628,7 +1624,7 @@ export function UsuariosScreen({
           <article className={`user-summary-card is-${String(card.key).toLowerCase()}`} key={card.key}>
             <span className="user-summary-icon"><Icon name={card.icon} /></span>
             <span>
-              <small>{card.label}</small>
+              <small>{card.key === 'all' ? card.label : getProfileLabel(card.key)}</small>
               <strong>{card.value.toLocaleString('pt-BR')}</strong>
               <em>{card.detail}</em>
             </span>
@@ -1639,9 +1635,9 @@ export function UsuariosScreen({
       <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
         {[
           ['all', 'Todos', counts.all],
-          ['Gerencial', 'Gerenciais', counts.Gerencial],
-          ['Supervisor', 'Supervisores', counts.Supervisor],
-          ['Promotor', 'Promotores', counts.Promotor],
+          ['Gerencial', 'Admin', counts.Gerencial],
+          ['Supervisor', 'Gerenciais', counts.Supervisor],
+          ['Promotor', 'Promotor', counts.Promotor],
         ].map(([value, label, count]) => (
           <button
             className={profileFilter === value ? 'is-active' : ''}
@@ -1667,7 +1663,7 @@ export function UsuariosScreen({
             <div className="table-row table-head" role="row">
               <span role="columnheader">NOME</span>
               <span role="columnheader">PERFIL</span>
-              <span role="columnheader">SUPERVISOR</span>
+              <span role="columnheader">GERENCIAIS</span>
               <span role="columnheader">E-MAIL</span>
               <span role="columnheader">UF</span>
               <span role="columnheader">STATUS</span>
@@ -1701,7 +1697,7 @@ export function UsuariosScreen({
                     <span className={`profile-pill is-${profileClass}`}>{getProfileLabel(usuario.perfil)}</span>
                   </span>
 
-                  <span className="supervisor-cell" role="cell" data-label="Supervisor">{getSupervisorName(usuario)}</span>
+                  <span className="supervisor-cell" role="cell" data-label="Gerenciais">{getSupervisorName(usuario)}</span>
 
                   <div className="email-cell" role="cell" data-label="E-mail">
                     {isEditing ? (
@@ -2491,7 +2487,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser }) {
 
   async function handlePendingNote(note) {
     if (note.status === 'Finalizada') return
-    if (!currentUser?.id) throw new Error('Sessão do usuário Gerencial não encontrada.')
+    if (!currentUser?.id) throw new Error('Sessão do usuário Admin não encontrada.')
 
     let store = (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
     if (!store) {
@@ -2796,7 +2792,7 @@ function App() {
   const [profilePhoto, setProfilePhoto] = useState('')
 
   useEffect(() => {
-    if (!isManagerProfile(currentUser?.perfil)) return
+    if (!isAdminProfile(currentUser?.perfil)) return
 
     try {
       window.localStorage.setItem(gerencialScreenStorageKey, selectedItem)
@@ -2886,7 +2882,7 @@ function App() {
       if (
         authLoading ||
         !session ||
-        !isManagerProfile(currentUser?.perfil) ||
+        !isAdminProfile(currentUser?.perfil) ||
         currentUser.ativo !== true ||
         currentUser.acesso_habilitado !== true
       ) {
@@ -2956,7 +2952,7 @@ function App() {
             ? 'Relatório'
             : 'Cadastro de Usuários'
   const pageSubtitle = isPerfil
-    ? 'Dados da conta gerencial.'
+     ? 'Dados da conta Admin.'
     : isLojas
     ? 'Roteirização dos promotores.'
     : isDashboard
@@ -2995,7 +2991,7 @@ function App() {
       if (
         gerencialPayload.nome.length < 4 ||
         !emailPattern.test(gerencialPayload.email) ||
-        gerencialPayload.password.length < PASSWORD_MIN_LENGTH
+        getPasswordValidationMessage(gerencialPayload.password)
       ) {
         setFormError('Revise nome, email e senha antes de criar.')
         return
@@ -3007,7 +3003,7 @@ function App() {
       try {
         await createGerencialUser(gerencialPayload)
       } catch (createError) {
-        setFormError(createError instanceof Error ? createError.message : 'Não foi possível criar o Gerencial.')
+        setFormError(createError instanceof Error ? createError.message : 'Não foi possível criar o Admin.')
         setSaving(false)
         return
       }
@@ -3032,7 +3028,7 @@ function App() {
     if (
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
-      payload.password.length < PASSWORD_MIN_LENGTH ||
+      getPasswordValidationMessage(payload.password) ||
       isNomeDuplicado(payload.nome, usuarios) ||
       !perfisOperacionais.includes(payload.perfil) && payload.perfil !== 'Supervisor' ||
       (currentUser?.perfil === 'Supervisor'
@@ -3255,6 +3251,7 @@ function App() {
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
       isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id) ||
+      getPasswordValidationMessage(editForm.senha, { optional: true }) ||
       !perfisEditaveis.includes(payload.perfil) ||
       (currentUser?.perfil === 'Supervisor'
         ? payload.estado !== currentUser.estado
@@ -3358,7 +3355,7 @@ function App() {
       !payload.usuario_id
       || payload.nome.length < 4
       || !emailPattern.test(payload.email)
-      || (payload.senha && payload.senha.length < PASSWORD_MIN_LENGTH)
+      || getPasswordValidationMessage(payload.senha, { optional: true })
     ) {
       setGerencialError('Revise nome, email e a nova senha antes de salvar.')
       return
@@ -3369,7 +3366,7 @@ function App() {
 
     const target = usuarios.find((usuario) => usuario.id === gerencialEditId)
     if (!target) {
-      setGerencialError('Gerencial não encontrado.')
+      setGerencialError('Admin não encontrado.')
       setGerencialBusy(false)
       return
     }
@@ -3388,7 +3385,7 @@ function App() {
         password: payload.senha || undefined,
       })
     } catch (updateError) {
-      setGerencialError(updateError instanceof Error ? updateError.message : 'Não foi possível editar o Gerencial.')
+      setGerencialError(updateError instanceof Error ? updateError.message : 'Não foi possível editar o Admin.')
       setGerencialBusy(false)
       return
     }
@@ -3414,7 +3411,7 @@ function App() {
     try {
       await deleteManagedUser(usuario.id)
     } catch (deleteError) {
-      setGerencialError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o Gerencial.')
+      setGerencialError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o Admin.')
       setGerencialBusy(false)
       return
     }

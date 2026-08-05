@@ -24,7 +24,7 @@ Os apps originais compartilhavam dados por Google Sheets (`FSTD Digital`) e Glid
 
 - Gerencial: usuario interno ativo com `usuarios.perfil = 'Gerencial'`; administra cadastros e dados operacionais.
 - Promotor: usuario operacional com `usuarios.perfil = 'Promotor'`; acessa apenas suas lojas vinculadas em `loja_promotores`.
-- Entregador: usuario operacional previsto para fluxo logistico/recolhimento; inicialmente cadastrado no mesmo modulo de usuarios.
+- Promotor: usuario operacional que tambem cobre o antigo fluxo de entregas/recolhimento.
 
 ## Fluxo Devolucao
 

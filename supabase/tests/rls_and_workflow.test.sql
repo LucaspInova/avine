@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(37);
+select plan(45);
 
 insert into auth.users (id, email)
 values
@@ -202,6 +202,10 @@ select ok(
 select ok(
   to_regprocedure('app_private.is_current_user_gerencial_ativo()') is not null,
   'the authorization helper exists in a private schema'
+);
+select ok(
+  to_regprocedure('public.recuperar_fstd_documentos()') is not null,
+  'manual FSTD document recovery RPC exists'
 );
 select is(
   (
@@ -539,6 +543,103 @@ select results_eq(
     values ('concluida'::text)
   $$,
   'finalized workflow persists the concluded status'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documentos as d
+    join public.fstd_processos as p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  array[1::bigint],
+  'newly finalized process receives exactly one FSTD document'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documentos as d
+    join public.fstd_processos as p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+      and d.numero_controle is not null
+  $$,
+  array[1::bigint],
+  'newly finalized document receives a sequence control number'
+);
+select lives_ok(
+  $$
+    select public.get_or_create_fstd_document(
+      (select id from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER')
+    )
+  $$,
+  'existing document can be requested again'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documentos as d
+    join public.fstd_processos as p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  array[1::bigint],
+  'repeated document creation request does not duplicate the document'
+);
+
+reset role;
+
+delete from public.fstd_documentos
+where processo_id = (
+  select id from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER'
+);
+
+set local role authenticated;
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+
+select is(
+  public.recuperar_fstd_documentos(),
+  1,
+  'manual recovery creates one missing legacy document'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documentos as d
+    join public.fstd_processos as p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  array[1::bigint],
+  'manual recovery restores exactly one document'
+);
+
+reset role;
+
+insert into public.fstd_processos (
+  nfd_chave_acesso,
+  nfd_numero,
+  loja_id,
+  promotor_id,
+  status
+)
+values (
+  'NFD-TRIGGER',
+  'TRIGGER-1',
+  '20000000-0000-0000-0000-000000000021',
+  '20000000-0000-0000-0000-000000000011',
+  'em_andamento'
+);
+
+update public.fstd_processos
+set status = 'concluida', finalizada_em = now()
+where nfd_chave_acesso = 'NFD-TRIGGER';
+
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documentos as d
+    join public.fstd_processos as p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-TRIGGER'
+  $$,
+  array[1::bigint],
+  'direct status transitions also create the document'
 );
 
 reset role;

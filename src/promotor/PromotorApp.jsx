@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../lib/profilePhoto'
 import { sortStoresByCode } from '../lib/storeSorting'
+import { getProfileLabel } from '../lib/profileLabels.js'
 import LogoutConfirmDialog from '../components/LogoutConfirmDialog.jsx'
 import avineLogo from '../assets/foto_logoavine.png'
 import profileUserIcon from '../assets/ui-icons/do-utilizador.png'
@@ -478,7 +479,7 @@ function MobileProfileMenu({ profile, profilePhoto, onLogout, onUploadPhoto, pho
       <dl className="mobile-profile-menu-details">
         <div>
           <dt>Função</dt>
-          <dd>{profile?.perfil ?? 'Promotor'}</dd>
+          <dd>{getProfileLabel(profile?.perfil ?? 'Promotor')}</dd>
         </div>
         <div>
           <dt>Estado</dt>
@@ -576,7 +577,7 @@ function AppHeader({
               </span>
               <span className="mobile-profile-trigger-copy">
                 <strong>{profile?.nome ?? 'Usuário'}</strong>
-                <small>{profile?.perfil ?? 'Promotor'}</small>
+                <small>{getProfileLabel(profile?.perfil ?? 'Promotor')}</small>
               </span>
               <span className="mobile-profile-chevron" aria-hidden="true" />
             </button>
@@ -846,7 +847,7 @@ function ProfileScreen({ profile, onBack, onLogout, onUploadPhoto, photoBusy }) 
             </span>
             <span>
               <small>Perfil</small>
-              <strong>{profile?.perfil ?? 'Promotor'}</strong>
+              <strong>{getProfileLabel(profile?.perfil ?? 'Promotor')}</strong>
             </span>
           </div>
 

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CadastroModal, UsuariosScreen } from './App.jsx'
+import { routeForProfile } from './auth/AuthProvider.jsx'
+import { getProfileLabel } from './lib/profileLabels.js'
 
 const usuarios = [
   {
@@ -27,11 +29,11 @@ const usuarios = [
     fotos_habilitadas: true,
   },
   {
-    id: 'entregador-1',
-    auth_user_id: 'auth-entregador-1',
-    nome: 'CARLA ENTREGADORA',
-    email: 'carla.entregadora@avine.com',
-    perfil: 'Entregador',
+    id: 'promotor-2',
+    auth_user_id: 'auth-promotor-2',
+    nome: 'CARLA PROMOTORA',
+    email: 'carla.promotora@avine.com',
+    perfil: 'Promotor',
     estado: 'PE',
     ativo: false,
     acesso_habilitado: false,
@@ -73,7 +75,7 @@ describe('Cadastro de Usuários', () => {
     const table = screen.getByRole('table', { name: 'Cadastro de Usuários' })
     expect(within(table).getByText('ANA GERENCIAL')).toBeInTheDocument()
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
-    expect(within(table).getByText('CARLA ENTREGADORA')).toBeInTheDocument()
+    expect(within(table).getByText('CARLA PROMOTORA')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Perfil'), { target: { value: 'Promotor' } })
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
@@ -86,7 +88,7 @@ describe('Cadastro de Usuários', () => {
     })
 
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Supervisores (0)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gerenciais (0)' }))
     expect(within(table).getByText('Nenhum usuário encontrado.')).toBeInTheDocument()
   })
 
@@ -111,7 +113,7 @@ describe('Cadastro de Usuários', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Supervisor' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Gerenciais' })).not.toBeDisabled()
 
     rerender(
       <CadastroModal
@@ -126,6 +128,15 @@ describe('Cadastro de Usuários', () => {
     )
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Supervisor responsável')).toBeDisabled()
+    expect(screen.getByLabelText('Gerenciais responsável')).toBeDisabled()
+  })
+
+  it('aplica os novos nomes visuais e rotas por perfil', () => {
+    expect(getProfileLabel('Gerencial')).toBe('Admin')
+    expect(getProfileLabel('Supervisor')).toBe('Gerenciais')
+    expect(getProfileLabel('Promotor')).toBe('Promotor')
+    expect(routeForProfile({ perfil: 'Gerencial' })).toBe('/gerencial')
+    expect(routeForProfile({ perfil: 'Supervisor' })).toBe('/acesso/supervisor')
+    expect(routeForProfile({ perfil: 'Promotor' })).toBe('/acesso/promotor')
   })
 })

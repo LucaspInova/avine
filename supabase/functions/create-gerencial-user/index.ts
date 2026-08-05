@@ -7,6 +7,17 @@ const corsHeaders = {
 }
 
 const PASSWORD_MIN_LENGTH = 8
+const PASSWORD_POLICY_ERROR =
+  `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
+  'uma letra maiuscula, uma letra minuscula, um numero e um simbolo.'
+
+function validatePassword(password: string) {
+  return password.length >= PASSWORD_MIN_LENGTH &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+}
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
@@ -75,15 +86,15 @@ Deno.serve(async (request) => {
   const perfil = typeof body.perfil === 'string' ? body.perfil : 'Gerencial'
   const estado = typeof body.estado === 'string' ? body.estado : 'CE'
   const fotosHabilitadas = body.fotos_habilitadas === true
-  const perfisPermitidos = ['Promotor', 'Entregador', 'Gerencial']
+  const perfisPermitidos = ['Promotor', 'Gerencial']
   const estadosPermitidos = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 
   if (nome.length < 4) return jsonResponse(400, { error: 'Informe um nome valido.' })
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return jsonResponse(400, { error: 'Informe um e-mail valido.' })
   }
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    return jsonResponse(400, { error: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.` })
+  if (!validatePassword(password)) {
+    return jsonResponse(400, { error: PASSWORD_POLICY_ERROR })
   }
   if (!perfisPermitidos.includes(perfil)) {
     return jsonResponse(400, { error: 'Perfil de acesso invalido.' })

@@ -7,8 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const allowedRoles = new Set(["Promotor", "Entregador", "Gerencial", "Supervisor"]);
+const allowedRoles = new Set(["Promotor", "Gerencial", "Supervisor"]);
+const allowedAuthRoles = new Set(["admin", "gerencial", "promotor"]);
 const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_POLICY_ERROR =
+  `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
+  "uma letra maiuscula, uma letra minuscula, um numero e um simbolo.";
 const legacyGerencialEmails = new Set([
   "admin@avine.com.br",
   "avinegerencial@gmail.com",
@@ -82,6 +86,22 @@ function boolean(value: unknown, fallback = false) {
 
 function isEmail(value: string) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+}
+
+function validatePassword(password: string) {
+  return password.length >= PASSWORD_MIN_LENGTH &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password);
+}
+
+function validateAuthRole(input: JsonRecord, profile: string) {
+  const requested = text(input.auth_role) || profile.toLowerCase();
+  if (!allowedAuthRoles.has(requested)) {
+    throw new Error("Role Auth invalida.");
+  }
+  return requested;
 }
 
 function validateProfile(input: JsonRecord) {
@@ -195,7 +215,7 @@ Deno.serve(async (request) => {
 
   function canManageTarget(target: { perfil?: string; estado?: string }) {
     if (!isSupervisor) return true;
-    return ["Promotor", "Entregador"].includes(target.perfil ?? "") &&
+    return ["Promotor"].includes(target.perfil ?? "") &&
       target.estado === callerProfile.estado;
   }
 
@@ -210,7 +230,7 @@ Deno.serve(async (request) => {
 
     if (isSupervisor) {
       listQuery = listQuery
-        .in("perfil", ["Promotor", "Entregador"])
+        .in("perfil", ["Promotor"])
         .eq("estado", callerProfile.estado);
     }
 
@@ -284,7 +304,7 @@ Deno.serve(async (request) => {
     }
 
     if (isSupervisor &&
-      (!["Promotor", "Entregador"].includes(profileInput.perfil) ||
+      (!["Promotor"].includes(profileInput.perfil) ||
         profileInput.estado !== callerProfile.estado)) {
       return jsonResponse(403, {
         error: "O Supervisor somente pode cadastrar perfis operacionais na sua UF.",
@@ -292,9 +312,18 @@ Deno.serve(async (request) => {
     }
 
     const password = typeof body.password === "string" ? body.password : "";
-    if (password.length < PASSWORD_MIN_LENGTH) {
+    if (!validatePassword(password)) {
       return jsonResponse(400, {
-        error: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+        error: PASSWORD_POLICY_ERROR,
+      });
+    }
+
+    let authRole: string;
+    try {
+      authRole = validateAuthRole(body, profileInput.perfil);
+    } catch (error) {
+      return jsonResponse(400, {
+        error: error instanceof Error ? error.message : "Role Auth invalida.",
       });
     }
 
@@ -319,7 +348,7 @@ Deno.serve(async (request) => {
         password,
         email_confirm: true,
         app_metadata: {
-          role: profileInput.perfil.toLowerCase(),
+          role: authRole,
           access_enabled: true,
         },
         user_metadata: { nome: profileInput.nome },
@@ -400,7 +429,7 @@ Deno.serve(async (request) => {
     }
 
     if (isSupervisor &&
-      (!["Promotor", "Entregador"].includes(nextProfile.perfil) ||
+      (!["Promotor"].includes(nextProfile.perfil) ||
         nextProfile.estado !== callerProfile.estado)) {
       return jsonResponse(403, {
         error: "O Supervisor somente pode manter perfis operacionais na sua UF.",
@@ -449,9 +478,29 @@ Deno.serve(async (request) => {
     }
 
     const password = typeof body.password === "string" ? body.password : "";
-    if (password && password.length < PASSWORD_MIN_LENGTH) {
+    if (password && !target.auth_user_id) {
       return jsonResponse(400, {
-        error: `A nova senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+        error: "Este usuario ainda nao possui uma conta de acesso para receber uma nova senha.",
+      });
+    }
+    if (password && !validatePassword(password)) {
+      return jsonResponse(400, {
+        error: PASSWORD_POLICY_ERROR.replace("A senha", "A nova senha"),
+      });
+    }
+
+    let authRole = text(body.auth_role);
+    if (!authRole && target.auth_user_id) {
+      const { data: targetAuth } = await adminClient.auth.admin.getUserById(
+        target.auth_user_id,
+      );
+      authRole = text(targetAuth.user?.app_metadata?.role);
+    }
+    try {
+      authRole = validateAuthRole({ auth_role: authRole }, nextProfile.perfil);
+    } catch (error) {
+      return jsonResponse(400, {
+        error: error instanceof Error ? error.message : "Role Auth invalida.",
       });
     }
 
@@ -460,7 +509,7 @@ Deno.serve(async (request) => {
       ...(password ? { password } : {}),
       user_metadata: { nome: nextProfile.nome },
       app_metadata: {
-        role: nextProfile.perfil.toLowerCase(),
+        role: authRole,
         access_enabled: nextAccess && nextActive,
       },
       ban_duration: nextAccess && nextActive ? "none" : "876000h",

@@ -2122,11 +2122,6 @@ select:focus-visible {
   background: #fff0df;
 }
 
-.profile-pill.is-entregador {
-  color: #64559b;
-  background: #eeeafa;
-}
-
 .supervisor-cell {
   overflow: hidden;
   color: #5b625d;
