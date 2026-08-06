@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { CadastroModal, UsuariosScreen } from './App.jsx'
-import { hasApplicationAccess, hasConsistentRole, routeForProfile } from './auth/AuthProvider.jsx'
-import { getProfileLabel } from './lib/profileLabels.js'
+import { CadastroModal, UsuariosScreen } from './GerencialApp.jsx'
+import { hasApplicationAccess, hasConsistentRole, routeForProfile } from '../../domains/auth/AuthProvider.jsx'
+import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 
 const usuarios = [
   {
