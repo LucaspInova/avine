@@ -39,9 +39,9 @@ const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
 
 const navItems = [
-  { id: 'usuarios', label: 'Cadastro de Usuários', icon: 'user-plus' },
+  { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
-  { id: 'notas', label: 'Notas fiscais', icon: 'notes' },
+  { id: 'notas', label: 'Notas', icon: 'notes' },
 ]
 
 const gerencialScreenIds = ['usuarios', 'lojas', 'notas']
@@ -381,7 +381,7 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
+function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
   const profileMenuRef = useRef(null)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -418,14 +418,16 @@ function Sidebar({ expanded, selectedItem, currentUser, profilePhoto, onLogout, 
           <img className="brand-logo" src={avineLogo} alt="Avine" />
         </button>
 
-        <button
-          className="sidebar-toggle"
-          type="button"
-          onClick={onToggle}
-          aria-label={expanded ? 'Recolher sidebar' : 'Expandir sidebar'}
-        >
-          <span className="sidebar-toggle-chevron" />
-        </button>
+        {canCollapse && (
+          <button
+            className="sidebar-toggle"
+            type="button"
+            onClick={onToggle}
+            aria-label={expanded ? 'Recolher sidebar' : 'Expandir sidebar'}
+          >
+            <span className="sidebar-toggle-chevron" />
+          </button>
+        )}
       </div>
 
       <nav className="sidebar-nav" aria-label="Menu principal">
@@ -2801,7 +2803,8 @@ function App() {
     signOut,
     refreshProfile,
   } = useAuth()
-  const [sidebarExpanded, setSidebarExpanded] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
   const [selectedItem, setSelectedItem] = useState(getInitialGerencialScreen)
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
@@ -2841,6 +2844,17 @@ function App() {
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
   const [profilePhoto, setProfilePhoto] = useState('')
+
+  useEffect(() => {
+    function handleViewportChange() {
+      const desktop = window.innerWidth > 980
+      setIsDesktop(desktop)
+      if (desktop) setSidebarExpanded(true)
+    }
+
+    window.addEventListener('resize', handleViewportChange)
+    return () => window.removeEventListener('resize', handleViewportChange)
+  }, [])
 
   useEffect(() => {
     if (!isAdministrativeProfile(currentUser)) return
@@ -3566,6 +3580,7 @@ function App() {
     <div className="admin-shell">
       <Sidebar
         expanded={sidebarExpanded}
+        canCollapse={!isDesktop}
         selectedItem={selectedItem}
         currentUser={currentUser}
         profilePhoto={profilePhoto}
