@@ -9,13 +9,13 @@ import {
   listManagedUsers,
   setManagedUserAccess,
   updateManagedUser,
-} from '../../domains/gerencial/gerencialUsers'
+} from '../../domains/users'
 import {
   getProfilePhotoSignedUrl,
   uploadProfilePhoto,
   validateProfilePhoto,
 } from '../../shared/lib/profilePhoto'
-import { sortStoresByCode } from '../../shared/lib/storeSorting'
+import { isMesmoUf, listStores, sortStoresByCode } from '../../domains/stores'
 import { getProfileLabel } from '../../shared/lib/profileLabels'
 import { getPasswordValidationMessage, PASSWORD_MIN_LENGTH } from '../../shared/lib/passwordPolicy'
 import { InvoiceIcon } from '../../shared/components/InvoiceIcon.jsx'
@@ -149,14 +149,6 @@ function normalizaNome(nome) {
 
 function normalizaTexto(texto) {
   return texto.trim().replace(/\s+/g, ' ')
-}
-
-function normalizaUf(uf) {
-  return (uf ?? '').trim().toUpperCase()
-}
-
-function isMesmoUf(loja, promotor) {
-  return normalizaUf(loja?.uf) === normalizaUf(promotor?.estado)
 }
 
 function isNomeDuplicado(nome, usuarios, ignoredId = '') {
@@ -753,7 +745,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   )
 }
 
-function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, error, onChange, onClose, onSubmit }) {
+export function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, error, onChange, onClose, onSubmit }) {
   const codigo = normalizaTexto(form.codigo)
   const nome = normalizaTexto(form.nome)
   const cidade = normalizaTexto(form.cidade)
@@ -857,7 +849,7 @@ function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, er
   )
 }
 
-function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
+export function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
   if (!usuario) return null
 
   return (
@@ -910,7 +902,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
   )
 }
 
-function EditarUsuarioModal({
+export function EditarUsuarioModal({
   form,
   usuarios,
   usuarioId,
@@ -1068,7 +1060,7 @@ function EditarUsuarioModal({
   )
 }
 
-function StoreFilterPopover({
+export function StoreFilterPopover({
   cidades,
   selectedUfs,
   selectedCidades,
@@ -1128,7 +1120,7 @@ function StoreFilterPopover({
   )
 }
 
-function PromotorSelect({ value, promotores, disabled, onChange }) {
+export function PromotorSelect({ value, promotores, disabled, onChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const selectedPromotor = promotores.find((promotor) => promotor.id === value)
@@ -1223,7 +1215,7 @@ function PromotorSelect({ value, promotores, disabled, onChange }) {
   )
 }
 
-function LojasScreen({
+export function LojasScreen({
   search,
   lojas,
   promotores,
@@ -2890,34 +2882,13 @@ function GerencialApp({ capabilities }) {
     setLoading(false)
   }
 
-  async function listAllLojas(allowedUf = '') {
-    const pageSize = 1000
-    const allLojas = []
-
-    for (let page = 0; ; page += 1) {
-      const from = page * pageSize
-      let query = supabase
-        .from('lojas')
-        .select('id, codigo, nome, uf, cidade, created_at')
-      if (allowedUf) query = query.eq('uf', allowedUf)
-      const { data, error } = await query
-        .order('codigo', { ascending: true })
-        .range(from, from + pageSize - 1)
-
-      if (error) throw error
-
-      allLojas.push(...(data ?? []))
-      if ((data ?? []).length < pageSize) return allLojas
-    }
-  }
-
   async function loadLojas() {
     setLojasLoading(true)
     setLojasError('')
     const scopedUfs = gerencialCapabilities.allowedUfs
 
     const [lojasResult, usuariosResult, vinculosResult] = await Promise.all([
-      listAllLojas()
+      listStores({ ufs: scopedUfs })
         .then((data) => ({ data, error: null }))
         .catch((error) => ({ data: [], error })),
       listManagedUsers()
@@ -2937,7 +2908,7 @@ function GerencialApp({ capabilities }) {
       setPromotores([])
       setLojaPromotores([])
     } else {
-      setLojas(sortStoresByCode((lojasResult.data ?? []).filter((loja) => scopedUfs.length === 0 || scopedUfs.includes(loja.uf))))
+      setLojas(sortStoresByCode(lojasResult.data ?? []))
       setPromotores(
         (usuariosResult.data ?? []).filter(
           (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,

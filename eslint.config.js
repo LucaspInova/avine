@@ -13,6 +13,11 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        { group: ['**/domains/invoices/*', '**/domains/stores/*', '**/domains/users/*'], message: 'Importe pela API pública index.ts do domínio.' },
+      ] }],
+    },
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },

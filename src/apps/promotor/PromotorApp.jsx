@@ -1,3 +1,4 @@
+import { fetchAllNfdNotas, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../domains/invoices'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -98,43 +99,6 @@ function getNfdNumber(nfd) {
   return nfd?.nota_fiscal ?? nfd?.numero ?? '-'
 }
 
-function getDaysSinceIssue(date) {
-  if (!date) return 0
-
-  const issueDate = new Date(`${date}T00:00:00`)
-  const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const difference = todayStart.getTime() - issueDate.getTime()
-
-  return Math.floor(difference / 86400000)
-}
-
-function getNfdVisualStatus(nfd, unknownComments = {}) {
-  if (nfd?.is_avulsa) {
-    if (nfd.conferencia_status === 'divergente') return 'avulsa-erro'
-    if (nfd.fstd_process_status === 'concluida') {
-      return nfd.conferencia_status === 'conferida' ? 'sent' : 'avulsa-finalizada'
-    }
-    return 'avulsa'
-  }
-
-  if (unknownComments[getNfdKey(nfd)]) return 'unknown'
-
-  if (nfd?.data_envio || (nfd?.fstd_status && nfd.fstd_status !== 'cancelada')) {
-    return 'sent'
-  }
-
-  return getDaysSinceIssue(nfd?.data_emissao) >= 1 ? 'overdue' : 'on-time'
-}
-
-function getNfdTabStatus(nfd, unknownComments) {
-  const visualStatus = getNfdVisualStatus(nfd, unknownComments)
-  if (visualStatus === 'sent') return 'finalizada'
-  if (visualStatus === 'overdue') return 'atrasada'
-  if (visualStatus === 'avulsa' || visualStatus === 'avulsa-finalizada' || visualStatus === 'avulsa-erro') return 'avulsa'
-  return 'outros'
-}
-
 function getBilledGal(nfd) {
   return Number(nfd?.quantidade_galinha ?? 0)
 }
@@ -143,73 +107,8 @@ function getBilledCod(nfd) {
   return Number(nfd?.quantidade_codorna ?? 0)
 }
 
-function getNfdReturnRates(nfd) {
-  const billedGal = getBilledGal(nfd)
-  const billedCod = getBilledCod(nfd)
-  const billedProductsByKey = new Map()
-  const billedProductsByCode = new Map()
-  for (const product of nfd?.produtos ?? []) {
-    billedProductsByKey.set(getProductGroupKey(product), product)
-    for (const code of product.codigos_produto ?? [product.codigo_produto]) {
-      billedProductsByCode.set(normalizeProductCode(code), product)
-    }
-  }
-  let returnedGal = 0
-  let returnedCod = 0
-
-  for (const returnedProduct of nfd?.fstd_process?.produtos ?? []) {
-    const billedProduct = billedProductsByKey.get(getProductGroupKey(returnedProduct))
-      ?? billedProductsByCode.get(normalizeProductCode(returnedProduct.codigo_produto))
-    const productBilledGal = Number(
-      returnedProduct.quantidade_faturada_galinha ?? billedProduct?.quantidade_faturada_galinha ?? 0,
-    )
-    const productBilledCod = Number(
-      returnedProduct.quantidade_faturada_codorna ?? billedProduct?.quantidade_faturada_codorna ?? 0,
-    )
-    const returned = Math.max(0, Number(returnedProduct.quantidade_retorno ?? 0))
-
-    if (productBilledGal > 0 && productBilledCod > 0) {
-      const productTotalBilled = productBilledGal + productBilledCod
-      returnedGal += returned * (productBilledGal / productTotalBilled)
-      returnedCod += returned * (productBilledCod / productTotalBilled)
-    } else if (productBilledGal > 0) {
-      returnedGal += returned
-    } else if (productBilledCod > 0) {
-      returnedCod += returned
-    }
-  }
-
-  const percentage = (returned, billed) => {
-    if (billed <= 0) return 0
-    return Math.min(100, Math.max(0, (returned / billed) * 100))
-  }
-
-  return {
-    galinha: percentage(returnedGal, billedGal),
-    codorna: percentage(returnedCod, billedCod),
-  }
-}
-
 function formatReturnPercentage(value) {
   return String(Math.round(Number(value) || 0))
-}
-
-function normalizeProductCode(value) {
-  return String(value ?? '')
-    .normalize('NFKC')
-    .replace(/\s+/g, '')
-    .toUpperCase()
-}
-
-function getProductGroupKey(product) {
-  const productId = String(product?.produto_id ?? '').trim()
-  if (productId) return `produto:${productId}`
-
-  const codes = Array.isArray(product?.codigos_produto)
-    ? product.codigos_produto
-    : [product?.codigo_produto]
-  const code = normalizeProductCode(codes.find(Boolean))
-  return code ? `codigo:${code}` : ''
 }
 
 function getCatalogProductKey(product) {
@@ -264,42 +163,6 @@ function getProductImageCandidates(value) {
   return [...new Set([...driveCandidates, url])]
 }
 
-function getNfdProducts(nfd, productsCatalog = []) {
-  const catalogByCode = new Map(
-    productsCatalog.map((product) => [normalizeProductCode(product.codigo_produto), product]),
-  )
-  const details = Array.isArray(nfd?.detalhes) ? nfd.detalhes : []
-
-  const productsByKey = new Map()
-  for (const detail of details) {
-    const codigo = normalizeProductCode(detail?.codigo_produto)
-    const catalog = catalogByCode.get(codigo)
-    if (!codigo) continue
-
-    const product = {
-      codigo_produto: codigo,
-      produto_id: catalog?.produto_id ?? null,
-      nome: catalog?.nome ?? detail?.descricao_produto ?? codigo,
-      descricao: detail?.descricao_produto ?? catalog?.nome ?? null,
-      imagem_url: catalog?.imagem_url ?? '',
-      quantidade_faturada_galinha: Number(detail?.quantidade_galinha ?? 0),
-      quantidade_faturada_codorna: Number(detail?.quantidade_codorna ?? 0),
-    }
-    const key = getProductGroupKey(product)
-    const current = productsByKey.get(key)
-
-    if (current) {
-      if (!current.codigos_produto.includes(codigo)) current.codigos_produto.push(codigo)
-      current.quantidade_faturada_galinha += product.quantidade_faturada_galinha
-      current.quantidade_faturada_codorna += product.quantidade_faturada_codorna
-    } else {
-      productsByKey.set(key, { ...product, codigos_produto: [codigo] })
-    }
-  }
-
-  return [...productsByKey.values()]
-}
-
 function getManualNfdKey(storeId, nfdNumber) {
   const normalizedNumber = String(nfdNumber ?? '').trim().replace(/^0+/, '') || '0'
   return `manual:${storeId ?? ''}:${normalizedNumber}`
@@ -318,48 +181,7 @@ function getProductBilledQuantity(product, kind) {
   return persistedValue > 0 || sourceValue <= 0 ? persistedValue : sourceValue
 }
 
-function mergeNfdProducts(importedProducts, processProducts) {
-  const productsByCode = new Map(
-    importedProducts.map((product) => [getProductGroupKey(product), product]),
-  )
-
-  for (const product of processProducts ?? []) {
-    const code = normalizeProductCode(product.codigo_produto)
-    const key = getProductGroupKey(product)
-    const importedProduct = productsByCode.get(key)
-
-    if (importedProduct) {
-      productsByCode.set(key, {
-        ...importedProduct,
-        produto_id: importedProduct.produto_id ?? product.produto_id ?? null,
-        codigos_produto: [...new Set([
-          ...(importedProduct.codigos_produto ?? [importedProduct.codigo_produto]),
-          ...(code ? [code] : []),
-        ])],
-        imagem_url: importedProduct.imagem_url || product.imagem_url || '',
-      })
-    } else if (code) {
-      productsByCode.set(key, {
-        codigo_produto: code,
-        produto_id: product.produto_id ?? null,
-        nome: product.nome ?? code,
-        descricao: product.descricao ?? product.nome ?? null,
-        imagem_url: product.imagem_url ?? '',
-        codigos_produto: [code],
-        quantidade_faturada_galinha: Number(product.quantidade_faturada_galinha ?? 0),
-        quantidade_faturada_codorna: Number(product.quantidade_faturada_codorna ?? 0),
-      })
-    }
-  }
-
-  return [...productsByCode.values()]
-}
-
 const PROMOTOR_UNKNOWN_NFD_KEY = 'fstd-promotor-unknown-nfds'
-
-function getNfdKey(nfd) {
-  return `${nfd?.codigo_cliente ?? nfd?.loja_codigo ?? ''}:${nfd?.nota_fiscal ?? nfd?.numero ?? ''}`
-}
 
 function getUnknownNfdStorageKey(profileId) {
   return `${PROMOTOR_UNKNOWN_NFD_KEY}:${profileId}`
@@ -403,24 +225,6 @@ async function copyToClipboard(value) {
   } finally {
     textarea.remove()
   }
-}
-
-async function fetchAllNfdNotas(select, configureQuery) {
-  const pageSize = 1000
-  const rows = []
-
-  for (let from = 0; ; from += pageSize) {
-    let query = supabase.from('nfd_notas').select(select)
-    query = configureQuery ? configureQuery(query) : query
-
-    const { data, error } = await query.range(from, from + pageSize - 1)
-    if (error) throw error
-
-    rows.push(...(data ?? []))
-    if ((data ?? []).length < pageSize) break
-  }
-
-  return rows
 }
 
 function filterBySearch(items, search, fields) {
@@ -911,7 +715,7 @@ function ProfileScreen({ profile, onBack, onLogout, onUploadPhoto, photoBusy }) 
   )
 }
 
-function StoresScreen({
+export function StoresScreen({
   stores,
   nfds,
   loading,
@@ -984,7 +788,7 @@ function StoresScreen({
   )
 }
 
-function StoreDetailScreen({
+export function StoreDetailScreen({
   store,
   nfds,
   statusFilter,
