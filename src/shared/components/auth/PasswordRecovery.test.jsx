@@ -17,7 +17,7 @@ const {
   updateUser: vi.fn(),
 }))
 
-vi.mock('../../lib/supabaseClient', () => ({
+vi.mock('../../lib/supabaseClient.ts', () => ({
   supabase: {
     auth: {
       getSession,
