@@ -147,8 +147,33 @@ function manifest(filePath) {
   return result
 }
 
+function validateDomainTypeReferences(committedPath, committedManifest) {
+  const domainsRoot = 'src/domains'
+  if (!fs.existsSync(domainsRoot)) return
+
+  const source = fs.readdirSync(domainsRoot, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
+    .map((entry) => fs.readFileSync(`${entry.parentPath}/${entry.name}`, 'utf8'))
+    .join('\n')
+
+  const groups = [
+    ['table', /(?:TableRow|TableInsert|TableUpdate)<['"]([^'"]+)['"]>/g, committedManifest.tables],
+    ['view', /ViewRow<['"]([^'"]+)['"]>/g, committedManifest.views],
+    ['function', /(?:RpcArgs|RpcResponse)<['"]([^'"]+)['"]>/g, committedManifest.functions],
+  ]
+
+  for (const [kind, pattern, available] of groups) {
+    for (const match of source.matchAll(pattern)) {
+      if (!(match[1] in available)) {
+        throw new Error(`Referência de ${kind} desconhecida nos domínios: ${match[1]} (${committedPath}).`)
+      }
+    }
+  }
+}
+
 const generatedManifest = manifest(generatedPath)
 const committedManifest = manifest(committedPath)
+validateDomainTypeReferences(committedPath, committedManifest)
 
 if (JSON.stringify(generatedManifest) !== JSON.stringify(committedManifest)) {
   console.error(
