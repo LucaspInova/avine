@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { Navigate } from 'react-router-dom'
 import { setAuthPersistence, supabase } from '../../shared/lib/supabaseClient'
+import { can as profileCan, getCapabilities } from './model/capabilities'
 
 const profileSelect =
   'id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, foto_url, ativo, acesso_habilitado, created_at'
@@ -158,16 +159,21 @@ export function AuthProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({
+    () => {
+      const capabilities = getCapabilities(profile)
+      return ({
       session,
       profile,
       loading,
       error,
       hasAccess: hasApplicationAccess(profile),
+      capabilities,
+      can: (capability) => profileCan(profile, capability),
       signIn,
       signOut,
       refreshProfile,
-    }),
+      })
+    },
     [error, loading, profile, refreshProfile, session, signIn, signOut],
   )
 

@@ -2,10 +2,11 @@
 import { useMemo } from 'react'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import GerencialApp from './GerencialApp.jsx'
+import { can } from '../../domains/auth/model/capabilities'
 
 export function deriveGerencialCapabilities(profile) {
-  const isAdmin = profile?.perfil === 'Admin' && profile?.auth_role === 'admin'
-  const isGerencial = profile?.perfil === 'Gerencial' && profile?.auth_role === 'gerencial'
+  const isAdmin = can(profile, 'admin.runRestrictedOperations')
+  const isGerencial = can(profile, 'users.managePromoters') && !isAdmin
   const allowedUfs = isGerencial ? [...new Set(profile?.ufs ?? [])] : []
 
   return {
@@ -13,8 +14,8 @@ export function deriveGerencialCapabilities(profile) {
     isGerencial,
     isScoped: isGerencial,
     allowedUfs,
-    canManageAllUsers: isAdmin,
-    canManageStores: isAdmin,
+    canManageAllUsers: can(profile, 'users.manageGerencial'),
+    canManageStores: can(profile, 'stores.create'),
   }
 }
 
