@@ -39,7 +39,7 @@ function RootApp() {
           <Route
             path="/admin/*"
             element={(
-              <RequireRole profile={["Admin", "Gerencial"]} authRole="admin">
+              <RequireRole profile="Admin" authRole="admin">
                 <GerencialApp />
               </RequireRole>
             )}
@@ -55,7 +55,7 @@ function RootApp() {
           <Route
             path="/acesso/promotor/*"
             element={(
-              <RequireRole profile="Promotor">
+              <RequireRole profile="Promotor" authRole="promotor">
                 <PromotorApp />
               </RequireRole>
             )}

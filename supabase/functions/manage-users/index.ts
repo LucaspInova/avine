@@ -13,10 +13,7 @@ const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_POLICY_ERROR =
   `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
   "uma letra maiuscula, uma letra minuscula, um numero e um simbolo.";
-const legacyGerencialEmails = new Set([
-  "admin@avine.com.br",
-  "avinegerencial@gmail.com",
-]);
+
 const allowedStates = new Set([
   "CE",
   "MA",
@@ -40,6 +37,7 @@ type UserProfile = {
   nome: string;
   perfil: string;
   estado: string;
+  ufs: string[];
   fotos_habilitadas: boolean;
   ativo: boolean;
   acesso_habilitado: boolean;
@@ -116,18 +114,25 @@ function validateProfile(input: JsonRecord) {
   const nome = text(input.nome);
   const normalizedEmail = email(input.email);
   const perfil = text(input.perfil) || "Gerencial";
-  const estado = text(input.estado) || "CE";
+  const requestedUfs = Array.isArray(input.ufs) ? input.ufs.map(text).filter(Boolean) : [];
+  const estadoInput = text(input.estado);
+  const ufs = perfil === "Admin" ? [] : [...new Set((requestedUfs.length ? requestedUfs : estadoInput ? [estadoInput] : []).map((uf) => uf.toUpperCase()))];
+  const estado = perfil === "Admin" ? "CE" : ufs[0] ?? "";
 
   if (nome.length < 4) throw new Error("Informe um nome valido.");
   if (!isEmail(normalizedEmail)) throw new Error("Informe um e-mail valido.");
   if (!allowedRoles.has(perfil)) throw new Error("Perfil de acesso invalido.");
-  if (!allowedStates.has(estado)) throw new Error("Estado invalido.");
+  if (ufs.some((uf) => !allowedStates.has(uf))) throw new Error("UF invalida.");
+  if (perfil === "Admin" && ufs.length) throw new Error("Admin deve possuir escopo global.");
+  if (perfil === "Gerencial" && ufs.length < 1) throw new Error("Gerencial deve possuir ao menos uma UF.");
+  if (perfil === "Promotor" && ufs.length !== 1) throw new Error("Promotor deve possuir exatamente uma UF.");
 
   return {
     nome,
     email: normalizedEmail,
     perfil,
     estado,
+    ufs,
     fotos_habilitadas: boolean(input.fotos_habilitadas),
   };
 }
@@ -140,6 +145,7 @@ function publicProfile(profile: UserProfile, authRole: string | null = null) {
     nome: profile.nome,
     perfil: profile.perfil,
     estado: profile.estado,
+    ufs: profile.ufs,
     fotos_habilitadas: profile.fotos_habilitadas,
     ativo: profile.ativo,
     acesso_habilitado: profile.acesso_habilitado,
@@ -207,7 +213,7 @@ Deno.serve(async (request) => {
 
   const { data: callerProfile, error: callerProfileError } = await adminClient
     .from("usuarios")
-    .select("id, perfil, estado, ativo, acesso_habilitado")
+    .select("id, perfil, estado, ufs, ativo, acesso_habilitado")
     .eq("auth_user_id", caller.id)
     .maybeSingle();
 
@@ -230,10 +236,10 @@ Deno.serve(async (request) => {
     return jsonResponse(403, { error: "Role Auth inconsistente com o perfil operacional." });
   }
 
+  const callerUfs = Array.isArray(callerProfile.ufs) ? callerProfile.ufs : [callerProfile.estado];
   function canManageTarget(target: { perfil?: string; estado?: string }) {
     if (isAdmin) return true;
-    return target.perfil === "Promotor" &&
-      target.estado === callerProfile.estado;
+    return target.perfil === "Promotor" && callerUfs.includes(target.estado ?? "");
   }
 
   const action = text(body.action) || "create";
@@ -242,11 +248,11 @@ Deno.serve(async (request) => {
     let listQuery = adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
       );
 
     if (isScopedGerencial) {
-      listQuery = listQuery.eq("estado", callerProfile.estado);
+      listQuery = listQuery.in("estado", callerUfs);
     }
 
     const { data, error } = await listQuery.order("nome", { ascending: true });
@@ -273,52 +279,33 @@ Deno.serve(async (request) => {
 
   if (action === "delete") {
     const usuarioId = text(body.usuario_id);
-    if (!usuarioId) {
-      return jsonResponse(400, { error: "Usuario alvo obrigatorio." });
-    }
+    if (!usuarioId) return jsonResponse(400, { error: "Usuario alvo obrigatorio." });
 
-    const { data: target, error: targetError } = await adminClient
-      .from("usuarios")
-      .select("id, auth_user_id, email, perfil")
-      .eq("id", usuarioId)
-      .maybeSingle();
-
-    if (targetError || !target) {
-      return jsonResponse(404, { error: "Usuario nao encontrado." });
-    }
-
-    if (
-      target.perfil !== "Admin" ||
-      !legacyGerencialEmails.has(email(target.email))
-    ) {
-      return jsonResponse(400, {
-        error: "Somente os dois usuarios gerenciais legados podem ser excluidos por esta acao.",
+    const { data: target, error: targetError } = await adminClient.from("usuarios")
+      .select("id, auth_user_id, email, perfil, estado, ativo, acesso_habilitado")
+      .eq("id", usuarioId).maybeSingle();
+    if (targetError || !target) return jsonResponse(404, { error: "Usuario nao encontrado." });
+    if (!canManageTarget(target)) return jsonResponse(403, {
+      error: "O Gerencial somente pode excluir Promotores das suas UFs.",
+    });
+    if (target.auth_user_id === caller.id) return jsonResponse(400, {
+      error: "Voce nao pode excluir o proprio acesso.",
+    });
+    if (target.perfil === "Admin" && target.ativo && target.acesso_habilitado) {
+      const { count, error: countError } = await adminClient.from("usuarios")
+        .select("id", { count: "exact", head: true }).eq("perfil", "Admin")
+        .eq("ativo", true).eq("acesso_habilitado", true).neq("id", target.id);
+      if (countError) return jsonResponse(400, { error: countError.message });
+      if ((count ?? 0) === 0) return jsonResponse(400, {
+        error: "Nao e permitido remover o ultimo Admin com acesso.",
       });
     }
-
-    if (target.auth_user_id === caller.id) {
-      return jsonResponse(400, { error: "Voce nao pode excluir o proprio acesso." });
-    }
-
     if (target.auth_user_id) {
-      const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(
-        target.auth_user_id,
-      );
-
-      if (authDeleteError) {
-        return jsonResponse(400, { error: authDeleteError.message });
-      }
+      const { error } = await adminClient.auth.admin.deleteUser(target.auth_user_id);
+      if (error) return jsonResponse(400, { error: error.message });
     }
-
-    const { error: profileDeleteError } = await adminClient
-      .from("usuarios")
-      .delete()
-      .eq("id", target.id);
-
-    if (profileDeleteError) {
-      return jsonResponse(400, { error: profileDeleteError.message });
-    }
-
+    const { error } = await adminClient.from("usuarios").delete().eq("id", target.id);
+    if (error) return jsonResponse(400, { error: error.message });
     return jsonResponse(200, { deleted: true });
   }
 
@@ -333,9 +320,9 @@ Deno.serve(async (request) => {
     }
 
     if (isScopedGerencial &&
-      (profileInput.perfil !== "Promotor" || profileInput.estado !== callerProfile.estado)) {
+      (profileInput.perfil !== "Promotor" || !callerUfs.includes(profileInput.estado))) {
       return jsonResponse(403, {
-        error: "O Gerencial somente pode cadastrar Promotores da sua UF.",
+        error: "O Gerencial somente pode cadastrar Promotores das suas UFs.",
       });
     }
 
@@ -406,7 +393,7 @@ Deno.serve(async (request) => {
 
     const { data: profile, error: profileError } = await profileRequest
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
       )
       .single();
 
@@ -430,7 +417,7 @@ Deno.serve(async (request) => {
     const { data: target, error: targetError } = await adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
       )
       .eq("id", usuarioId)
       .maybeSingle();
@@ -441,7 +428,7 @@ Deno.serve(async (request) => {
 
     if (!canManageTarget(target)) {
       return jsonResponse(403, {
-        error: "O Gerencial somente pode administrar Promotores da sua UF.",
+        error: "O Gerencial somente pode administrar Promotores das suas UFs.",
       });
     }
 
@@ -454,6 +441,11 @@ Deno.serve(async (request) => {
       return jsonResponse(400, {
         error: error instanceof Error ? error.message : "Dados invalidos.",
       });
+    }
+
+    if (isScopedGerencial &&
+      (nextProfile.perfil !== "Promotor" || !callerUfs.includes(nextProfile.estado))) {
+      return jsonResponse(403, { error: "O Gerencial somente pode salvar Promotores das suas UFs." });
     }
 
     const nextActive = action === "update"
@@ -556,7 +548,7 @@ Deno.serve(async (request) => {
       })
       .eq("id", target.id)
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
       )
       .single();
 
