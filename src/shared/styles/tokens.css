@@ -1,0 +1,57 @@
+:root {
+  /* Brand and semantic colors */
+  --color-brand-50: #eef8f2;
+  --color-brand-100: #d9efe2;
+  --color-brand-500: #248451;
+  --color-brand-600: #196b42;
+  --color-brand-700: #155b38;
+  --color-accent-500: #f0b429;
+  --color-danger-50: #fef2f2;
+  --color-danger-600: #c53030;
+  --color-text: #3f403f;
+  --color-text-strong: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-surface: #ffffff;
+  --color-background: #f8f8f8;
+  --color-overlay: rgb(15 23 42 / 42%);
+
+  /* Typography */
+  --font-family-sans: Roboto, Arial, system-ui, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  --line-height-normal: 1.5;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  /* Borders, elevation and interaction */
+  --border-width: 1px;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --radius-pill: 999px;
+  --shadow-sm: 0 2px 8px rgb(15 23 42 / 8%);
+  --shadow-md: 0 12px 30px rgb(15 23 42 / 14%);
+  --shadow-lg: 0 18px 48px rgb(15 23 42 / 18%);
+  --focus-ring: 0 0 0 3px rgb(36 132 81 / 22%);
+  --touch-target: 44px;
+
+  /* Breakpoints are exposed for JS and documentation; media queries use the same values. */
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}

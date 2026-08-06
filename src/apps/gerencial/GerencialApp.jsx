@@ -27,6 +27,7 @@ import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
+import { Pagination } from '../../shared/ui'
 import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -1348,38 +1349,6 @@ export function LojasScreen({
   )
 }
 
-function Pagination({ currentPage, totalPages, onPageChange }) {
-  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
-  const visiblePages = pages.filter((page) => page <= 5 || page === totalPages || Math.abs(page - currentPage) <= 1)
-  const items = visiblePages.reduce((acc, page) => {
-    const last = acc[acc.length - 1]
-    if (last && page - last > 1) acc.push('ellipsis')
-    acc.push(page)
-    return acc
-  }, [])
-
-  return (
-    <nav className="pagination" aria-label="Paginação de lojas">
-      <button type="button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>&lsaquo;</button>
-      {items.map((item, index) =>
-        item === 'ellipsis' ? (
-          <span key={`ellipsis-${index}`}>...</span>
-        ) : (
-          <button
-            key={item}
-            className={item === currentPage ? 'is-active' : ''}
-            type="button"
-            onClick={() => onPageChange(item)}
-          >
-            {item}
-          </button>
-        ),
-      )}
-      <button type="button" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages}>&rsaquo;</button>
-    </nav>
-  )
-}
-
 function PerfilScreen({ user, profilePhoto, onSave }) {
   const [isOpen, setOpen] = useState(false)
   const [name, setName] = useState(user?.nome ?? '')
@@ -2109,29 +2078,14 @@ function NotesFilterPopover({
 }
 
 function NotesPagination({ page, pages, onChange }) {
-  const pageNumbers = pages <= 7
-    ? Array.from({ length: pages }, (_, index) => index)
-    : [0, 1, 2, 'ellipsis', pages - 1]
-
   return (
-    <nav className="pagination notes-pagination" aria-label="Páginas da lista de NFD">
-      <button type="button" disabled={page === 0} onClick={() => onChange(page - 1)} aria-label="Página anterior">&lsaquo;</button>
-      {pageNumbers.map((pageNumber, index) => (
-        pageNumber === 'ellipsis' ? (
-          <span key={`ellipsis-${index}`}>...</span>
-        ) : (
-          <button
-            className={pageNumber === page ? 'is-active' : ''}
-            type="button"
-            key={pageNumber}
-            onClick={() => onChange(pageNumber)}
-          >
-            {pageNumber + 1}
-          </button>
-        )
-      ))}
-      <button type="button" disabled={page === pages - 1} onClick={() => onChange(page + 1)} aria-label="Próxima página">&rsaquo;</button>
-    </nav>
+    <Pagination
+      className="pagination notes-pagination"
+      currentPage={page + 1}
+      label="Páginas da lista de NFD"
+      onPageChange={(nextPage) => onChange(nextPage - 1)}
+      totalPages={pages}
+    />
   )
 }
 
