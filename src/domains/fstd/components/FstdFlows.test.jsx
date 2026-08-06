@@ -2,28 +2,53 @@ import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const workspaceSpy = vi.fn()
-vi.mock('../../../apps/promotor/PromotorApp.jsx', () => ({ PromotorWorkspace: (props) => {
-  workspaceSpy(props)
-  return <div data-testid="promotor-presentation">{props.embeddedFstd ? 'Gerencial' : 'Promotor'}</div>
-} }))
-vi.mock('../../auth/AuthProvider.jsx', () => ({ useAuth: () => ({ profile: { id: 'u1', perfil: 'Gerencial' } }) }))
+vi.mock('./PromotorWorkspace.jsx', () => ({
+  PromotorWorkspace: (props) => {
+    workspaceSpy(props)
+    return <div data-testid="fstd-flow">{props.embeddedFstd ? 'Embutido' : 'Completo'}</div>
+  },
+}))
 
 import { PromotorFstdFlow } from './PromotorFstdFlow.jsx'
-import { GerencialFstdModal } from '../../../apps/gerencial/features/fstd/GerencialFstdModal.jsx'
 
-describe('apresentações Promotor e Gerencial do mesmo fluxo FSTD', () => {
+describe('PromotorFstdFlow', () => {
   beforeEach(() => workspaceSpy.mockClear())
 
-  it('apresenta o caso de uso como jornada Promotor', () => {
-    render(<PromotorFstdFlow profile={{ id: 'p1', perfil: 'Promotor' }} initialStore={{ id: 'l1' }} initialFstdTarget={{ chave_acesso: 'n1' }} />)
-    expect(screen.getByTestId('promotor-presentation')).toHaveTextContent('Promotor')
-    expect(workspaceSpy).toHaveBeenCalledWith(expect.objectContaining({ initialStore: { id: 'l1' }, initialFstdTarget: { chave_acesso: 'n1' } }))
+  it('expõe a jornada completa pela API pública do domínio', () => {
+    const profile = { id: 'p1', perfil: 'Promotor' }
+    const store = { id: 'l1' }
+    const target = { chave_acesso: 'n1' }
+
+    render(<PromotorFstdFlow profile={profile} initialStore={store} initialFstdTarget={target} />)
+
+    expect(screen.getByTestId('fstd-flow')).toHaveTextContent('Completo')
+    expect(workspaceSpy).toHaveBeenCalledWith(expect.objectContaining({
+      profile,
+      initialStore: store,
+      initialFstdTarget: target,
+    }))
   })
 
-  it('muda para modal Gerencial preservando alvo, callbacks e fluxo compartilhado', () => {
-    const onClose = vi.fn(); const onCompleted = vi.fn()
-    render(<GerencialFstdModal note={{ chave_acesso: 'n1' }} store={{ id: 'l1' }} onClose={onClose} onCompleted={onCompleted} />)
-    expect(screen.getByTestId('promotor-presentation')).toHaveTextContent('Gerencial')
-    expect(workspaceSpy).toHaveBeenCalledWith(expect.objectContaining({ embeddedFstd: true, initialStore: { id: 'l1' }, initialFstdTarget: { chave_acesso: 'n1' }, onEmbeddedClose: onClose, onEmbeddedComplete: onCompleted }))
+  it('preserva o contrato do fluxo embutido e seus callbacks', () => {
+    const onClose = vi.fn()
+    const onCompleted = vi.fn()
+
+    render(
+      <PromotorFstdFlow
+        embeddedFstd
+        profile={{ id: 'g1', perfil: 'Gerencial' }}
+        initialStore={{ id: 'l1' }}
+        initialFstdTarget={{ chave_acesso: 'n1' }}
+        onEmbeddedClose={onClose}
+        onEmbeddedComplete={onCompleted}
+      />,
+    )
+
+    expect(screen.getByTestId('fstd-flow')).toHaveTextContent('Embutido')
+    expect(workspaceSpy).toHaveBeenCalledWith(expect.objectContaining({
+      embeddedFstd: true,
+      onEmbeddedClose: onClose,
+      onEmbeddedComplete: onCompleted,
+    }))
   })
 })
