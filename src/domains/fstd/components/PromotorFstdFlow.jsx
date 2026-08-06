@@ -1,4 +1,4 @@
-import { PromotorWorkspace } from '../../../apps/promotor/PromotorApp.jsx'
+import { PromotorWorkspace } from './PromotorWorkspace.jsx'
 
 export function PromotorFstdFlow(props) {
   return <PromotorWorkspace {...props} />
