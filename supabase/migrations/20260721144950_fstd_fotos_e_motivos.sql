@@ -136,3 +136,4 @@ revoke all on function public.concluir_fstd_produto(uuid, uuid, integer, text, j
 grant execute on function public.concluir_fstd_produto(uuid, uuid, integer, text, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
+;

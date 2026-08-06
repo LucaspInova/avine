@@ -192,10 +192,8 @@ begin
   return v_processo.id;
 end;
 $function$;
-
 revoke all on function public.iniciar_fstd_avulsa(uuid, text, numeric, date, jsonb) from public, anon;
 grant execute on function public.iniciar_fstd_avulsa(uuid, text, numeric, date, jsonb) to authenticated;
-
 create or replace function public.conferir_fstd_avulsas()
 returns jsonb
 language plpgsql
@@ -435,10 +433,8 @@ begin
   );
 end;
 $function$;
-
 revoke all on function public.iniciar_fstd_avulsa(uuid, text, numeric, date, jsonb) from public, anon;
 grant execute on function public.iniciar_fstd_avulsa(uuid, text, numeric, date, jsonb) to authenticated;
 revoke all on function public.conferir_fstd_avulsas() from public, anon, authenticated;
 grant execute on function public.conferir_fstd_avulsas() to service_role;
-
 notify pgrst, 'reload schema';

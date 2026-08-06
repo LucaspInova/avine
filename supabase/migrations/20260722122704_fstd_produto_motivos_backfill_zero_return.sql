@@ -11,4 +11,4 @@ where fp.status = 'concluido'
     select 1
     from public.fstd_produto_motivos as existing
     where existing.produto_id = fp.id
-  );
+  );;

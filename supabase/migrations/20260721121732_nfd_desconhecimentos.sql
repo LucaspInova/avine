@@ -1,5 +1,5 @@
 -- Registra cada movimentação em que um promotor declara não reconhecer uma NFD.
--- A NFD exibida no app vem da view/importação `nfd_notas`, por isso o vínculo
+-- A NFD exibida no app vem da view/importação nfd_notas, por isso o vínculo
 -- usa uma referência textual e também mantém um snapshot dos dados principais.
 
 create table if not exists public.nfd_desconhecimentos (
@@ -73,4 +73,4 @@ with check (
   )
 );
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

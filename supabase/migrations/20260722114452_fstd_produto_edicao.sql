@@ -154,4 +154,4 @@ $$;
 revoke all on function public.editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb) from public;
 grant execute on function public.editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb) to authenticated;
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

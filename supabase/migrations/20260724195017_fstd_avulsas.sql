@@ -282,3 +282,4 @@ revoke all on function public.concluir_fstd_produto_avulso(uuid, jsonb, integer,
 grant execute on function public.concluir_fstd_produto_avulso(uuid, jsonb, integer, integer, text, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
+;

@@ -32,4 +32,4 @@ left join public.loja_promotores lp on lp.loja_id = l.id
 left join public.usuarios u on u.id = lp.promotor_id
 group by l.id, l.codigo, l.nome, l.uf, l.cidade;
 
-grant select on table public.lojas_com_promotores to anon, authenticated;
+grant select on table public.lojas_com_promotores to anon, authenticated;;

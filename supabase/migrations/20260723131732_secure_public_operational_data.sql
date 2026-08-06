@@ -3,7 +3,6 @@ alter table public.nfd_itens enable row level security;
 alter table public.nfd_logs enable row level security;
 alter table public.produtos enable row level security;
 
--- Browser clients only need read access to NFDs and the active product catalog.
 revoke all on table public.nfd_itens from anon, authenticated;
 grant select on table public.nfd_itens to authenticated;
 
@@ -41,8 +40,6 @@ using (
   or (select public.is_current_user_gerencial_ativo())
 );
 
--- These privileged RPCs already validate that the caller is an active Gerencial.
--- They must never be reachable without a valid authenticated session.
 revoke execute on function public.create_gerencial_user(uuid, text, text) from public, anon;
 grant execute on function public.create_gerencial_user(uuid, text, text) to authenticated;
 
@@ -52,5 +49,4 @@ grant execute on function public.is_current_user_gerencial_ativo() to authentica
 revoke execute on function public.update_gerencial_user(uuid, text, text, boolean) from public, anon;
 grant execute on function public.update_gerencial_user(uuid, text, text, boolean) to authenticated;
 
--- The unique constraint duplicates the primary-key index on produtos.
-alter table public.produtos drop constraint if exists produtos_id_key;
+alter table public.produtos drop constraint if exists produtos_id_key;;

@@ -291,3 +291,4 @@ revoke all on function public.conferir_fstd_avulsas() from public, anon, authent
 grant execute on function public.conferir_fstd_avulsas() to service_role;
 
 notify pgrst, 'reload schema';
+;

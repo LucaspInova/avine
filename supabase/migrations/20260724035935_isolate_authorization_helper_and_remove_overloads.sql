@@ -125,3 +125,4 @@ drop function if exists public.concluir_fstd_produto(
 );
 
 notify pgrst, 'reload schema';
+;

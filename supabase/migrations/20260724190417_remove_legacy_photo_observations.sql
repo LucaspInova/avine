@@ -10,4 +10,4 @@ set observacao = nullif(
   )),
   ''
 )
-where observacao ~* '(^|\n)[[:space:]]*Fotos selecionadas[[:space:]]*:';
+where observacao ~* '(^|\n)[[:space:]]*Fotos selecionadas[[:space:]]*:';;
