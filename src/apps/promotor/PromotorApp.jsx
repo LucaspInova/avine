@@ -2,7 +2,6 @@ import { getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVi
 import { buildSaveFstdProductCommand } from '../../domains/fstd/model/commands'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import { supabase } from '../../shared/lib/supabaseClient'
 import { usePromotorWorkspace } from '../../domains/promotor/hooks/usePromotorWorkspace'
@@ -16,10 +15,10 @@ import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import cameraIcon from '../../shared/assets/fstd-icons/camera.png'
 import {
-  clearPromotorNavigation,
   readPromotorNavigation,
   savePromotorNavigation,
 } from './navigationState'
+import { PromotorApplicationShell } from './features/shell/PromotorApplicationShell.jsx'
 import './PromotorApp.css'
 
 const statusTabs = [
@@ -3739,38 +3738,13 @@ export function GerencialFinalizedNfdModal({ note, store, onClose, onEdit }) {
 }
 
 function PromotorApp() {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const {
-    session,
-    profile,
-    loading: authLoading,
-    signOut,
-  } = useAuth()
-  const isAllowed = profile?.perfil === 'Promotor'
-    && profile?.ativo
-    && profile?.acesso_habilitado
-
-  async function handleLogout() {
-    if (profile?.id) clearPromotorNavigation(profile.id)
-    await signOut()
-    queryClient.clear()
-    navigate('/', { replace: true })
-  }
-
-  if (authLoading) {
-    return (
-      <main className="promotor-loading">
-        <span>Carregando FSTD Digital...</span>
-      </main>
-    )
-  }
-
-  if (!session || !isAllowed) {
-    return <Navigate to="/" replace />
-  }
-
-  return <PromotorWorkspace profile={profile} onLogout={handleLogout} />
+  return (
+    <PromotorApplicationShell>
+      {({ profile, onLogout }) => (
+        <PromotorWorkspace profile={profile} onLogout={onLogout} />
+      )}
+    </PromotorApplicationShell>
+  )
 }
 
 export default PromotorApp

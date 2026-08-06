@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import { can } from '../../domains/auth/model/capabilities'
 import { supabase } from '../../shared/lib/supabaseClient'
@@ -23,6 +23,7 @@ import { getPasswordValidationMessage, PASSWORD_MIN_LENGTH } from '../../shared/
 import { InvoiceIcon } from '../../shared/components/InvoiceIcon.jsx'
 import { GerencialFstdModal } from './features/fstd/GerencialFstdModal.jsx'
 import { GerencialFinalizedNfdModal } from './features/fstd/GerencialFinalizedNfdModal.jsx'
+import { GerencialApplicationShell } from './features/shell/GerencialApplicationShell.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
@@ -3373,21 +3374,12 @@ function GerencialApp({ capabilities }) {
     setLojaFormError('')
   }
 
-  if (authLoading) {
-    return (
-      <main className="login-shell">
-        <p className="auth-loading">Validando sessão...</p>
-      </main>
-    )
-  }
-
-  if (!session || !currentUser) {
-    return <Navigate to="/" replace />
-  }
-
   return (
-    <div className="admin-shell">
-      <Sidebar
+    <GerencialApplicationShell
+      authLoading={authLoading}
+      session={session}
+      profile={currentUser}
+      sidebar={<Sidebar
         expanded={sidebarExpanded}
         canCollapse={!isDesktop}
         selectedItem={selectedItem}
@@ -3396,7 +3388,8 @@ function GerencialApp({ capabilities }) {
         onLogout={handleLogout}
         onSelect={handleSelectItem}
         onToggle={() => setSidebarExpanded((open) => !open)}
-      />
+      />}
+    >
 
       <main className={`workspace ${sidebarExpanded ? 'sidebar-open' : ''} ${isUsuarios ? 'registration-workspace' : ''}`}>
         <header className="page-hero">
@@ -3538,7 +3531,7 @@ function GerencialApp({ capabilities }) {
         />
       )}
 
-    </div>
+    </GerencialApplicationShell>
   )
 }
 
