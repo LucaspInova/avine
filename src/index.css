@@ -1,9 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+@import './shared/styles/tokens.css';
 
 :root {
-  font-family: Roboto, Arial, system-ui, sans-serif;
-  color: #3f403f;
-  background: #f8f8f8;
+  font-family: var(--font-family-sans);
+  color: var(--color-text);
+  background: var(--color-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -15,7 +16,7 @@
 }
 
 html {
-  background: #f8f8f8;
+  background: var(--color-background);
 }
 
 body {

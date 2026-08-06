@@ -9,6 +9,7 @@ import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../../shared/lib/fst
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../../shared/lib/profilePhoto'
 import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
+import { EmptyState, SearchField } from '../../shared/ui'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
@@ -426,27 +427,8 @@ function AppHeader({
   )
 }
 
-function SearchField({ value, onChange }) {
-  return (
-    <label className="mobile-search">
-      <span aria-hidden="true">⌕</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Procurar"
-        type="search"
-      />
-    </label>
-  )
-}
-
 function EmptyNotice({ children }) {
-  return (
-    <div className="empty-notice">
-      <span aria-hidden="true">♡</span>
-      <strong>{children}</strong>
-    </div>
-  )
+  return <EmptyState className="empty-notice">{children}</EmptyState>
 }
 
 function StoreIcon({ status }) {
@@ -749,7 +731,7 @@ export function StoresScreen({
       />
 
       <section className="mobile-card stores-card">
-        <SearchField value={search} onChange={onSearch} />
+        <SearchField className="mobile-search" value={search} onChange={onSearch} />
 
         {loading && <p className="mobile-muted">Carregando lojas...</p>}
 
@@ -828,7 +810,7 @@ export function StoreDetailScreen({
           <EmptyNotice>0 Notas Pendentes!</EmptyNotice>
         ) : (
           <>
-            <SearchField value={search} onChange={onSearch} />
+            <SearchField className="mobile-search" value={search} onChange={onSearch} />
 
             <div className="nfd-rows">
               {visibleNfds.map((nfd) => {
