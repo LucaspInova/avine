@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
+import { can } from '../../domains/auth/model/capabilities'
 import { supabase } from '../../shared/lib/supabaseClient'
 import {
   createGerencialUser,
@@ -2351,7 +2352,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   )
 }
 
-function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] }) {
+function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
   const invoiceFilters = useMemo(() => ({ restrictedUfs }), [restrictedUfs])
   const invoicesQuery = useInvoices(invoiceFilters)
   const invoiceMutations = useInvoiceMutations()
@@ -2475,6 +2476,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
   }
 
   function handleEditFinalizedNfd(note, store) {
+    if (!canEditFinalized) return
     const editableNote = {
       ...note,
       status: 'Finalizada',
@@ -2637,7 +2639,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
         note={selectedFinalized?.note}
         store={selectedFinalized?.store}
         onClose={() => setSelectedFinalized(null)}
-        onEdit={(note, store) => handleEditFinalizedNfd(note, store)}
+        onEdit={canEditFinalized ? handleEditFinalizedNfd : undefined}
       />
     </section>
   )
@@ -2898,6 +2900,14 @@ function GerencialApp({ capabilities }) {
   async function handleCreateUsuario(event) {
     event.preventDefault()
 
+    const canCreateSelectedProfile = form.perfil === 'Promotor'
+      ? can(currentUser, 'users.managePromoters')
+      : can(currentUser, 'users.manageGerencial')
+    if (!canCreateSelectedProfile) {
+      setFormError('Seu perfil não pode cadastrar este tipo de usuário.')
+      return
+    }
+
     if (form.perfil === 'Admin' && !isScopedGerencial(currentUser)) {
       const gerencialPayload = {
         nome: normalizaTexto(form.nome),
@@ -2992,7 +3002,7 @@ function GerencialApp({ capabilities }) {
 
   async function handleCreateLoja(event) {
     event.preventDefault()
-    if (currentUser?.perfil !== 'Admin' || currentUser?.auth_role !== 'admin') {
+    if (!can(currentUser, 'stores.create')) {
       setLojaFormError('Apenas Admin pode cadastrar lojas.')
       return
     }
@@ -3482,6 +3492,7 @@ function GerencialApp({ capabilities }) {
             lojas={lojas}
             currentUser={currentUser}
             restrictedUfs={gerencialCapabilities.allowedUfs}
+            canEditFinalized={can(currentUser, 'fstd.editFinalized')}
           />
         ) : isLojas ? (
           <LojasScreen
@@ -3548,7 +3559,9 @@ function GerencialApp({ capabilities }) {
           onEdit={openEditModal}
           onTogglePhotos={handlePhotoToggle}
           photoBusy={updatingId === selectedUsuario.id}
-          canManage={!isScopedGerencial(currentUser) || selectedUsuario.perfil === 'Promotor'}
+          canManage={selectedUsuario.perfil === 'Promotor'
+            ? can(currentUser, 'users.managePromoters')
+            : can(currentUser, 'users.manageGerencial')}
         />
       )}
 

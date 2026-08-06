@@ -64,6 +64,10 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 
 ## Modelo Operacional
 
+`can()` controla somente a exposição de ações e a navegação no frontend. Uma
+capacidade nunca concede autorização de banco: RLS, grants, RPCs e validações no
+servidor continuam sendo obrigatórios para toda operação.
+
 1. `sync-devolucoes-avine` importa NFDs e atualiza lojas no servidor.
 2. Gerencial administra perfis, contas de acesso, lojas e vinculos.
 3. Promotor acessa somente lojas e NFDs liberadas pela RLS.
