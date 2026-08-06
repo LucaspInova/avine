@@ -1,18 +1,9 @@
 import { supabase } from '../../shared/lib/supabaseClient'
+import type { Estado, PerfilUsuario } from '../../types/database.types'
+import type { TableRow } from '../../types/database.helpers'
 
-export type ManagedUser = {
-  id: string
-  auth_user_id: string | null
-  email: string
-  nome: string
-  perfil: 'Promotor' | 'Gerencial' | 'Admin'
-  estado: string
-  ufs: string[]
-  fotos_habilitadas: boolean
-  ativo: boolean
-  acesso_habilitado: boolean
-  foto_url: string | null
-  created_at: string
+export type ManagedUserRecord = TableRow<'usuarios'>
+export type ManagedUserViewModel = ManagedUserRecord & {
   auth_role: 'admin' | 'gerencial' | 'promotor' | null
 }
 
@@ -27,9 +18,9 @@ export type CreateOperationalUserPayload = {
   nome: string
   email: string
   password: string
-  perfil: 'Promotor' | 'Gerencial' | 'Admin'
-  estado: string
-  ufs: string[]
+  perfil: PerfilUsuario
+  estado: Estado
+  ufs: Estado[]
   fotos_habilitadas: boolean
 }
 
@@ -37,9 +28,9 @@ export type UpdateManagedUserPayload = {
   usuario_id: string
   nome: string
   email: string
-  perfil: 'Promotor' | 'Gerencial' | 'Admin'
-  estado: string
-  ufs: string[]
+  perfil: PerfilUsuario
+  estado: Estado
+  ufs: Estado[]
   fotos_habilitadas: boolean
   ativo: boolean
   acesso_habilitado: boolean
@@ -49,8 +40,8 @@ export type UpdateManagedUserPayload = {
 
 type ManageUsersResponse = {
   error?: string
-  usuario?: ManagedUser
-  usuarios?: ManagedUser[]
+  usuario?: ManagedUserViewModel
+  usuarios?: ManagedUserViewModel[]
 }
 
 function getFunctionResponse(error: unknown): Response | null {
@@ -89,7 +80,7 @@ async function createUser(
   await invokeManageUsers({ action: 'create', ...payload })
 }
 
-export async function listManagedUsers(): Promise<ManagedUser[]> {
+export async function listManagedUsers(): Promise<ManagedUserViewModel[]> {
   const data = await invokeManageUsers({ action: 'list' })
   return data.usuarios ?? []
 }
@@ -110,7 +101,7 @@ export async function createOperationalUser(payload: CreateOperationalUserPayloa
 
 export async function updateManagedUser(
   payload: UpdateManagedUserPayload,
-): Promise<ManagedUser> {
+): Promise<ManagedUserViewModel> {
   const data = await invokeManageUsers({ action: 'update', ...payload })
   if (!data.usuario) throw new Error('A função não retornou o usuário atualizado.')
   return data.usuario
@@ -120,7 +111,7 @@ export async function setManagedUserAccess(
   usuarioId: string,
   acessoHabilitado: boolean,
   ativo = acessoHabilitado,
-): Promise<ManagedUser> {
+): Promise<ManagedUserViewModel> {
   const data = await invokeManageUsers({
     action: 'set_access',
     usuario_id: usuarioId,

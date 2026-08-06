@@ -1,6 +1,7 @@
 import { supabase } from '../../shared/lib/supabaseClient'
 import { paginateSupabase } from '../../shared/api/pagination'
 import { toAppError } from '../../shared/errors'
+import type { InvoiceOverviewViewModel, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand } from './types'
 
 export async function fetchAllNfdNotas(select: string, configureQuery?: (query: any) => any) {
   return paginateSupabase<any>((from, to) => {
@@ -10,7 +11,7 @@ export async function fetchAllNfdNotas(select: string, configureQuery?: (query: 
   })
 }
 
-export async function listInvoicesOverview(restrictedUfs: string[] = []) {
+export async function listInvoicesOverview(restrictedUfs: string[] = []): Promise<InvoiceOverviewViewModel[]> {
   try {
     const scope = (query: any) => restrictedUfs.length ? query.in('uf', restrictedUfs) : query
     const [notes, processes, unknown, locations] = await Promise.all([
@@ -44,12 +45,12 @@ export async function findInvoiceStore(code: string | number, restrictedUfs: str
   return data
 }
 
-export async function markInvoiceUnknown(store: any, note: any, comment: string) {
+export async function markInvoiceUnknown(store: MarkInvoiceUnknownCommand['store'], note: MarkInvoiceUnknownCommand['note'], comment: string) {
   const { error } = await (supabase as any).rpc('desconhecer_nfd_gerencial', { p_loja_id: store.id, p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`, p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null, p_nfd_numero: String(note.nota_fiscal ?? ''), p_loja_codigo: store.codigo ? String(store.codigo) : null, p_comentario: comment })
   if (error) throw toAppError(error)
 }
 
-export async function recognizeInvoice(note: any) {
+export async function recognizeInvoice(note: RecognizeInvoiceCommand) {
   const { error } = await (supabase as any).rpc('reconhecer_nfd_gerencial', { p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`, p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null, p_nfd_numero: String(note.nota_fiscal ?? '') })
   if (error) throw toAppError(error)
 }
