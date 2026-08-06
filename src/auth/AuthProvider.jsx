@@ -12,13 +12,19 @@ import { Navigate } from 'react-router-dom'
 import { setAuthPersistence, supabase } from '../lib/supabaseClient'
 
 const profileSelect =
-  'id, auth_user_id, email, nome, perfil, estado, fotos_habilitadas, foto_url, ativo, acesso_habilitado, created_at'
+  'id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, foto_url, ativo, acesso_habilitado, created_at'
 
 const AuthContext = createContext(null)
 
+function expectedAuthRole(perfil) {
+  return perfil === 'Admin' ? 'admin' : perfil === 'Gerencial' ? 'gerencial' : perfil === 'Promotor' ? 'promotor' : null
+}
+
+function hasConsistentRole(profile) {
+  return Boolean(profile && expectedAuthRole(profile.perfil) === profile.auth_role)
+}
+
 function routeForProfile(profile) {
-  if (profile?.auth_role === 'admin') return '/admin'
-  if (profile?.auth_role === 'gerencial') return '/gerencial'
   if (profile?.perfil === 'Admin') return '/admin'
   if (profile?.perfil === 'Gerencial') return '/gerencial'
   if (profile?.perfil === 'Promotor') return '/acesso/promotor'
@@ -30,7 +36,8 @@ function hasApplicationAccess(profile) {
     profile &&
       profile.ativo === true &&
       profile.acesso_habilitado === true &&
-      profile.auth_user_id,
+      profile.auth_user_id &&
+      hasConsistentRole(profile),
   )
 }
 
@@ -200,4 +207,4 @@ export function RequireRole({ profile: requiredProfile, authRole: requiredAuthRo
   return children
 }
 
-export { hasApplicationAccess, routeForProfile }
+export { expectedAuthRole, hasApplicationAccess, hasConsistentRole, routeForProfile }

@@ -66,6 +66,7 @@ const initialUserForm = {
   perfil: '',
   auth_role: 'admin',
   estado: '',
+  ufs: [],
   fotos_habilitadas: false,
 }
 
@@ -106,14 +107,10 @@ function getGerencialName(user) {
 }
 
 function getManagedRoleLabel(user) {
-  if (user?.auth_role === 'admin') return 'Admin'
-  if (user?.auth_role === 'gerencial') return 'Gerencial'
   return getProfileLabel(user?.perfil)
 }
 
 function getManagedRoleKey(user) {
-  if (user?.auth_role === 'admin') return 'Admin'
-  if (user?.auth_role === 'gerencial') return 'Gerencial'
   return user?.perfil ?? ''
 }
 
@@ -548,7 +545,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const currentUserIsGerencial = isScopedGerencial(currentUser)
   const isOperationalProfile = perfisOperacionais.includes(form.perfil)
   const requiresState = isOperationalProfile || isGerencial
-  const allowedStates = currentUserIsGerencial ? [currentUser.estado] : estados
+  const allowedStates = currentUserIsGerencial ? currentUser.ufs : estados
   const hasEmailInput = trimmedEmail.length > 0
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
@@ -560,7 +557,8 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const isAuthRoleValid = form.auth_role === expectedAuthRole
   const isProfileValid = perfisCadastro.includes(form.perfil) && isAuthRoleValid &&
     (!currentUserIsGerencial || form.perfil === 'Promotor')
-  const isEstadoValid = isAdmin || (requiresState && allowedStates.includes(form.estado))
+  const selectedUfs = form.ufs ?? (form.estado ? [form.estado] : [])
+  const isEstadoValid = isAdmin || (isGerencial ? selectedUfs.length > 0 && selectedUfs.every((uf) => allowedStates.includes(uf)) : selectedUfs.length === 1 && allowedStates.includes(selectedUfs[0]))
   const canSubmit =
     isEmailValid &&
     isNameValid &&
@@ -664,10 +662,15 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                     {allowedStates.map((estado) => (
                       <button
                         key={estado}
-                        className={`choice-chip ${form.estado === estado ? 'is-selected' : ''}`}
+                        className={`choice-chip ${selectedUfs.includes(estado) ? 'is-selected' : ''}`}
                         type="button"
                         disabled={currentUserIsGerencial}
-                        onClick={() => onChange({ estado: form.estado === estado ? '' : estado })}
+                        onClick={() => {
+                          const nextUfs = isGerencial
+                            ? (selectedUfs.includes(estado) ? selectedUfs.filter((uf) => uf !== estado) : [...selectedUfs, estado])
+                            : (selectedUfs.includes(estado) ? [] : [estado])
+                          onChange({ ufs: nextUfs, estado: nextUfs[0] ?? '' })
+                        }}
                       >
                         {estado}
                       </button>
@@ -894,7 +897,7 @@ function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, pho
             </div>
             <div>
               <dt>Estado</dt>
-              <dd>{usuario.estado}</dd>
+              <dd>{(usuario.ufs?.length ? usuario.ufs : [usuario.estado]).join(', ') || 'Escopo global'}</dd>
             </div>
           </dl>
         </div>
@@ -1235,6 +1238,7 @@ function LojasScreen({
   onCloseFilters,
   onOpenCadastro,
   onChangePromotor,
+  canCreateStore,
 }) {
   const cidades = useMemo(
     () =>
@@ -1303,10 +1307,12 @@ function LojasScreen({
             )}
           </div>
 
-          <button className="create-button" type="button" onClick={onOpenCadastro}>
-            <Icon name="plus" />
-            <span>Cadastrar Loja</span>
-          </button>
+          {canCreateStore && (
+            <button className="create-button" type="button" onClick={onOpenCadastro}>
+              <Icon name="plus" />
+              <span>Cadastrar Loja</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1508,7 +1514,7 @@ export function UsuariosScreen({
   onCancelEdit,
   onSaveEdit,
   onDelete,
-  restrictedUf = '',
+  restrictedUfs = [],
 }) {
   const [profileFilter, setProfileFilter] = useState('all')
   const [ufFilter, setUfFilter] = useState('all')
@@ -1534,15 +1540,15 @@ export function UsuariosScreen({
     return usuarios.filter((usuario) => {
       const matchesSearch = !query || `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query)
       const matchesProfile = profileFilter === 'all' || getManagedRoleKey(usuario) === profileFilter
-      const matchesUf = restrictedUf
-        ? usuario.estado === restrictedUf
+      const matchesUf = restrictedUfs.length
+        ? restrictedUfs.includes(usuario.estado)
         : ufFilter === 'all' || usuario.estado === ufFilter
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' ? isUserActive(usuario) : !isUserActive(usuario))
 
       return matchesSearch && matchesProfile && matchesUf && matchesStatus
     })
-  }, [profileFilter, restrictedUf, search, statusFilter, ufFilter, usuarios])
+  }, [profileFilter, restrictedUfs, search, statusFilter, ufFilter, usuarios])
   const totalPages = Math.max(1, Math.ceil(filtered.length / USERS_PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pageUsers = filtered.slice((safePage - 1) * USERS_PAGE_SIZE, safePage * USERS_PAGE_SIZE)
@@ -1563,7 +1569,7 @@ export function UsuariosScreen({
   }, [safePage, totalPages])
 
   function handleEdit(usuario) {
-    if (restrictedUf && usuario.perfil !== 'Promotor') {
+    if (restrictedUfs.length > 0 && usuario.perfil !== 'Promotor') {
       onOpenUsuario(usuario)
       return
     }
@@ -1618,8 +1624,8 @@ export function UsuariosScreen({
         <label className="user-select-field">
           <span>UF</span>
           <select
-            value={restrictedUf || ufFilter}
-            disabled={Boolean(restrictedUf)}
+            value={restrictedUfs.length === 1 ? restrictedUfs[0] : ufFilter}
+            disabled={restrictedUfs.length > 0}
             onChange={(event) => {
               setUfFilter(event.target.value)
               setPage(1)
@@ -1755,7 +1761,7 @@ export function UsuariosScreen({
                     ) : usuario.email}
                   </div>
 
-                  <span className="uf-cell" role="cell" data-label="UF">{usuario.estado || '-'}</span>
+                  <span className="uf-cell" role="cell" data-label="UF">{usuario.perfil === 'Admin' ? 'Todas' : (usuario.ufs?.length ? usuario.ufs.join(', ') : usuario.estado || '-')}</span>
 
                   <span className="status-cell" role="cell" data-label="Status">
                     {isEditing ? (
@@ -1785,15 +1791,15 @@ export function UsuariosScreen({
                     ) : (
                       <>
                         <button className="secondary-button edit-user-button" type="button" onClick={() => handleEdit(usuario)}>
-                          {restrictedUf && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
+                          {restrictedUfs.length > 0 && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
                         </button>
                         <details className="user-actions-menu">
                           <summary aria-label={`Mais ações para ${usuario.nome}`}><Icon name="more" /></summary>
                           <div className="user-actions-popover">
                             <button type="button" onClick={() => handleEdit(usuario)}>
-                              {restrictedUf && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
+                              {restrictedUfs.length > 0 && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
                             </button>
-                            <button type="button" disabled={Boolean(restrictedUf && usuario.perfil !== 'Promotor')}>Resetar senha</button>
+                            <button type="button" disabled={Boolean(restrictedUfs.length > 0 && usuario.perfil !== 'Promotor')}>Resetar senha</button>
                             <button type="button" disabled>{isUserActive(usuario) ? 'Desativar' : 'Ativar'}</button>
                             <button
                               className={isLegacyUser ? 'is-danger' : ''}
@@ -2360,7 +2366,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   )
 }
 
-function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }) {
+function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] }) {
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -2388,7 +2394,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }
             let queryBuilder = supabase
               .from('nfd_notas')
               .select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')
-            if (restrictedUf) queryBuilder = queryBuilder.eq('uf', restrictedUf)
+            if (restrictedUfs.length) queryBuilder = queryBuilder.in('uf', restrictedUfs)
             return queryBuilder
               .order('data_referencia', { ascending: false })
               .order('nota_fiscal', { ascending: false })
@@ -2409,7 +2415,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }
             let queryBuilder = supabase
               .from('nfd_itens')
               .select('chave_acesso, uf, cidade')
-            if (restrictedUf) queryBuilder = queryBuilder.eq('uf', restrictedUf)
+            if (restrictedUfs.length) queryBuilder = queryBuilder.in('uf', restrictedUfs)
             return queryBuilder
               .order('chave_acesso', { ascending: true })
               .range(from, to)
@@ -2461,7 +2467,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }
     return () => {
       isMounted = false
     }
-  }, [restrictedUf])
+  }, [restrictedUfs])
 
   const filteredGroups = useMemo(() => {
     const groups = new Map()
@@ -2539,7 +2545,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf = '' }
         .from('lojas')
         .select('id, codigo, nome, uf, cidade')
         .eq('codigo', note.codigo_cliente)
-      if (restrictedUf) storeQuery = storeQuery.eq('uf', restrictedUf)
+      if (restrictedUfs.length) storeQuery = storeQuery.in('uf', restrictedUfs)
       const { data, error } = await storeQuery.maybeSingle()
       if (error) throw error
       store = data
@@ -2884,10 +2890,10 @@ function App() {
   async function loadLojas() {
     setLojasLoading(true)
     setLojasError('')
-    const scopedUf = isScopedGerencial(currentUser) ? currentUser.estado : ''
+    const scopedUfs = isScopedGerencial(currentUser) ? currentUser.ufs : []
 
     const [lojasResult, usuariosResult, vinculosResult] = await Promise.all([
-      listAllLojas(scopedUf)
+      listAllLojas()
         .then((data) => ({ data, error: null }))
         .catch((error) => ({ data: [], error })),
       listManagedUsers()
@@ -2907,7 +2913,7 @@ function App() {
       setPromotores([])
       setLojaPromotores([])
     } else {
-      setLojas(sortStoresByCode(lojasResult.data))
+      setLojas(sortStoresByCode((lojasResult.data ?? []).filter((loja) => scopedUfs.length === 0 || scopedUfs.includes(loja.uf))))
       setPromotores(
         (usuariosResult.data ?? []).filter(
           (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,
@@ -3068,13 +3074,14 @@ function App() {
       return
     }
 
-    const restrictedUf = isScopedGerencial(currentUser) ? currentUser.estado : ''
+    const restrictedUfs = isScopedGerencial(currentUser) ? currentUser.ufs : []
     const payload = {
       email: form.email.trim().toLowerCase(),
       nome: form.nome.trim().toUpperCase(),
       password: form.senha,
       perfil: form.perfil,
-      estado: form.estado,
+      estado: form.ufs?.[0] ?? form.estado,
+      ufs: form.perfil === 'Admin' ? [] : form.ufs,
       fotos_habilitadas: form.fotos_habilitadas,
     }
 
@@ -3084,7 +3091,7 @@ function App() {
       getPasswordValidationMessage(payload.password) ||
       isNomeDuplicado(payload.nome, usuarios) ||
       !perfisCadastro.includes(payload.perfil) ||
-      (restrictedUf ? payload.estado !== restrictedUf : !estados.includes(payload.estado)) ||
+      (restrictedUfs.length ? !restrictedUfs.includes(payload.estado) : payload.perfil !== 'Admin' && !payload.ufs.every((uf) => estados.includes(uf))) ||
       (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
       setFormError(
@@ -3126,6 +3133,10 @@ function App() {
 
   async function handleCreateLoja(event) {
     event.preventDefault()
+    if (currentUser?.perfil !== 'Admin' || currentUser?.auth_role !== 'admin') {
+      setLojaFormError('Apenas Admin pode cadastrar lojas.')
+      return
+    }
 
     const payload = {
       codigo: normalizaTexto(lojaForm.codigo),
@@ -3138,9 +3149,7 @@ function App() {
       !payload.codigo ||
       isCodigoDuplicado(payload.codigo, lojas) ||
       !payload.nome ||
-      (isScopedGerencial(currentUser)
-        ? payload.uf === currentUser.estado
-        : estadosLojas.includes(payload.uf)) ||
+      !estadosLojas.includes(payload.uf) ||
       !payload.cidade
     ) {
       setLojaFormError(
@@ -3180,6 +3189,7 @@ function App() {
         email: usuario.email,
         perfil: usuario.perfil,
         estado: usuario.estado,
+        ufs: usuario.ufs ?? [usuario.estado],
         fotos_habilitadas: nextValue,
         ativo: usuario.ativo,
         acesso_habilitado: usuario.acesso_habilitado,
@@ -3272,6 +3282,7 @@ function App() {
       nome: selectedUsuario.nome,
       perfil: selectedUsuario.perfil,
       estado: selectedUsuario.estado,
+      ufs: selectedUsuario.ufs ?? [selectedUsuario.estado],
       fotos_habilitadas: selectedUsuario.fotos_habilitadas,
     })
     setEditError('')
@@ -3295,6 +3306,7 @@ function App() {
       nome: normalizaNome(editForm.nome),
       perfil: editForm.perfil,
       estado: editForm.estado,
+      ufs: [editForm.estado],
       fotos_habilitadas: editForm.fotos_habilitadas,
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }
@@ -3306,7 +3318,7 @@ function App() {
       getPasswordValidationMessage(editForm.senha, { optional: true }) ||
       !perfisEditaveis.includes(payload.perfil) ||
       (isScopedGerencial(currentUser)
-        ? payload.estado !== currentUser.estado
+        ? !currentUser.ufs.includes(payload.estado)
         : !estados.includes(payload.estado)) ||
       (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
@@ -3432,6 +3444,7 @@ function App() {
         email: payload.email,
         perfil: target.perfil === 'Admin' ? 'Admin' : 'Gerencial',
         estado: target.estado,
+        ufs: target.ufs ?? (target.perfil === 'Admin' ? [] : [target.estado]),
         fotos_habilitadas: target.fotos_habilitadas,
         ativo: payload.ativo,
         acesso_habilitado: payload.ativo,
@@ -3598,7 +3611,7 @@ function App() {
             onCancelEdit={cancelEditGerencial}
             onSaveEdit={handleSaveGerencial}
             onDelete={handleDeleteGerencial}
-            restrictedUf={isScopedGerencial(currentUser) ? currentUser.estado : ''}
+            restrictedUfs={isScopedGerencial(currentUser) ? currentUser.ufs : []}
           />
         ) : isRelatorios ? (
           <ReportScreen />
@@ -3608,7 +3621,7 @@ function App() {
             onSearch={setSearch}
             lojas={lojas}
             currentUser={currentUser}
-            restrictedUf={isScopedGerencial(currentUser) ? currentUser.estado : ''}
+            restrictedUfs={isScopedGerencial(currentUser) ? currentUser.ufs : []}
           />
         ) : isLojas ? (
           <LojasScreen
@@ -3631,8 +3644,9 @@ function App() {
               setStoreSelectedCidades([])
             }}
             onCloseFilters={() => setFilterOpen(false)}
-            onOpenCadastro={() => setCadastroOpen(true)}
+            onOpenCadastro={() => currentUser.perfil === 'Admin' && setCadastroOpen(true)}
             onChangePromotor={handlePromotorChange}
+            canCreateStore={currentUser.perfil === 'Admin' && currentUser.auth_role === 'admin'}
           />
         ) : (
           <PlaceholderScreen title={pageTitle} />
@@ -3652,7 +3666,7 @@ function App() {
         />
       )}
 
-      {isCadastroOpen && isLojas && (
+      {isCadastroOpen && isLojas && currentUser.perfil === 'Admin' && currentUser.auth_role === 'admin' && (
         <CadastroLojaModal
           form={lojaForm}
           lojas={lojas}

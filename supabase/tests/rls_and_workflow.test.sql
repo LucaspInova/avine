@@ -19,6 +19,7 @@ insert into public.usuarios (
   nome,
   perfil,
   estado,
+  ufs,
   auth_user_id,
   ativo,
   acesso_habilitado
@@ -30,6 +31,7 @@ values
     'Gerencial Teste',
     'Gerencial',
     'CE',
+    array['CE'],
     '10000000-0000-0000-0000-000000000001',
     true,
     true
@@ -40,6 +42,7 @@ values
     'Promotor Proprietario',
     'Promotor',
     'CE',
+    array['CE'],
     '20000000-0000-0000-0000-000000000001',
     true,
     true
@@ -50,6 +53,7 @@ values
     'Promotor Externo',
     'Promotor',
     'CE',
+    array['CE'],
     '30000000-0000-0000-0000-000000000001',
     true,
     true
@@ -60,6 +64,7 @@ values
     'Promotor Bloqueado',
     'Promotor',
     'CE',
+    array['CE'],
     '40000000-0000-0000-0000-000000000001',
     true,
     false
@@ -231,6 +236,7 @@ select ok(
 
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
 
 select results_eq(
   'select count(*) from public.usuarios',
@@ -243,6 +249,7 @@ select ok(
 );
 
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select results_eq(
   'select count(*) from public.lojas',
@@ -343,6 +350,7 @@ where p.nfd_chave_acesso = 'NFD-OWNER';
 
 set local role authenticated;
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select results_eq(
   $$select count(*) from storage.objects where bucket_id = 'fstd-fotos'$$,
@@ -465,6 +473,7 @@ select throws_ok(
 );
 
 set local request.jwt.claim.sub = '30000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"30000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select results_eq(
   $$select count(*) from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER'$$,
@@ -493,6 +502,7 @@ select throws_ok(
 );
 
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
 
 select results_eq(
   $$select count(*) from storage.objects where bucket_id = 'fstd-fotos'$$,
@@ -501,6 +511,7 @@ select results_eq(
 );
 
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select lives_ok(
   $$
@@ -593,6 +604,7 @@ where processo_id = (
 
 set local role authenticated;
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
 
 select is(
   public.recuperar_fstd_documentos(),
@@ -650,6 +662,7 @@ where auth_user_id = '20000000-0000-0000-0000-000000000001';
 
 set local role authenticated;
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select results_eq(
   'select count(*) from public.lojas',
@@ -667,6 +680,7 @@ select throws_ok(
 );
 
 set local request.jwt.claim.sub = '50000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"50000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
 select results_eq(
   'select count(*) from public.lojas',

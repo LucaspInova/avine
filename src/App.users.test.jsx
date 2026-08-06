@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { CadastroModal, UsuariosScreen } from './App.jsx'
-import { routeForProfile } from './auth/AuthProvider.jsx'
+import { hasApplicationAccess, hasConsistentRole, routeForProfile } from './auth/AuthProvider.jsx'
 import { getProfileLabel } from './lib/profileLabels.js'
 
 const usuarios = [
@@ -131,6 +131,25 @@ describe('Cadastro de Usuários', () => {
     expect(screen.getByLabelText('Gerencial responsável')).toBeDisabled()
   })
 
+
+  it('permite selecionar múltiplas UFs para Gerencial', () => {
+    const onChange = vi.fn()
+    render(
+      <CadastroModal
+        form={{ email: '', nome: '', senha: '', perfil: 'Gerencial', auth_role: 'gerencial', estado: 'CE', ufs: ['CE'], fotos_habilitadas: false }}
+        usuarios={usuarios}
+        currentUser={{ perfil: 'Admin', auth_role: 'admin', ufs: [] }}
+        busy={false}
+        error=""
+        onChange={onChange}
+        onClose={noop}
+        onSubmit={noop}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'PE' }))
+    expect(onChange).toHaveBeenCalledWith({ ufs: ['CE', 'PE'], estado: 'CE' })
+  })
+
   it('aplica os novos nomes visuais e rotas por perfil', () => {
     expect(getProfileLabel('Gerencial')).toBe('Gerencial')
     expect(getProfileLabel('Supervisor')).toBe('Supervisor')
@@ -138,5 +157,9 @@ describe('Cadastro de Usuários', () => {
     expect(routeForProfile({ perfil: 'Gerencial' })).toBe('/gerencial')
     expect(routeForProfile({ perfil: 'Supervisor' })).toBe('/')
     expect(routeForProfile({ perfil: 'Promotor' })).toBe('/acesso/promotor')
+    expect(routeForProfile({ perfil: 'Admin', auth_role: 'gerencial' })).toBe('/admin')
+    const inconsistentAdmin = { perfil: 'Admin', auth_role: 'gerencial', ativo: true, acesso_habilitado: true, auth_user_id: 'auth-admin' }
+    expect(hasConsistentRole(inconsistentAdmin)).toBe(false)
+    expect(hasApplicationAccess(inconsistentAdmin)).toBe(false)
   })
 })

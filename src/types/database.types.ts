@@ -33,6 +33,7 @@ export type Database = {
           nome: string
           perfil: PerfilUsuario
           estado: Estado
+          ufs: Estado[]
           fotos_habilitadas: boolean
           created_at: string
           auth_user_id: string | null
@@ -46,6 +47,7 @@ export type Database = {
           nome: string
           perfil: PerfilUsuario
           estado: Estado
+          ufs: Estado[]
           fotos_habilitadas?: boolean
           created_at?: string
           auth_user_id?: string | null
@@ -59,6 +61,7 @@ export type Database = {
           nome?: string
           perfil?: PerfilUsuario
           estado?: Estado
+          ufs?: Estado[]
           fotos_habilitadas?: boolean
           created_at?: string
           auth_user_id?: string | null
