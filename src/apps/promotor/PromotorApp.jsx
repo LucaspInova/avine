@@ -1,4 +1,5 @@
 import { getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../domains/invoices'
+import { buildSaveFstdProductCommand } from '../../domains/fstd/model/commands'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
@@ -3206,31 +3207,16 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
         }
 
         const existingPaths = Array.isArray(fotosExistentes) ? fotosExistentes : []
-        const rpcName = product.persisted?.status === 'concluido'
-          ? 'editar_fstd_produto'
-          : product.is_avulsa
-            ? 'concluir_fstd_produto_avulso'
-            : 'concluir_fstd_produto'
-        const rpcArgs = {
-          p_produto_id: produtoId,
-          p_divisoes: (divisoes ?? []).map((division) => ({
-            motivo_id: division.motivoId,
-            quantidade_faturada: division.faturado,
-            quantidade_retorno: division.retorno,
-          })),
-          p_observacao: cleanLegacyPhotoObservation(observacao) || null,
-          p_fotos: [...existingPaths, ...uploadedPaths],
-        }
-
-        if (rpcName === 'editar_fstd_produto') {
-          rpcArgs.p_quantidade_faturada_galinha = faturadoGalinha
-          rpcArgs.p_quantidade_faturada_codorna = faturadoCodorna
-        }
-
-        if (rpcName === 'concluir_fstd_produto_avulso') {
-          rpcArgs.p_quantidade_faturada_galinha = faturadoGalinha
-          rpcArgs.p_quantidade_faturada_codorna = faturadoCodorna
-        }
+        const { rpcName, args: rpcArgs } = buildSaveFstdProductCommand({
+          productId: produtoId,
+          completed: product.persisted?.status === 'concluido',
+          standalone: Boolean(product.is_avulsa),
+          divisions: (divisoes ?? []).map((division) => ({ reasonId: division.motivoId, billed: division.faturado, returned: division.retorno })),
+          observation: cleanLegacyPhotoObservation(observacao),
+          photoPaths: [...existingPaths, ...uploadedPaths],
+          billedChicken: faturadoGalinha,
+          billedQuail: faturadoCodorna,
+        })
 
         const { data, error } = await supabase.rpc(rpcName, rpcArgs)
         if (error) throw error
