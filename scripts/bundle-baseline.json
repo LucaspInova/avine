@@ -1,0 +1,12 @@
+{
+  "entries": {
+    "Promotor": {
+      "rawBytes": 1312,
+      "gzipBytes": 684
+    },
+    "Gerencial": {
+      "rawBytes": 75086,
+      "gzipBytes": 20104
+    }
+  }
+}
