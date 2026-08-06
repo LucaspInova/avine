@@ -2307,7 +2307,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   )
 }
 
-function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
+export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
   const invoiceFilters = useMemo(() => ({ restrictedUfs }), [restrictedUfs])
   const invoicesQuery = useInvoices(invoiceFilters)
   const invoiceMutations = useInvoiceMutations()
