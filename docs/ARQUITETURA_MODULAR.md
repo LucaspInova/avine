@@ -128,10 +128,14 @@ Legenda: **Sim** = disponível no fluxo atual; **Escopo** = disponível apenas p
 
 ## Fontes do comportamento atual
 
-- `src/RootApp.jsx`: composição das rotas e guardas por papel.
-- `src/auth/AuthProvider.jsx`: sessão, perfil, coerência de papéis e requisitos de acesso.
-- `src/App.jsx`: experiência Admin/Gerencial de usuários, lojas, roteirização, notas e FSTD.
-- `src/promotor/PromotorApp.jsx`: lojas atribuídas, NFD, FSTD, fotos, documentos e manifestações do Promotor.
-- `src/lib/gerencialUsers.ts`: contrato do cliente com a Edge Function de gestão de usuários.
+- `src/app/RootApp.jsx`: composição das rotas e guardas por papel.
+- `src/domains/auth/AuthProvider.jsx`: sessão, perfil, coerência de papéis e requisitos de acesso.
+- `src/apps/gerencial/GerencialApp.jsx`: experiência Admin/Gerencial de usuários, lojas, roteirização, notas e FSTD.
+- `src/apps/promotor/PromotorApp.jsx`: lojas atribuídas, NFD, FSTD, fotos, documentos e manifestações do Promotor.
+- `src/domains/users/`: contrato do cliente com a Edge Function de gestão de usuários.
+
+Os entrypoints `src/App.jsx` e `src/promotor/PromotorApp.jsx` continuam disponíveis
+somente para compatibilidade de consumidores externos; código interno deve importar os
+caminhos canônicos em `src/apps`.
 - `supabase/functions/manage-users/index.ts`: autorização administrativa, escopo por UF e sincronização Auth/perfil.
 - `supabase/migrations/20260806120000_admin_gerencial_multi_uf_security.sql`: invariantes, funções de autorização, RLS e escopo multi-UF.
