@@ -343,7 +343,7 @@ begin
     raise exception 'Use um motivo diferente para cada divisao da quantidade.';
   end if;
 
-  select fp.*
+  select fp
   into v_item
   from public.fstd_produtos as fp
   join public.fstd_processos as p on p.id = fp.processo_id
@@ -544,7 +544,7 @@ begin
     raise exception 'Use um motivo diferente para cada divisao da quantidade.';
   end if;
 
-  select fp.*
+  select fp
   into v_item
   from public.fstd_produtos as fp
   join public.fstd_processos as p on p.id = fp.processo_id
@@ -1023,8 +1023,9 @@ revoke truncate, references, trigger
   from authenticated;
 
 revoke all on table public.fstds from authenticated;
-drop function if exists public.solicitar_fstd(
+revoke execute on function public.solicitar_fstd(
   uuid, uuid, uuid, integer, integer, integer, text[], text
-);
+) from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
+;

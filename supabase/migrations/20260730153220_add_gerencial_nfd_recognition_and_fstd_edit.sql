@@ -79,9 +79,6 @@ $function$;
 revoke all on function public.reconhecer_nfd_gerencial(text, text, text) from public, anon;
 grant execute on function public.reconhecer_nfd_gerencial(text, text, text) to authenticated;
 
--- A FSTD concluida continua finalizada durante a edicao. Somente um Gerencial
--- ativo pode editar produtos nesse estado; o fluxo do Promotor permanece
--- limitado a processos em andamento.
 do $migration$
 declare
   v_definition text;
@@ -187,4 +184,4 @@ begin
 end
 $migration$;
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

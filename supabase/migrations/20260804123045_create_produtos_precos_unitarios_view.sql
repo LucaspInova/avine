@@ -78,4 +78,4 @@ comment on view public.produtos_precos_unitarios is
 revoke all on table public.produtos_precos_unitarios from anon;
 grant select on table public.produtos_precos_unitarios to authenticated;
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

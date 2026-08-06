@@ -192,3 +192,5 @@ $new$
   execute v_definition;
 end
 $migration$;
+
+;

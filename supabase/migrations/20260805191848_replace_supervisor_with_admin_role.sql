@@ -235,3 +235,5 @@ $migration$;
 
 comment on table public.usuarios is
   'Usuarios do FSTD Digital e do painel Gerencial; perfis operacionais ativos: Promotor, Gerencial por UF e Admin global.';
+
+;

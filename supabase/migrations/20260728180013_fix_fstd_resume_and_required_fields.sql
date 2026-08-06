@@ -80,8 +80,15 @@ begin
 
     v_fixed_definition := replace(
       v_definition,
-      E'  if jsonb_typeof(coalesce(p_fotos, ''[]''::jsonb)) <> ''array'' then\n    raise exception ''As fotos devem ser enviadas como uma lista.'';\n  end if;\n',
-      E'  if jsonb_typeof(coalesce(p_fotos, ''[]''::jsonb)) <> ''array'' then\n    raise exception ''As fotos devem ser enviadas como uma lista.'';\n  end if;\n\n' || v_required_block
+      E'  if jsonb_typeof(coalesce(p_fotos, ''[]''::jsonb)) <> ''array'' then
+    raise exception ''As fotos devem ser enviadas como uma lista.'';
+  end if;
+',
+      E'  if jsonb_typeof(coalesce(p_fotos, ''[]''::jsonb)) <> ''array'' then
+    raise exception ''As fotos devem ser enviadas como uma lista.'';
+  end if;
+
+' || v_required_block
     );
 
     if v_fixed_definition = v_definition then
@@ -93,4 +100,4 @@ begin
 end
 $migration$;
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

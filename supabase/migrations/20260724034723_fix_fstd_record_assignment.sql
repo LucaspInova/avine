@@ -33,3 +33,4 @@ begin
   end loop;
 end
 $migration$;
+;

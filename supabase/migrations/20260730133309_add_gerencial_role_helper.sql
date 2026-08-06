@@ -17,3 +17,5 @@ $function$;
 
 revoke all on function public.is_current_user_gerencial_ativo() from public;
 grant execute on function public.is_current_user_gerencial_ativo() to authenticated;
+
+;

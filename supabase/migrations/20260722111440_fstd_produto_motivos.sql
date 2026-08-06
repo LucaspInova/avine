@@ -186,8 +186,7 @@ revoke all on function public.concluir_fstd_produto(uuid, jsonb, text, jsonb) fr
 grant execute on function public.concluir_fstd_produto(uuid, jsonb, text, jsonb) to authenticated;
 
 -- Mantem as assinaturas antigas para nao quebrar clientes que ainda nao
--- receberam a versao nova do frontend. Elas usam o retorno como faturado
--- legado, enquanto o frontend novo envia faturado e retorno por motivo.
+-- receberam a versao nova do frontend. Ambas passam pela mesma validacao exata.
 create or replace function public.concluir_fstd_produto(
   p_produto_id uuid,
   p_motivo_id uuid,
@@ -240,4 +239,4 @@ grant execute on function public.concluir_fstd_produto(uuid, uuid, integer, text
 revoke all on function public.concluir_fstd_produto(uuid, uuid, integer, text, jsonb) from public;
 grant execute on function public.concluir_fstd_produto(uuid, uuid, integer, text, jsonb) to authenticated;
 
-notify pgrst, 'reload schema';
+notify pgrst, 'reload schema';;

@@ -6,3 +6,4 @@ drop function if exists public.solicitar_fstd(
 );
 
 notify pgrst, 'reload schema';
+;

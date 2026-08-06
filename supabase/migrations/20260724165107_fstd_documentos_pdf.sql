@@ -91,7 +91,7 @@ with check (
   and (
     (select app_private.is_current_user_gerencial_ativo())
     or (
-      name ~ ('^' || (select auth.uid())::text || '/[0-9a-fA-F-]{36}/[0-9]{6,7}[.]pdf$')
+      name ~ ('^' || (select auth.uid())::text || '/[0-9a-fA-F-]{36}/[0-9]{6,7}\\.pdf$')
       and exists (
         select 1
         from public.fstd_processos as p
@@ -112,34 +112,9 @@ for update
 to authenticated
 using (
   bucket_id = 'fstd-pdfs'
-  and (
-    (select app_private.is_current_user_gerencial_ativo())
-    or exists (
-      select 1
-      from public.fstd_documentos as d
-      join public.fstd_processos as p on p.id = d.processo_id
-      join public.usuarios as u on u.id = p.promotor_id
-      where d.pdf_path = storage.objects.name
-        and u.auth_user_id = (select auth.uid())
-        and u.ativo is true
-    )
-  )
+  and (select app_private.is_current_user_gerencial_ativo())
 )
-with check (
-  bucket_id = 'fstd-pdfs'
-  and (
-    (select app_private.is_current_user_gerencial_ativo())
-    or exists (
-      select 1
-      from public.fstd_documentos as d
-      join public.fstd_processos as p on p.id = d.processo_id
-      join public.usuarios as u on u.id = p.promotor_id
-      where d.pdf_path = storage.objects.name
-        and u.auth_user_id = (select auth.uid())
-        and u.ativo is true
-    )
-  )
-);
+with check (bucket_id = 'fstd-pdfs');
 
 create or replace function public.get_or_create_fstd_document(p_processo_id uuid)
 returns public.fstd_documentos
@@ -199,18 +174,8 @@ begin
 
   update public.fstd_documentos as d
   set
-    pdf_path = case
-      when d.pdf_path is null
-        or (p_pdf_metadata ->> 'template_version') is distinct from (d.pdf_metadata ->> 'template_version')
-        then trim(p_pdf_path)
-      else d.pdf_path
-    end,
-    pdf_metadata = case
-      when d.pdf_path is null
-        or (p_pdf_metadata ->> 'template_version') is distinct from (d.pdf_metadata ->> 'template_version')
-        then coalesce(p_pdf_metadata, '{}'::jsonb)
-      else d.pdf_metadata
-    end
+    pdf_path = coalesce(d.pdf_path, trim(p_pdf_path)),
+    pdf_metadata = case when d.pdf_path is null then coalesce(p_pdf_metadata, '{}'::jsonb) else d.pdf_metadata end
   where d.id = p_document_id
     and exists (
       select 1
@@ -237,3 +202,4 @@ revoke all on function public.set_fstd_document_pdf(uuid, text, jsonb) from publ
 grant execute on function public.set_fstd_document_pdf(uuid, text, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
+;

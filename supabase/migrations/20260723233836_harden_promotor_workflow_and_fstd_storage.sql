@@ -1,5 +1,5 @@
--- Browser clients may read the FSTD workflow, but state changes must only run
--- through the validated RPCs below.
+-- Harden the promotor workflow: browser clients can read the workflow but all state
+-- changes must go through validated RPCs.
 revoke insert, update, delete on table public.fstd_processos from authenticated;
 revoke insert, update, delete on table public.fstd_produtos from authenticated;
 revoke insert, update, delete on table public.fstd_produto_motivos from authenticated;
@@ -19,8 +19,8 @@ grant execute on function public.concluir_fstd_produto(uuid, jsonb, text, jsonb)
 grant execute on function public.editar_fstd_produto(uuid, jsonb, integer, integer, text, jsonb) to authenticated;
 grant execute on function public.finalizar_fstd_produtos(uuid) to authenticated;
 
--- Keep the workflow protections in RLS as defence in depth in case table
--- write privileges are ever granted again.
+-- Preserve this constraint in RLS as defence in depth if table write privileges
+-- are ever granted again.
 drop policy if exists fstd_processos_update_own on public.fstd_processos;
 create policy fstd_processos_update_own
 on public.fstd_processos
@@ -117,9 +117,9 @@ with check (
   )
 );
 
--- Keep FSTD evidence private and reject files that are not supported images.
+-- FSTD evidence is private and limited to common web image formats.
 update storage.buckets
 set
   file_size_limit = 10485760,
   allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']::text[]
-where id = 'fstd-fotos';
+where id = 'fstd-fotos';;

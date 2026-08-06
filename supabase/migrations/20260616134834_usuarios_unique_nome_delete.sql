@@ -33,4 +33,4 @@ create policy "usuarios_delete_client"
 on public.usuarios
 for delete
 to anon, authenticated
-using (true);
+using (true);;

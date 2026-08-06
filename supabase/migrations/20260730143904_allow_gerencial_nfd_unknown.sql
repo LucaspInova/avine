@@ -4,7 +4,7 @@ create or replace function public.desconhecer_nfd_gerencial(
   p_nfd_chave_acesso text,
   p_nfd_numero text,
   p_loja_codigo text,
-  p_comentario text default 'NFD marcada como desconhecida pelo usuário Gerencial.'
+  p_comentario text default 'NFD marcada como desconhecida pelo usuÃ¡rio Gerencial.'
 )
 returns public.nfd_desconhecimentos
 language plpgsql
@@ -25,13 +25,13 @@ begin
   limit 1;
 
   if v_gerencial_id is null then
-    raise exception 'Usuário Gerencial ativo não encontrado.';
+    raise exception 'UsuÃ¡rio Gerencial ativo nÃ£o encontrado.';
   end if;
 
   if p_loja_id is null
     or nullif(btrim(coalesce(p_nfd_referencia, '')), '') is null
     or nullif(btrim(coalesce(p_nfd_numero, '')), '') is null then
-    raise exception 'Loja e identificação da NFD são obrigatórias.';
+    raise exception 'Loja e identificaÃ§Ã£o da NFD sÃ£o obrigatÃ³rias.';
   end if;
 
   insert into public.nfd_desconhecimentos (
@@ -50,7 +50,7 @@ begin
     nullif(btrim(p_nfd_chave_acesso), ''),
     btrim(p_nfd_numero),
     nullif(btrim(p_loja_codigo), ''),
-    coalesce(nullif(btrim(p_comentario), ''), 'NFD marcada como desconhecida pelo usuário Gerencial.')
+    coalesce(nullif(btrim(p_comentario), ''), 'NFD marcada como desconhecida pelo usuÃ¡rio Gerencial.')
   )
   returning * into v_result;
 
@@ -60,3 +60,5 @@ $function$;
 
 revoke all on function public.desconhecer_nfd_gerencial(uuid, text, text, text, text, text) from public, anon;
 grant execute on function public.desconhecer_nfd_gerencial(uuid, text, text, text, text, text) to authenticated;
+
+;
