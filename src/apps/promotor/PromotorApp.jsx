@@ -3128,7 +3128,7 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
   )
 }
 
-function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFinalized = false, allowFinalizedEdit = false, initialStore = null, initialFstdTarget, onEmbeddedClose, onEmbeddedComplete, onEmbeddedEdit }) {
+export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, embeddedFinalized = false, allowFinalizedEdit = false, initialStore = null, initialFstdTarget, onEmbeddedClose, onEmbeddedComplete, onEmbeddedEdit }) {
   const queryClient = useQueryClient()
   const [savedNavigation] = useState(() => embeddedFstd || embeddedFinalized ? null : readPromotorNavigation(profile.id))
   const [selectedStore, setSelectedStore] = useState(() => initialStore ?? savedNavigation?.selectedStore ?? null)
