@@ -139,3 +139,30 @@ somente para compatibilidade de consumidores externos; código interno deve impo
 caminhos canônicos em `src/apps`.
 - `supabase/functions/manage-users/index.ts`: autorização administrativa, escopo por UF e sincronização Auth/perfil.
 - `supabase/migrations/20260806120000_admin_gerencial_multi_uf_security.sql`: invariantes, funções de autorização, RLS e escopo multi-UF.
+
+## Orçamento e baseline dos bundles lazy
+
+O build mantém o manifesto do Vite em `dist/.vite/manifest.json`. O comando
+`npm run check:bundle` usa as chaves de origem desse manifesto para associar, sem
+depender dos nomes com hash, `src/apps/promotor/routes.jsx` a **Promotor** e
+`src/apps/gerencial/routes.jsx` a **Gerencial**. Para cada entrada ele informa o
+tamanho bruto e o tamanho gzip calculado no pipeline.
+
+A baseline versionada está em `scripts/bundle-baseline.json`. O check falha quando
+o tamanho bruto ou gzip de uma dessas entradas cresce mais de **5%** em relação à
+baseline. Independentemente dessa tolerância relativa, todos os arquivos JavaScript
+em `dist/assets` continuam sujeitos ao orçamento absoluto de **450 KB**.
+
+Uma alteração da baseline deve ser intencional e revisável:
+
+1. Execute `npm run build && npm run check:bundle` antes da mudança e guarde os
+   valores impressos como referência.
+2. Faça a movimentação ou alteração de dependências e execute novamente os dois
+   comandos. Investigue qualquer crescimento; não atualize a baseline apenas para
+   fazer o check passar.
+3. Quando o crescimento for esperado e aceito, copie os valores exatos em bytes
+   exibidos pelo check para `rawBytes` e `gzipBytes` da entrada correspondente em
+   `scripts/bundle-baseline.json`.
+4. Execute novamente `npm run check:bundle` e inclua no commit a baseline junto da
+   mudança que justifica sua atualização. Registre na revisão a comparação anterior
+   e a razão para aceitar o novo custo.
