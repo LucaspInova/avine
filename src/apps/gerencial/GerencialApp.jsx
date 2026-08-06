@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import { supabase } from '../../shared/lib/supabaseClient'
@@ -130,18 +131,6 @@ function getNoteDateKey(note) {
   return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
 }
 
-async function listAllRows(queryFactory, pageSize = 1000) {
-  const rows = []
-
-  for (let page = 0; ; page += 1) {
-    const from = page * pageSize
-    const { data, error } = await queryFactory(from, from + pageSize - 1)
-    if (error) throw error
-
-    rows.push(...(data ?? []))
-    if ((data ?? []).length < pageSize) return rows
-  }
-}
 
 function normalizaNome(nome) {
   return nome.trim().replace(/\s+/g, ' ').toUpperCase()
@@ -2363,9 +2352,12 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
 }
 
 function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] }) {
-  const [notes, setNotes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const invoiceFilters = useMemo(() => ({ restrictedUfs }), [restrictedUfs])
+  const invoicesQuery = useInvoices(invoiceFilters)
+  const invoiceMutations = useInvoiceMutations()
+  const notes = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data])
+  const loading = invoicesQuery.isLoading
+  const error = invoicesQuery.error?.message ?? ''
   const [isFilterOpen, setFilterOpen] = useState(false)
   const [selectedStatuses, setSelectedStatuses] = useState([])
   const [selectedUfs, setSelectedUfs] = useState([])
@@ -2376,94 +2368,6 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
   const [selectedFinalized, setSelectedFinalized] = useState(null)
   const [completionMessage, setCompletionMessage] = useState('')
   const query = search.trim().toLowerCase()
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadNotas() {
-      setLoading(true)
-      setError('')
-
-      try {
-        const [importedNotes, fstdProcesses, unknownNfds, noteLocations] = await Promise.all([
-          listAllRows((from, to) => {
-            let queryBuilder = supabase
-              .from('nfd_notas')
-              .select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')
-            if (restrictedUfs.length) queryBuilder = queryBuilder.in('uf', restrictedUfs)
-            return queryBuilder
-              .order('data_referencia', { ascending: false })
-              .order('nota_fiscal', { ascending: false })
-              .range(from, to)
-          }),
-          listAllRows((from, to) => supabase
-            .from('fstd_processos')
-            .select('id, nfd_chave_acesso, status, created_at')
-            .order('created_at', { ascending: false })
-            .range(from, to)),
-          listAllRows((from, to) => supabase
-            .from('nfd_desconhecimentos')
-            .select('id, nfd_referencia, nfd_chave_acesso, nfd_numero, loja_codigo, created_at, reconhecida_em')
-            .is('reconhecida_em', null)
-            .order('created_at', { ascending: false })
-            .range(from, to)),
-          listAllRows((from, to) => {
-            let queryBuilder = supabase
-              .from('nfd_itens')
-              .select('chave_acesso, uf, cidade')
-            if (restrictedUfs.length) queryBuilder = queryBuilder.in('uf', restrictedUfs)
-            return queryBuilder
-              .order('chave_acesso', { ascending: true })
-              .range(from, to)
-          }),
-        ])
-
-        const statusByKey = new Map(
-          fstdProcesses.map((process) => [String(process.nfd_chave_acesso), process.status]),
-        )
-        const unknownByKey = new Set()
-        unknownNfds.forEach((item) => {
-          if (item.nfd_chave_acesso) unknownByKey.add(`key:${item.nfd_chave_acesso}`)
-          if (item.nfd_referencia) unknownByKey.add(`ref:${item.nfd_referencia}`)
-        })
-        const locationByKey = new Map()
-        noteLocations.forEach((item) => {
-          const key = String(item.chave_acesso)
-          const current = locationByKey.get(key) ?? {}
-          locationByKey.set(key, {
-            uf: current.uf || item.uf,
-            cidade: current.cidade || item.cidade,
-          })
-        })
-
-        if (isMounted) {
-          setNotes(importedNotes.map((note) => ({
-            ...note,
-            uf: note.uf || locationByKey.get(String(note.chave_acesso))?.uf || '',
-            cidade: note.cidade || locationByKey.get(String(note.chave_acesso))?.cidade || '',
-            status: unknownByKey.has(`key:${note.chave_acesso}`)
-              || unknownByKey.has(`ref:${note.codigo_cliente}:${note.nota_fiscal}`)
-              ? 'Desconhecida'
-              : statusByKey.get(String(note.chave_acesso)) === 'concluida'
-                ? 'Finalizada'
-                : 'Pendente',
-          })))
-        }
-      } catch (requestError) {
-        if (isMounted) {
-          setError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar as notas fiscais.')
-          setNotes([])
-        }
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-
-    void loadNotas()
-    return () => {
-      isMounted = false
-    }
-  }, [restrictedUfs])
 
   const filteredGroups = useMemo(() => {
     const groups = new Map()
@@ -2537,22 +2441,11 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
 
     let store = (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
     if (!store) {
-      let storeQuery = supabase
-        .from('lojas')
-        .select('id, codigo, nome, uf, cidade')
-        .eq('codigo', note.codigo_cliente)
-      if (restrictedUfs.length) storeQuery = storeQuery.in('uf', restrictedUfs)
-      const { data, error } = await storeQuery.maybeSingle()
-      if (error) throw error
-      store = data
+      store = await invoiceMutations.findStore.mutateAsync({ code: note.codigo_cliente, restrictedUfs })
     }
     if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
 
-    const { error: processError } = await supabase.rpc('iniciar_fstd_produtos_v2', {
-      p_loja_id: store.id,
-      p_nfd_chave_acesso: String(note.chave_acesso),
-    })
-    if (processError) throw processError
+    await invoiceMutations.start.mutateAsync({ storeId: store.id, accessKey: String(note.chave_acesso) })
 
     const selectedNfd = {
       ...note,
@@ -2572,37 +2465,12 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
     const store = getStoreForNote(note)
     if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
 
-    const { error: unknownError } = await supabase.rpc('desconhecer_nfd_gerencial', {
-      p_loja_id: store.id,
-      p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`,
-      p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null,
-      p_nfd_numero: String(note.nota_fiscal ?? ''),
-      p_loja_codigo: store.codigo ? String(store.codigo) : null,
-      p_comentario: comment,
-    })
-    if (unknownError) throw unknownError
-
-    setNotes((current) => current.map((item) => (
-      String(item.chave_acesso) === String(note.chave_acesso)
-        ? { ...item, status: 'Desconhecida' }
-        : item
-    )))
+    await invoiceMutations.markUnknown.mutateAsync({ store, note, comment })
     setSelectedNote((current) => current ? { ...current, status: 'Desconhecida' } : current)
   }
 
   async function handleRecognizeNote(note) {
-    const { error: recognizeError } = await supabase.rpc('reconhecer_nfd_gerencial', {
-      p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`,
-      p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null,
-      p_nfd_numero: String(note.nota_fiscal ?? ''),
-    })
-    if (recognizeError) throw recognizeError
-
-    setNotes((current) => current.map((item) => (
-      String(item.chave_acesso) === String(note.chave_acesso)
-        ? { ...item, status: 'Pendente' }
-        : item
-    )))
+    await invoiceMutations.recognize.mutateAsync(note)
     setSelectedNote((current) => current ? { ...current, status: 'Pendente' } : current)
   }
 
@@ -2626,11 +2494,7 @@ function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [] 
       status_nfd: 'finalizada',
     }
 
-    setNotes((current) => current.map((item) => (
-      String(item.chave_acesso) === String(finalizedNote.chave_acesso)
-        ? { ...item, status: 'Finalizada' }
-        : item
-    )))
+    void invoicesQuery.refetch()
     setCompletionMessage(`NFD ${finalizedNote.nota_fiscal ?? finalizedNote.numero} finalizada com sucesso.`)
     setSelectedFstd(null)
     setSelectedFinalized({ note: finalizedNote, store: selectedFstd.store })

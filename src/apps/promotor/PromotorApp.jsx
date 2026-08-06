@@ -1,12 +1,12 @@
-import { fetchAllNfdNotas, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../domains/invoices'
+import { getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../domains/invoices'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import { supabase } from '../../shared/lib/supabaseClient'
+import { usePromotorWorkspace } from '../../domains/promotor/hooks/usePromotorWorkspace'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../../shared/lib/fstdPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../../shared/lib/profilePhoto'
-import { sortStoresByCode } from '../../shared/lib/storeSorting'
 import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
@@ -2984,149 +2984,13 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
     })
   }, [embeddedFinalized, embeddedFstd, fstdTarget, nfdSearch, profile.id, selectedNfd, selectedStore, statusFilter, storeSearch])
 
-  const storesQuery = useQuery({
-    queryKey: ['promotor', 'lojas', profile.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lojas')
-        .select('id, codigo, nome, uf, cidade')
-        .order('nome', { ascending: true })
-
-      if (error) throw error
-      return sortStoresByCode(data)
-    },
-  })
-
-  const nfdsQuery = useQuery({
-    enabled: (storesQuery.data?.length ?? 0) > 0,
-    queryKey: ['promotor', 'nfds', profile.id],
-    queryFn: async () => {
-      const storesByCode = new Map(
-        (storesQuery.data ?? []).map((store) => [String(store.codigo), store]),
-      )
-      const storeCodes = [...storesByCode.keys()]
-        .map((code) => Number(code))
-        .filter((code) => Number.isFinite(code))
-
-      if (storeCodes.length === 0) return []
-
-      const data = await fetchAllNfdNotas(
-        'chave_acesso, nota_fiscal, data_emissao, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total, detalhes',
-        (query) =>
-          query
-            .in('codigo_cliente', storeCodes)
-            .order('data_emissao', { ascending: false })
-            .order('nota_fiscal', { ascending: false }),
-      )
-
-      return data.map((nota) => {
-        const store = storesByCode.get(String(nota.codigo_cliente))
-        return {
-          ...nota,
-          id: nota.chave_acesso,
-          loja_id: store?.id ?? null,
-          loja_codigo: String(nota.codigo_cliente),
-          loja_nome: nota.nome_abreviado,
-          numero: String(nota.nota_fiscal),
-          quantidade_galinha: nota.quantidade_galinha,
-          quantidade_codorna: nota.quantidade_codorna,
-          valor_total: nota.valor_total,
-          status_nfd: 'outros',
-          fstd_id: null,
-          fstd_status: null,
-        }
-      })
-    },
-  })
-
-  const produtosCatalogQuery = useQuery({
-    queryKey: ['promotor', 'produtos-catalogo'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('produtos_expandidos')
-        .select('produto_id, codigo_produto, nome, ovos_und, categoria, imagem_url')
-        .eq('status', true)
-        .order('nome', { ascending: true })
-
-      if (error) throw error
-      return data ?? []
-    },
-  })
-
-  const fstdProcessosQuery = useQuery({
-    queryKey: ['promotor', 'fstd-processos', profile.id],
-    queryFn: async () => {
-      const { data: processos, error: processosError } = await supabase
-        .from('fstd_processos')
-        .select('id, nfd_chave_acesso, nfd_numero, loja_id, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em')
-        .order('created_at', { ascending: false })
-
-      if (processosError) throw processosError
-      if (!processos?.length) return []
-
-      const processIds = processos.map((processo) => processo.id)
-      const { data: produtos, error: produtosError } = await supabase
-        .from('fstd_produtos')
-        .select('id, processo_id, produto_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em')
-        .in('processo_id', processIds)
-
-      if (produtosError) throw produtosError
-
-      const produtoIds = (produtos ?? []).map((produto) => produto.id)
-      const { data: divisoes, error: divisoesError } = produtoIds.length > 0
-        ? await supabase
-          .from('fstd_produto_motivos')
-          .select('produto_id, motivo_id, quantidade_faturada, quantidade')
-          .in('produto_id', produtoIds)
-        : { data: [], error: null }
-
-      if (divisoesError) throw divisoesError
-
-    return processos.map((processo) => ({
-        ...processo,
-        produtos: (produtos ?? [])
-          .filter((produto) => produto.processo_id === processo.id)
-          .map((produto) => ({
-            ...produto,
-            divisoes: (divisoes ?? []).filter((division) => division.produto_id === produto.id),
-          })),
-      }))
-    },
-  })
-
-  const desconhecimentosQuery = useQuery({
-    queryKey: ['promotor', 'nfd-desconhecimentos', profile.id],
-    queryFn: async () => {
-      let query = supabase
-        .from('nfd_desconhecimentos')
-        .select('nfd_referencia, comentario, created_at')
-        .is('reconhecida_em', null)
-        .order('created_at', { ascending: false })
-
-      if (profile.perfil !== 'Admin' && profile.perfil !== 'Gerencial') {
-        query = query.eq('promotor_id', profile.id)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      return data ?? []
-    },
-  })
-
-  const motivosQuery = useQuery({
-    queryKey: ['promotor', 'motivos'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('motivos_devolucao')
-        .select('id, nome, ordem, ativo')
-        .order('ordem', { ascending: true })
-        .order('nome', { ascending: true })
-
-      if (error) throw error
-      return data ?? []
-    },
-  })
+  const workspaceQueries = usePromotorWorkspace(profile)
+  const storesQuery = workspaceQueries.stores
+  const nfdsQuery = workspaceQueries.invoices
+  const produtosCatalogQuery = workspaceQueries.catalog
+  const fstdProcessosQuery = workspaceQueries.processes
+  const desconhecimentosQuery = workspaceQueries.unknown
+  const motivosQuery = workspaceQueries.reasons
 
   const stores = useMemo(() => storesQuery.data ?? [], [storesQuery.data])
   const databaseUnknownNfdComments = useMemo(() => {
@@ -3306,8 +3170,8 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] })
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
+      await queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] })
+      await queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] })
     },
   })
 
@@ -3404,8 +3268,8 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] })
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] })
+      await queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] })
+      await queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] })
     },
   })
 
@@ -3422,8 +3286,8 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
     },
     onSuccess: (completedProcess) => {
       const refreshQueries = Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['promotor', 'fstd-processos', profile.id] }),
-        queryClient.invalidateQueries({ queryKey: ['promotor', 'nfds', profile.id] }),
+        queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] }),
       ])
 
       void refreshQueries.catch((refreshError) => {
@@ -3549,7 +3413,7 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
       return data
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'nfd-desconhecimentos', profile.id] })
+      await queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id, status: 'unknown' }] })
     },
   })
 
@@ -3571,7 +3435,7 @@ export function PromotorWorkspace({ profile, onLogout, embeddedFstd = false, emb
       return uploaded
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['promotor', 'profile', profile.auth_user_id] })
+      await queryClient.invalidateQueries({ queryKey: ['profile', profile.auth_user_id] })
     },
   })
 
