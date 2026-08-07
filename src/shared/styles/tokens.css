@@ -5,7 +5,14 @@
   --color-brand-500: #248451;
   --color-brand-600: #196b42;
   --color-brand-700: #155b38;
+  --color-brand-800: #12492f;
   --color-accent-500: #f0b429;
+  --color-warning-50: #fffbeb;
+  --color-warning-600: #d97706;
+  --color-neutral-50: #f8faf9;
+  --color-neutral-100: #f1f5f2;
+  --color-neutral-500: #647067;
+  --color-neutral-700: #37413a;
   --color-danger-50: #fef2f2;
   --color-danger-600: #c53030;
   --color-text: #3f403f;
@@ -23,9 +30,11 @@
   --font-size-md: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
   --font-weight-medium: 500;
   --font-weight-bold: 700;
   --line-height-normal: 1.5;
+  --line-height-tight: 1.25;
 
   /* Spacing */
   --space-1: 0.25rem;
@@ -48,6 +57,9 @@
   --shadow-lg: 0 18px 48px rgb(15 23 42 / 18%);
   --focus-ring: 0 0 0 3px rgb(36 132 81 / 22%);
   --touch-target: 44px;
+  --control-height: 44px;
+  --control-padding-x: 0.875rem;
+  --transition-fast: 160ms ease;
 
   /* Breakpoints are exposed for JS and documentation; media queries use the same values. */
   --breakpoint-sm: 480px;
