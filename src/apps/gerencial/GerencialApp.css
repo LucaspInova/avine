@@ -1813,7 +1813,7 @@ select:focus-visible {
 
 .user-filter-bar {
   display: grid;
-  grid-template-columns: minmax(280px, 2.2fr) repeat(3, minmax(130px, 0.85fr)) auto;
+  grid-template-columns: minmax(280px, 2.2fr) repeat(2, minmax(130px, 0.85fr)) auto;
   align-items: stretch;
   gap: 16px;
 }
@@ -2058,11 +2058,31 @@ select:focus-visible {
 
 .user-registration-row {
   min-height: 63px;
-  cursor: default !important;
+  cursor: pointer !important;
 }
 
-.user-registration-row:hover {
+.user-registration-row:hover,
+.user-registration-row:focus-visible {
   background: #f8faf7 !important;
+}
+
+.user-registration-row:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.user-routing-panel {
+  padding: 22px 28px 28px;
+}
+
+.user-routing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.user-routing-grid .store-card {
+  min-width: 0;
 }
 
 .user-registration-row .name-cell {
@@ -3286,6 +3306,9 @@ select:focus-visible {
 }
 
 @media (max-width: 900px) {
+  .user-routing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .registration-workspace .page-hero-inner,
   .registration-workspace .users-card {
     width: calc(100% - 30px);
