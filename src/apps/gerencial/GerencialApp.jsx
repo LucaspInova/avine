@@ -35,7 +35,7 @@ const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL
 const estadosLojas = [...estados, 'TO']
 const perfisOperacionais = ['Promotor']
 const perfisCadastro = ['Admin', 'Gerencial', 'Promotor']
-const perfisEditaveis = ['Promotor']
+const perfisEditaveis = ['Admin', 'Gerencial', 'Promotor']
 const perfisCadastroUi = [
   { value: 'Admin', label: 'Admin', authRole: 'admin' },
   { value: 'Gerencial', label: 'Gerencial', authRole: 'gerencial' },
@@ -841,8 +841,12 @@ export function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, b
   )
 }
 
-export function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
+export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
+  const [storeSearch, setStoreSearch] = useState('')
   if (!usuario) return null
+  const query = storeSearch.trim().toLocaleLowerCase('pt-BR')
+  const visibleStores = lojas.filter((loja) => !query
+    || `${loja.codigo} ${loja.nome} ${loja.uf}`.toLocaleLowerCase('pt-BR').includes(query))
 
   return (
     <div className="modal-backdrop" role="presentation">
@@ -889,6 +893,27 @@ export function InformacoesUsuarioModal({ usuario, onClose, onEdit, onTogglePhot
             </div>
           </dl>
         </div>
+
+        {usuario.perfil === 'Promotor' && lojas.length > 0 && (
+          <section className="user-routing-panel" aria-label="Roteirização do promotor">
+            <div className="stores-toolbar">
+              <h3>Lojas</h3>
+              <label className="stores-search user-search-field">
+                <Icon name="search" />
+                <input type="search" value={storeSearch} onChange={(event) => setStoreSearch(event.target.value)} placeholder="Procurar" aria-label="Procurar loja atribuída" />
+              </label>
+            </div>
+            <div className="user-routing-grid">
+              {visibleStores.map((loja) => (
+                <article className="store-card" key={loja.id}>
+                  <strong>{loja.codigo} - {loja.uf}</strong>
+                  <span>{loja.nome}</span>
+                </article>
+              ))}
+            </div>
+            {visibleStores.length === 0 && <p className="table-message">Nenhuma loja encontrada.</p>}
+          </section>
+        )}
       </div>
     </div>
   )
@@ -906,6 +931,7 @@ export function EditarUsuarioModal({
   onClose,
   onSubmit,
   onDelete,
+  allowedProfiles = ['Promotor'],
 }) {
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
@@ -914,8 +940,8 @@ export function EditarUsuarioModal({
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
   const passwordError = getPasswordValidationMessage(form.senha, { optional: true })
   const isPasswordValid = !passwordError
-  const isProfileValid = perfisEditaveis.includes(form.perfil)
-  const isEstadoValid = estados.includes(form.estado)
+  const isProfileValid = allowedProfiles.includes(form.perfil)
+  const isEstadoValid = form.perfil === 'Admin' || estados.includes(form.estado)
   const canSubmit =
     isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy && !deleting && isPasswordValid
 
@@ -992,7 +1018,7 @@ export function EditarUsuarioModal({
               <small>Necessário</small>
             </legend>
             <div className="chip-group">
-              {perfisEditaveis.map((perfil) => (
+              {allowedProfiles.map((perfil) => (
                 <button
                   key={perfil}
                   className={`choice-chip ${form.perfil === perfil ? 'is-selected' : ''}`}
@@ -1005,7 +1031,7 @@ export function EditarUsuarioModal({
             </div>
           </fieldset>
 
-          <fieldset className="edit-field">
+          {form.perfil !== 'Admin' && <fieldset className="edit-field">
             <legend>
               UF
               <small>Necessário</small>
@@ -1022,7 +1048,7 @@ export function EditarUsuarioModal({
                 </button>
               ))}
             </div>
-          </fieldset>
+          </fieldset>}
 
           <label className="edit-checkbox">
             <input
@@ -1466,7 +1492,6 @@ export function UsuariosScreen({
   onOpenCadastro,
   onOpenUsuario,
   onEditChange,
-  onStartEdit,
   onCancelEdit,
   onSaveEdit,
   onDelete,
@@ -1524,25 +1549,6 @@ export function UsuariosScreen({
     return items
   }, [safePage, totalPages])
 
-  function handleEdit(usuario) {
-    if (restrictedUfs.length > 0 && usuario.perfil !== 'Promotor') {
-      onOpenUsuario(usuario)
-      return
-    }
-    if (usuario.perfil === 'Admin' || usuario.perfil === 'Gerencial') {
-      onStartEdit(usuario)
-      return
-    }
-
-    onOpenUsuario(usuario)
-  }
-
-  const summaryCards = [
-    { key: 'all', label: 'Total de usuários', value: counts.all, detail: 'Todos os perfis', icon: 'users' },
-    { key: 'Gerencial', label: 'Gerencial', value: counts.Gerencial, detail: 'Usuários', icon: 'shield' },
-    { key: 'Promotor', label: 'Promotores', value: counts.Promotor, detail: 'Usuários', icon: 'users' },
-  ]
-
   return (
     <section className="users-card user-registration-card">
       <div className="user-filter-bar">
@@ -1558,23 +1564,6 @@ export function UsuariosScreen({
             type="search"
             aria-label="Pesquisar por nome ou e-mail"
           />
-        </label>
-
-        <label className="user-select-field">
-          <span>Perfil</span>
-          <select
-            value={profileFilter}
-            onChange={(event) => {
-              setProfileFilter(event.target.value)
-              setPage(1)
-            }}
-          >
-            <option value="all">Todos</option>
-            <option value="Admin">Admin</option>
-            <option value="Gerencial">Gerencial</option>
-            <option value="Promotor">Promotor</option>
-          </select>
-          <span className="select-chevron" />
         </label>
 
         <label className="user-select-field">
@@ -1613,19 +1602,6 @@ export function UsuariosScreen({
           <Icon name="plus" />
           <span>Cadastrar Usuário</span>
         </button>
-      </div>
-
-      <div className="user-summary-grid" aria-label="Resumo de usuários">
-        {summaryCards.map((card) => (
-          <article className={`user-summary-card is-${String(card.key).toLowerCase()}`} key={card.key}>
-            <span className="user-summary-icon"><Icon name={card.icon} /></span>
-            <span>
-              <small>{card.label}</small>
-              <strong>{card.value.toLocaleString('pt-BR')}</strong>
-              <em>{card.detail}</em>
-            </span>
-          </article>
-        ))}
       </div>
 
       <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
@@ -1675,7 +1651,19 @@ export function UsuariosScreen({
               const profileClass = getManagedRoleKey(usuario).toLowerCase()
 
               return (
-                <div className={`table-row user-registration-row ${isEditing ? 'is-editing' : ''}`} role="row" key={usuario.id}>
+                <div
+                  className={`table-row user-registration-row ${isEditing ? 'is-editing' : ''}`}
+                  role="row"
+                  tabIndex={isEditing ? undefined : 0}
+                  key={usuario.id}
+                  onClick={() => !isEditing && onOpenUsuario(usuario)}
+                  onKeyDown={(event) => {
+                    if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault()
+                      onOpenUsuario(usuario)
+                    }
+                  }}
+                >
                   <div className="name-cell" role="cell">
                     <span className="avatar-mini">{getUserInitials(usuario.nome)}</span>
                     {isEditing ? (
@@ -1756,15 +1744,9 @@ export function UsuariosScreen({
                       </>
                     ) : (
                       <>
-                        <button className="secondary-button edit-user-button" type="button" onClick={() => handleEdit(usuario)}>
-                          {restrictedUfs.length > 0 && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
-                        </button>
-                        <details className="user-actions-menu">
+                        <details className="user-actions-menu" onClick={(event) => event.stopPropagation()}>
                           <summary aria-label={`Mais ações para ${usuario.nome}`}><Icon name="more" /></summary>
                           <div className="user-actions-popover">
-                            <button type="button" onClick={() => handleEdit(usuario)}>
-                              {restrictedUfs.length > 0 && usuario.perfil !== 'Promotor' ? 'Visualizar' : 'Editar'}
-                            </button>
                             <button type="button" disabled={Boolean(restrictedUfs.length > 0 && usuario.perfil !== 'Promotor')}>Resetar senha</button>
                             <button type="button" disabled>{isUserActive(usuario) ? 'Desativar' : 'Ativar'}</button>
                             <button
@@ -3140,8 +3122,9 @@ function GerencialApp({ capabilities }) {
       nome: normalizaNome(editForm.nome),
       perfil: editForm.perfil,
       estado: editForm.estado,
-      ufs: [editForm.estado],
+      ufs: editForm.perfil === 'Admin' ? [] : [editForm.estado],
       fotos_habilitadas: editForm.fotos_habilitadas,
+      auth_role: editForm.perfil === 'Admin' ? 'admin' : editForm.perfil.toLowerCase(),
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }
 
@@ -3150,10 +3133,10 @@ function GerencialApp({ capabilities }) {
       payload.nome.length < 4 ||
       isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id) ||
       getPasswordValidationMessage(editForm.senha, { optional: true }) ||
-      !perfisEditaveis.includes(payload.perfil) ||
-      (isScopedGerencial(currentUser)
+      !(gerencialCapabilities.isAdmin ? perfisEditaveis : ['Promotor']).includes(payload.perfil) ||
+      (payload.perfil !== 'Admin' && (isScopedGerencial(currentUser)
         ? !currentUser.ufs.includes(payload.estado)
-        : !estados.includes(payload.estado)) ||
+        : !estados.includes(payload.estado))) ||
       (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
       setEditError(
@@ -3512,6 +3495,11 @@ function GerencialApp({ capabilities }) {
       {selectedUsuario && !isEditOpen && (
         <InformacoesUsuarioModal
           usuario={selectedUsuario}
+          lojas={lojaPromotores
+            .filter((vinculo) => vinculo.promotor_id === selectedUsuario.id)
+            .sort((a, b) => a.posicao - b.posicao)
+            .map((vinculo) => lojas.find((loja) => loja.id === vinculo.loja_id))
+            .filter(Boolean)}
           onClose={closeUserModals}
           onEdit={openEditModal}
           onTogglePhotos={handlePhotoToggle}
@@ -3538,6 +3526,7 @@ function GerencialApp({ capabilities }) {
           onClose={closeUserModals}
           onSubmit={handleEditUsuario}
           onDelete={handleDeleteUsuario}
+          allowedProfiles={gerencialCapabilities.isAdmin ? perfisEditaveis : ['Promotor']}
         />
       )}
 

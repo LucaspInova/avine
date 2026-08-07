@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { CadastroModal, UsuariosScreen } from './GerencialApp.jsx'
+import { CadastroModal, EditarUsuarioModal, InformacoesUsuarioModal, UsuariosScreen } from './GerencialApp.jsx'
 import { hasApplicationAccess, hasConsistentRole, routeForProfile } from '../../domains/auth/AuthProvider.jsx'
 import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 
@@ -70,7 +70,7 @@ function UsersHarness() {
 }
 
 describe('Cadastro de Usuários', () => {
-  it('combina pesquisa, perfil, UF e status sobre a mesma tabela', () => {
+  it('combina tabs de perfil, pesquisa, UF e status sobre a mesma tabela sem controles redundantes', () => {
     render(<UsersHarness />)
 
     const table = screen.getByRole('table', { name: 'Cadastro de Usuários' })
@@ -81,7 +81,9 @@ describe('Cadastro de Usuários', () => {
     expect(within(table).getByText('07/08/2026, 12:30')).toBeInTheDocument()
     expect(within(table).getAllByText('Nunca')).toHaveLength(2)
 
-    fireEvent.change(screen.getByLabelText('Perfil'), { target: { value: 'Promotor' } })
+    expect(screen.queryByLabelText('Perfil')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Resumo de usuários')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Promotor (2)' }))
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     expect(within(table).queryByText('ANA GERENCIAL')).not.toBeInTheDocument()
 
@@ -94,6 +96,38 @@ describe('Cadastro de Usuários', () => {
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Gerencial (1)' }))
     expect(within(table).getByText('Nenhum usuário encontrado.')).toBeInTheDocument()
+  })
+
+  it('abre as informações de qualquer perfil ao clicar ou usar o teclado na linha', () => {
+    const onOpenUsuario = vi.fn()
+    render(<UsersHarness />)
+    const adminRow = screen.getByText('ANA GERENCIAL').closest('[role="row"]')
+    fireEvent.click(adminRow)
+    expect(noop).toHaveBeenCalled()
+
+    render(
+      <UsuariosScreen currentUser={usuarios[0]} usuarios={usuarios} loading={false} error="" busy={false}
+        editId="" editForm={{}} search="" onSearch={noop} onOpenCadastro={noop}
+        onOpenUsuario={onOpenUsuario} onEditChange={noop} onCancelEdit={noop} onSaveEdit={noop} onDelete={noop} />,
+    )
+    fireEvent.keyDown(screen.getAllByText('BRUNO PROMOTOR')[1].closest('[role="row"]'), { key: 'Enter' })
+    expect(onOpenUsuario).toHaveBeenCalledWith(expect.objectContaining({ id: 'promotor-1' }))
+  })
+
+  it('mostra a roteirização atribuída no modal do promotor', () => {
+    render(<InformacoesUsuarioModal usuario={usuarios[1]} lojas={[
+      { id: 'loja-1', codigo: '13015', nome: 'EVANDRO 05', uf: 'PI' },
+    ]} onClose={noop} onEdit={noop} onTogglePhotos={noop} />)
+    expect(screen.getByRole('region', { name: 'Roteirização do promotor' })).toHaveTextContent('13015 - PI')
+    expect(screen.getByText('EVANDRO 05')).toBeInTheDocument()
+  })
+
+  it('oferece promoção e rebaixamento de perfis ao Admin', () => {
+    render(<EditarUsuarioModal form={{ ...usuarios[0], senha: '' }} usuarios={usuarios} usuarioId="gerencial-1"
+      busy={false} deleting={false} error="" onChange={noop} onBack={noop} onClose={noop}
+      onSubmit={noop} onDelete={noop} allowedProfiles={['Admin', 'Gerencial', 'Promotor']} />)
+    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gerencial' })).toBeInTheDocument()
   })
 
   it('mantém Supervisor preparado sem habilitar um fluxo inexistente', () => {
