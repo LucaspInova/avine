@@ -9,14 +9,13 @@ const corsHeaders = {
 const PASSWORD_MIN_LENGTH = 8
 const PASSWORD_POLICY_ERROR =
   `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
-  'uma letra maiuscula, uma letra minuscula, um numero e um simbolo.'
+  'uma letra maiuscula, uma letra minuscula e um numero.'
 
 function validatePassword(password: string) {
   return password.length >= PASSWORD_MIN_LENGTH &&
     /[a-z]/.test(password) &&
     /[A-Z]/.test(password) &&
-    /[0-9]/.test(password) &&
-    /[^A-Za-z0-9]/.test(password)
+    /[0-9]/.test(password)
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
@@ -85,7 +84,7 @@ Deno.serve(async (request) => {
   const password = typeof body.password === 'string' ? body.password : ''
   const perfil = typeof body.perfil === 'string' ? body.perfil : 'Gerencial'
   const estado = typeof body.estado === 'string' ? body.estado : 'CE'
-  const fotosHabilitadas = body.fotos_habilitadas === true
+  const fotosHabilitadas = perfil === 'Promotor' || body.fotos_habilitadas === true
   const perfisPermitidos = ['Promotor', 'Gerencial', 'Admin']
   const estadosPermitidos = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 

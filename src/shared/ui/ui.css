@@ -15,7 +15,7 @@
 .ui-modal__header { padding-bottom: 0; }.ui-modal__header h2 { margin: 0; color: var(--color-text-strong); font-size: var(--font-size-lg); }
 .ui-modal__content > :first-child { margin-top: 0; }.ui-modal__content > :last-child { margin-bottom: 0; }
 .ui-modal__footer { display: flex; justify-content: flex-end; gap: var(--space-3); padding-top: 0; }
-.ui-confirm-dialog { width: min(100%, 22.5rem); }.ui-confirm-dialog .ui-modal__footer > * { flex: 1; }
+.ui-confirm-dialog { width: min(100%, 22.5rem); }.ui-confirm-dialog .ui-modal__footer > * { flex: 1; }.ui-confirm-dialog .ui-modal__content > p { color: var(--color-text); font-weight: 500; }
 .ui-search-field { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--control-padding-x); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .ui-search-field input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--color-text); font: inherit; }
 .ui-search-field__icon { color: var(--color-text-muted); font-size: var(--font-size-xl); }

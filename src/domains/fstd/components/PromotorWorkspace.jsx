@@ -1,5 +1,6 @@
 import { getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../invoices'
 import { buildSaveFstdProductCommand } from '../model/commands'
+import { keepNumericNfdCode } from '../model/validation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../shared/lib/supabaseClient'
@@ -781,6 +782,7 @@ export function StoreDetailScreen({
     ['numero', 'data_emissao'],
   )
   const isPendingTab = statusFilter === 'atrasada'
+  const hasSearch = search.trim().length > 0
 
   return (
     <main className="promotor-app">
@@ -800,12 +802,12 @@ export function StoreDetailScreen({
       </nav>
 
       <section className="store-detail-body">
-        {isPendingTab && visibleNfds.length === 0 ? (
+        <SearchField className="mobile-search" value={search} onChange={onSearch} />
+
+        {isPendingTab && visibleNfds.length === 0 && !hasSearch ? (
           <EmptyNotice>0 Notas Pendentes!</EmptyNotice>
         ) : (
           <>
-            <SearchField className="mobile-search" value={search} onChange={onSearch} />
-
             <div className="nfd-rows">
               {visibleNfds.map((nfd) => {
                 const visualStatus = nfd.visual_status ?? getNfdVisualStatus(nfd)
@@ -828,6 +830,11 @@ export function StoreDetailScreen({
                 )
               })}
             </div>
+            {visibleNfds.length === 0 && (
+              <p className="mobile-muted nfd-search-empty">
+                {hasSearch ? 'Nenhuma NFD encontrada para esta pesquisa.' : 'Nenhuma NFD encontrada.'}
+              </p>
+            )}
           </>
         )}
 
@@ -839,7 +846,7 @@ export function StoreDetailScreen({
   )
 }
 
-function FstdAvulsaFlow({
+export function FstdAvulsaFlow({
   store,
   productsCatalog,
   catalogLoading,
@@ -853,11 +860,15 @@ function FstdAvulsaFlow({
   onCreate,
 }) {
   const [step, setStep] = useState(initialStep)
-  const [nfdForm, setNfdForm] = useState(() => initialNfdForm ?? ({
-    numero: '',
-    valor: '',
-    dataEmissao: getLocalIsoDate(),
-  }))
+  const [nfdForm, setNfdForm] = useState(() => {
+    const initial = initialNfdForm ?? {
+      numero: '',
+      valor: '',
+      dataEmissao: getLocalIsoDate(),
+    }
+
+    return { ...initial, numero: keepNumericNfdCode(initial.numero) }
+  })
   const [search, setSearch] = useState('')
   const [selectedProductKeys, setSelectedProductKeys] = useState([])
   const groupedProducts = useMemo(() => groupCatalogProducts(productsCatalog), [productsCatalog])
@@ -941,7 +952,9 @@ function FstdAvulsaFlow({
             <input
               autoComplete="off"
               inputMode="numeric"
-              onChange={(event) => setNfdForm((current) => ({ ...current, numero: event.target.value }))}
+              onChange={(event) => setNfdForm((current) => ({ ...current, numero: keepNumericNfdCode(event.target.value) }))}
+              pattern="[0-9]*"
+              type="text"
               placeholder="Informe o código da NFD"
               value={nfdForm.numero}
             />
@@ -2194,7 +2207,7 @@ function createFstdTableDraft(product) {
   const preserveSavedReturn = product.persisted?.status === 'concluido'
   const divisions = getFstdDivisionDefaults(product).map((division) => ({
     motivoId: division.motivoId,
-    faturado: division.faturado,
+    faturado: product.is_avulsa ? '' : division.faturado,
     retorno: preserveSavedReturn ? String(division.retorno ?? '') : '',
   }))
 
@@ -2228,7 +2241,7 @@ function getFstdTableBilledSplit(product, total) {
   }
 }
 
-function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinalizedEdit, onSubmit }) {
+export function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinalizedEdit, onAddProducts, onSubmit }) {
   const finalizationLocked = processFinalized && !allowFinalizedEdit
   const canEdit = !finalizationLocked
   const [drafts, setDrafts] = useState(() => Object.fromEntries(
@@ -2259,6 +2272,13 @@ function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinal
   }
 
   function updateFaturado(product, row, value) {
+    if (product.is_avulsa) {
+      updateRow(product, row.id, {
+        faturado: value === '' ? '' : String(normalizeNonNegativeQuantity(value)),
+      })
+      return
+    }
+
     const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
 
     updateDraft(product.codigo_produto, (draft) => {
@@ -2297,6 +2317,8 @@ function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinal
   }
 
   function getFaturadoLimit(product, row, rows) {
+    if (product.is_avulsa) return undefined
+
     const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
     const hasAdditionalRows = rows.some((candidate) => candidate.isAdditional)
     const otherRowsBilled = rows
@@ -2410,7 +2432,7 @@ function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinal
     const rowsBilled = draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0)
     const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
     const productPhotosCount = draft.rows.reduce((total, row) => total + row.fotos.length + row.fotosExistentes.length, 0)
-    const targetBilledIsValid = rowsBilled === databaseBilled
+    const targetBilledIsValid = product.is_avulsa ? rowsBilled > 0 : rowsBilled === databaseBilled
 
     return Boolean(
       draft.rows.length > 0
@@ -2517,7 +2539,7 @@ function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinal
               const productCompleted = product.persisted?.status === 'concluido'
               const rowsBilled = draft.rows.reduce((total, row) => total + normalizeQuantity(row.faturado), 0)
               const databaseBilled = getProductBilledQuantity(product, 'galinha') + getProductBilledQuantity(product, 'codorna')
-              const billedMatchesDatabase = rowsBilled === databaseBilled
+              const billedMatchesDatabase = product.is_avulsa ? rowsBilled > 0 : rowsBilled === databaseBilled
               const productHasRequiredPhotos = draft.rows.reduce((total, row) => total + row.fotos.length + row.fotosExistentes.length, 0) >= draft.rows.length
               return draft.rows.map((row) => {
                 const rowCompleted = isRowValid(row, draft.rows) && billedMatchesDatabase && productHasRequiredPhotos
@@ -2623,6 +2645,14 @@ function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinal
           </tfoot>
         </table>
       </div>
+
+      {products.some((product) => product.is_avulsa) && !processFinalized && (
+        <div className="fstd-avulsa-actions fstd-avulsa-actions-after-total">
+          <button className="fstd-add-products-button" onClick={onAddProducts} type="button">
+            + Adicionar mais produtos
+          </button>
+        </div>
+      )}
 
       <section className="fstd-table-section fstd-observation-section">
         <label htmlFor="fstd-general-observation">
@@ -2781,6 +2811,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
           allowFinalizedEdit={allowFinalizedEdit}
           busy={busy || finalizeBusy}
           motivos={motivos}
+          onAddProducts={onAddProducts}
           onSubmit={handleSubmitProducts}
           processFinalized={processFinalized}
           products={products}
@@ -2792,13 +2823,6 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
             <span>{documentBusy ? 'Abrindo...' : 'Ver FSTD'}</span>
             <img src={pdfIcon} alt="" aria-hidden="true" />
           </button>
-        )}
-        {isAvulsa && !processFinalized && (
-          <div className="fstd-avulsa-actions">
-            <button className="fstd-add-products-button" onClick={onAddProducts} type="button">
-              + Adicionar mais produtos
-            </button>
-          </div>
         )}
       </main>
       <FstdDocumentPreview document={documentPreview} onClose={() => setDocumentPreview(null)} />

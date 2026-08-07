@@ -1,8 +1,42 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { FstdAvulsaFlow, FstdTableEditor, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { keepNumericNfdCode } from '../model/validation'
 
 const noop = vi.fn()
+
+describe('NFD avulsa', () => {
+  it('aceita somente dÃ­gitos no cÃ³digo da NFD', () => {
+    expect(keepNumericNfdCode('NFD-12A/3')).toBe('123')
+
+    render(<FstdAvulsaFlow store={{ nome: 'Loja Centro', codigo: '10' }} productsCatalog={[]} catalogLoading={false} busy={false} onBack={noop} onCreate={noop} />)
+    const codeInput = screen.getByRole('textbox')
+    fireEvent.change(codeInput, { target: { value: '12A/3' } })
+    expect(codeInput).toHaveValue('123')
+  })
+
+  it('deixa o faturado editÃ¡vel e posiciona adicionar produtos apÃ³s o total', () => {
+    const product = {
+      codigo_produto: '123',
+      nome: 'CAIPIRA C/10',
+      descricao: 'CAIPIRA C/10',
+      imagem_url: '',
+      quantidade_faturada_galinha: 0,
+      quantidade_faturada_codorna: 0,
+      is_avulsa: true,
+    }
+    render(<FstdTableEditor products={[product]} motivos={[{ id: 'm1', nome: 'Avaria', ativo: true }]} busy={false} processFinalized={false} allowFinalizedEdit={false} onAddProducts={noop} onSubmit={noop} />)
+
+    const billedInput = screen.getByRole('spinbutton', { name: 'Faturado de CAIPIRA C/10' })
+    expect(billedInput).not.toBeDisabled()
+    fireEvent.change(billedInput, { target: { value: '7' } })
+    expect(billedInput).toHaveValue(7)
+
+    const totalRow = screen.getByRole('row', { name: /Total/ })
+    const addProductsButton = screen.getByRole('button', { name: '+ Adicionar mais produtos' })
+    expect(totalRow.compareDocumentPosition(addProductsButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
 const storesProps = {
   stores: [], nfds: [], loading: false, search: '', onSearch: noop, onMenu: noop,
   onCloseProfileMenu: noop, onLogout: noop, onUploadPhoto: noop, photoBusy: false,
@@ -37,6 +71,14 @@ describe('telas proprietárias de lojas e notas do Promotor', () => {
     expect(onOpenAvulsa).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
     expect(onBack).toHaveBeenCalledOnce()
+  })
+
+  it('mantém a busca visível e evita o estado de notas pendentes quando a pesquisa não encontra NFD', () => {
+    render(<StoreDetailScreen store={{ nome: 'Loja Centro' }} nfds={[]} statusFilter="atrasada" search="a" onSearch={noop} onStatusFilter={noop} onBack={noop} onOpenNfd={noop} onOpenAvulsa={noop} />)
+
+    expect(screen.getByRole('searchbox')).toHaveValue('a')
+    expect(screen.getByText('Nenhuma NFD encontrada para esta pesquisa.')).toBeVisible()
+    expect(screen.queryByText('0 Notas Pendentes!')).not.toBeInTheDocument()
   })
 })
 

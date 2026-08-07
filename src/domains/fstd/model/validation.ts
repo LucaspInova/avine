@@ -1,6 +1,10 @@
 import { normalizeNonNegativeQuantity, normalizeQuantity } from './calculations'
 import type { FstdDivisionDraft } from './types'
 
+export function keepNumericNfdCode(value: unknown): string {
+  return String(value ?? '').replace(/[^0-9]/g, '')
+}
+
 export const FSTD_ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 export const FSTD_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 

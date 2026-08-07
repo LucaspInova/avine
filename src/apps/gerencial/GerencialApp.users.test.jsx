@@ -136,7 +136,7 @@ describe('Cadastro de Usuários', () => {
     expect(screen.getByRole('button', { name: 'Gerencial' })).toBeInTheDocument()
   })
 
-  it('mantém Supervisor preparado sem habilitar um fluxo inexistente', () => {
+  it('cadastra Promotor por UF sem vínculo de Gerencial ou seletor de fotos', () => {
     const gerencialForm = {
       email: '',
       nome: '',
@@ -172,7 +172,8 @@ describe('Cadastro de Usuários', () => {
     )
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Gerencial responsável')).toBeDisabled()
+    expect(screen.queryByLabelText('Gerencial responsável')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Habilitar fotos' })).not.toBeInTheDocument()
   })
 
 

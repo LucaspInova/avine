@@ -669,32 +669,16 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                   </div>
                 </fieldset>
 
-                {form.perfil === 'Promotor' && (
-                  <label className="form-row" htmlFor="cadastro-gerencial">
-                    <span>Gerencial responsável</span>
-                    <select
-                      id="cadastro-gerencial"
-                      value=""
-                      disabled
-                      aria-label="Gerencial responsável"
-                      aria-describedby="gerencial-unavailable-hint"
-                    >
-                      <option value="">Nenhum gerencial disponível</option>
-                    </select>
-                    <small id="gerencial-unavailable-hint">
-                      O vínculo será habilitado quando o perfil Gerencial existir no sistema.
-                    </small>
+                {form.perfil !== 'Promotor' && (
+                  <label className="switch-field">
+                    <span>Habilitar fotos?</span>
+                    <PhotoSwitch
+                      checked={form.fotos_habilitadas}
+                      label="Habilitar fotos"
+                      onChange={() => onChange({ fotos_habilitadas: !form.fotos_habilitadas })}
+                    />
                   </label>
                 )}
-
-                <label className="switch-field">
-                  <span>Habilitar fotos?</span>
-                  <PhotoSwitch
-                    checked={form.fotos_habilitadas}
-                    label="Habilitar fotos"
-                    onChange={() => onChange({ fotos_habilitadas: !form.fotos_habilitadas })}
-                  />
-                </label>
               </>
             )}
           </div>
@@ -875,15 +859,17 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
             </span>
           </button>
 
-          <div className="info-toggle">
-            <span>Habilitar fotos</span>
-            <PhotoSwitch
-              checked={usuario.fotos_habilitadas}
-              disabled={photoBusy || !canManage}
-              label="Fotos habilitadas"
-              onChange={() => onTogglePhotos(usuario)}
-            />
-          </div>
+          {usuario.perfil !== 'Promotor' && (
+            <div className="info-toggle">
+              <span>Habilitar fotos</span>
+              <PhotoSwitch
+                checked={usuario.fotos_habilitadas}
+                disabled={photoBusy || !canManage}
+                label="Fotos habilitadas"
+                onChange={() => onTogglePhotos(usuario)}
+              />
+            </div>
+          )}
 
           <dl className="info-data">
             <div>
@@ -1053,14 +1039,16 @@ export function EditarUsuarioModal({
             </div>
           </fieldset>}
 
-          <label className="edit-checkbox">
-            <input
-              checked={form.fotos_habilitadas}
-              onChange={(event) => onChange({ fotos_habilitadas: event.target.checked })}
-              type="checkbox"
-            />
-            <span>Habilitar envio de fotos?</span>
-          </label>
+          {form.perfil !== 'Promotor' && (
+            <label className="edit-checkbox">
+              <input
+                checked={form.fotos_habilitadas}
+                onChange={(event) => onChange({ fotos_habilitadas: event.target.checked })}
+                type="checkbox"
+              />
+              <span>Habilitar envio de fotos?</span>
+            </label>
+          )}
         </div>
 
         {error && <p className="form-error">{error}</p>}
@@ -2683,7 +2671,7 @@ function GerencialApp({ capabilities }) {
       perfil: form.perfil,
       estado: form.ufs?.[0] ?? form.estado,
       ufs: form.perfil === 'Admin' ? [] : form.ufs,
-      fotos_habilitadas: form.fotos_habilitadas,
+      fotos_habilitadas: form.perfil === 'Promotor' ? true : form.fotos_habilitadas,
     }
 
     if (
@@ -2908,7 +2896,7 @@ function GerencialApp({ capabilities }) {
       perfil: editForm.perfil,
       estado: editForm.estado,
       ufs: editForm.perfil === 'Admin' ? [] : [editForm.estado],
-      fotos_habilitadas: editForm.fotos_habilitadas,
+      fotos_habilitadas: editForm.perfil === 'Promotor' ? true : editForm.fotos_habilitadas,
       auth_role: editForm.perfil === 'Admin' ? 'admin' : editForm.perfil.toLowerCase(),
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }

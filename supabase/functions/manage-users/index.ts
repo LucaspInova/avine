@@ -12,7 +12,7 @@ const allowedAuthRoles = new Set(["admin", "gerencial", "promotor"]);
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_POLICY_ERROR =
   `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
-  "uma letra maiuscula, uma letra minuscula, um numero e um simbolo.";
+  "uma letra maiuscula, uma letra minuscula e um numero.";
 
 const allowedStates = new Set([
   "CE",
@@ -91,8 +91,7 @@ function validatePassword(password: string) {
   return password.length >= PASSWORD_MIN_LENGTH &&
     /[a-z]/.test(password) &&
     /[A-Z]/.test(password) &&
-    /[0-9]/.test(password) &&
-    /[^A-Za-z0-9]/.test(password);
+    /[0-9]/.test(password);
 }
 
 function validateAuthRole(input: JsonRecord, profile: string) {
@@ -134,7 +133,7 @@ function validateProfile(input: JsonRecord) {
     perfil,
     estado,
     ufs,
-    fotos_habilitadas: boolean(input.fotos_habilitadas),
+    fotos_habilitadas: perfil === "Promotor" || boolean(input.fotos_habilitadas),
   };
 }
 

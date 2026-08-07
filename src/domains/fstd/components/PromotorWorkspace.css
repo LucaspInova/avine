@@ -532,6 +532,10 @@
   font-size: 0.9rem;
 }
 
+.nfd-search-empty {
+  margin: 0 4px;
+}
+
 .store-rows,
 .nfd-rows {
   display: grid;
@@ -2064,6 +2068,10 @@
   opacity: 0.55;
 }
 
+.fstd-avulsa-actions-after-total {
+  margin: 18px 0 24px;
+}
+
 .fstd-avulsa-actions .fstd-finalize-button {
   width: 100%;
   margin: 0;
@@ -2968,6 +2976,20 @@
 
 .fstd-list-page.is-avulsa {
   background: #f8f8f8;
+}
+
+.fstd-list-page.is-avulsa .fstd-list-topbar {
+  background: #f8f8f8;
+  color: #17231a;
+}
+
+.fstd-list-page.is-avulsa .fstd-list-topbar button,
+.fstd-list-page.is-avulsa .fstd-list-topbar strong {
+  color: #2f672c;
+}
+
+.fstd-list-page.is-avulsa .fstd-list-topbar button {
+  cursor: pointer;
 }
 
 .fstd-list-page .fstd-product-list {
@@ -4071,8 +4093,9 @@ button.fstd-summary-product {
 
 .profile-logout-confirm-card p {
   margin: 10px 0 22px;
-  color: #6b7280;
+  color: #3f403f;
   font-size: 0.9rem;
+  font-weight: 500;
   line-height: 1.45;
 }
 
