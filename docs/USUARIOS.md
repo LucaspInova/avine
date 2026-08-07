@@ -12,6 +12,12 @@ suas UFs.
 - Pesquisa, UF e status podem ser combinados com a tab selecionada.
 - Toda linha é acionável por clique, `Enter` ou barra de espaço e abre
   **Informações do Usuário**, independentemente do perfil.
+- A tabela não possui colunas de Gerencial ou Ações: as operações ficam
+  centralizadas no modal de informações/edição. A coluna `Lojas` informa a
+  quantidade de atribuições somente para Promotores.
+- `Último acesso` registra a abertura validada da aplicação por meio de uma
+  função autenticada no banco; usuários que ainda não abriram a aplicação são
+  identificados como `Nunca`.
 - Para Promotores com lojas atribuídas, o modal exibe a roteirização na ordem de
   `loja_promotores.posicao`, com código, UF, nome da loja e pesquisa local.
 

@@ -51,6 +51,7 @@ function UsersHarness() {
     <UsuariosScreen
       currentUser={usuarios[0]}
       usuarios={usuarios}
+      lojaPromotores={[{ promotor_id: 'promotor-1', loja_id: 'loja-1' }, { promotor_id: 'promotor-1', loja_id: 'loja-2' }]}
       loading={false}
       error=""
       busy={false}
@@ -78,6 +79,11 @@ describe('Cadastro de Usuários', () => {
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     expect(within(table).getByText('CARLA PROMOTORA')).toBeInTheDocument()
     expect(within(table).getByRole('columnheader', { name: 'ÚLTIMO ACESSO' })).toBeInTheDocument()
+    expect(within(table).queryByRole('columnheader', { name: 'GERENCIAL' })).not.toBeInTheDocument()
+    expect(within(table).queryByRole('columnheader', { name: 'AÇÕES' })).not.toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: 'LOJAS' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Mais ações para/)).not.toBeInTheDocument()
+    expect(screen.getByText('BRUNO PROMOTOR').closest('[role="row"]')).toHaveTextContent('2')
     expect(within(table).getByText('07/08/2026, 12:30')).toBeInTheDocument()
     expect(within(table).getAllByText('Nunca')).toHaveLength(2)
 
