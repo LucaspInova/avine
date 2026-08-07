@@ -42,6 +42,7 @@ type UserProfile = {
   ativo: boolean;
   acesso_habilitado: boolean;
   foto_url: string | null;
+  last_access_at: string | null;
   created_at: string;
 };
 
@@ -150,6 +151,7 @@ function publicProfile(profile: UserProfile, authRole: string | null = null) {
     ativo: profile.ativo,
     acesso_habilitado: profile.acesso_habilitado,
     foto_url: profile.foto_url,
+    last_access_at: profile.last_access_at,
     created_at: profile.created_at,
     auth_role: authRole,
   };
@@ -248,7 +250,7 @@ Deno.serve(async (request) => {
     let listQuery = adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       );
 
     if (isScopedGerencial) {
@@ -393,7 +395,7 @@ Deno.serve(async (request) => {
 
     const { data: profile, error: profileError } = await profileRequest
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .single();
 
@@ -417,7 +419,7 @@ Deno.serve(async (request) => {
     const { data: target, error: targetError } = await adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .eq("id", usuarioId)
       .maybeSingle();
@@ -548,7 +550,7 @@ Deno.serve(async (request) => {
       })
       .eq("id", target.id)
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .single();
 

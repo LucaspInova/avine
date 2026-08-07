@@ -1663,6 +1663,7 @@ export function UsuariosScreen({
               <span role="columnheader">E-MAIL</span>
               <span role="columnheader">UF</span>
               <span role="columnheader">STATUS</span>
+              <span role="columnheader">ÚLTIMO ACESSO</span>
               <span role="columnheader">AÇÕES</span>
             </div>
 
@@ -1736,6 +1737,15 @@ export function UsuariosScreen({
                         {isUserActive(usuario) ? 'Ativo' : 'Inativo'}
                       </span>
                     )}
+                  </span>
+
+                  <span className="last-access-cell" role="cell" data-label="Último acesso">
+                    {usuario.last_access_at
+                      ? new Intl.DateTimeFormat('pt-BR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        }).format(new Date(usuario.last_access_at))
+                      : 'Nunca'}
                   </span>
 
                   <span className="actions-cell" role="cell">

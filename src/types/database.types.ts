@@ -40,6 +40,7 @@ export type Database = {
           ativo: boolean
           acesso_habilitado: boolean
           foto_url: string | null
+          last_access_at: string | null
         }
         Insert: {
           id?: string
@@ -54,6 +55,7 @@ export type Database = {
           ativo?: boolean
           acesso_habilitado?: boolean
           foto_url?: string | null
+          last_access_at?: string | null
         }
         Update: {
           id?: string
@@ -68,6 +70,7 @@ export type Database = {
           ativo?: boolean
           acesso_habilitado?: boolean
           foto_url?: string | null
+          last_access_at?: string | null
         }
         Relationships: [
           {
