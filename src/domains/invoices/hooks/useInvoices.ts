@@ -7,10 +7,10 @@ export const invoiceKeys = {
   list: (filters: unknown) => ['invoices', filters] as const,
 }
 
-export function useInvoices(filters: { restrictedUfs: string[] }) {
+export function useInvoices(filters: { restrictedUfs: string[]; startDate?: string; endDate?: string }) {
   return useQuery({
     queryKey: invoiceKeys.list(filters),
-    queryFn: () => listInvoicesOverview(filters.restrictedUfs),
+    queryFn: () => listInvoicesOverview(filters.restrictedUfs, filters.startDate, filters.endDate),
   })
 }
 
