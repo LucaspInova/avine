@@ -1823,7 +1823,7 @@ select:focus-visible {
   position: relative;
   display: flex;
   min-width: 0;
-  height: 56px;
+  height: var(--control-height);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -1840,6 +1840,8 @@ select:focus-visible {
 
 .user-search-field {
   align-items: center;
+  border-color: transparent;
+  background: #f0f0f0;
 }
 
 .user-search-field .icon {
@@ -1890,7 +1892,7 @@ select:focus-visible {
 }
 
 .user-create-button {
-  height: 56px;
+  height: var(--control-height);
   padding-inline: 24px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -2683,7 +2685,7 @@ select:focus-visible {
 }
 
 .notes-card {
-  min-height: 680px;
+  min-height: 420px;
   padding: 16px 33px 26px 29px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2762,8 +2764,8 @@ select:focus-visible {
 
 .notes-summary-card span { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); }
 .notes-summary-card strong { color: var(--color-text-strong); font-size: var(--font-size-2xl); line-height: var(--line-height-tight); }
-.notes-summary-card.is-finalizada { border-top-color: var(--color-brand-600); }
-.notes-summary-card.is-pendente { border-top-color: var(--color-warning-600); }
+.notes-summary-card.is-finalizada { border-top-color: #3c8a3a; }
+.notes-summary-card.is-pendente { border-top-color: #f20f18; }
 .notes-summary-card.is-desconhecida { border-top-color: var(--color-neutral-500); }
 
 .notes-filter-popover {
