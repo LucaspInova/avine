@@ -108,10 +108,6 @@ function isUserActive(user) {
   return user.ativo === true && user.acesso_habilitado === true
 }
 
-function getGerencialName(user) {
-  return user.gerencial_nome ?? user.gerencial?.nome ?? '-'
-}
-
 function getManagedRoleLabel(user) {
   return getProfileLabel(user?.perfil)
 }
@@ -1480,30 +1476,20 @@ function PerfilScreen({ user, profilePhoto, onSave }) {
 }
 
 export function UsuariosScreen({
-  currentUser,
   usuarios,
+  lojaPromotores = [],
   loading,
   error,
-  busy,
-  editId,
-  editForm,
   search,
   onSearch,
   onOpenCadastro,
   onOpenUsuario,
-  onEditChange,
-  onCancelEdit,
-  onSaveEdit,
-  onDelete,
   restrictedUfs = [],
 }) {
   const [profileFilter, setProfileFilter] = useState('all')
   const [ufFilter, setUfFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
-  const activeAdminCount = usuarios.filter(
-    (usuario) => usuario.perfil === 'Admin' && usuario.ativo,
-  ).length
   const counts = useMemo(() => ({
     all: usuarios.length,
     Admin: usuarios.filter((usuario) => getManagedRoleKey(usuario) === 'Admin').length,
@@ -1515,6 +1501,10 @@ export function UsuariosScreen({
       .sort((first, second) => first.localeCompare(second, 'pt-BR')),
     [usuarios],
   )
+  const storeCountByPromotor = useMemo(() => lojaPromotores.reduce((counts, vinculo) => {
+    counts.set(vinculo.promotor_id, (counts.get(vinculo.promotor_id) ?? 0) + 1)
+    return counts
+  }, new Map()), [lojaPromotores])
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
 
@@ -1635,30 +1625,25 @@ export function UsuariosScreen({
             <div className="table-row table-head" role="row">
               <span role="columnheader">NOME</span>
               <span role="columnheader">PERFIL</span>
-              <span role="columnheader">GERENCIAL</span>
               <span role="columnheader">E-MAIL</span>
               <span role="columnheader">UF</span>
+              <span role="columnheader">LOJAS</span>
               <span role="columnheader">STATUS</span>
               <span role="columnheader">ÚLTIMO ACESSO</span>
-              <span role="columnheader">AÇÕES</span>
             </div>
 
             {pageUsers.map((usuario) => {
-              const isEditing = editId === usuario.id
-              const isLegacyUser = ['admin@avine.com.br', 'avinegerencial@gmail.com'].includes(usuario.email.toLowerCase())
-              const isSelf = usuario.auth_user_id === currentUser?.auth_user_id
-              const cannotDeactivate = isSelf || (usuario.ativo && activeAdminCount <= 1 && usuario.perfil === 'Admin')
               const profileClass = getManagedRoleKey(usuario).toLowerCase()
 
               return (
                 <div
-                  className={`table-row user-registration-row ${isEditing ? 'is-editing' : ''}`}
+                  className="table-row user-registration-row"
                   role="row"
-                  tabIndex={isEditing ? undefined : 0}
+                  tabIndex={0}
                   key={usuario.id}
-                  onClick={() => !isEditing && onOpenUsuario(usuario)}
+                  onClick={() => onOpenUsuario(usuario)}
                   onKeyDown={(event) => {
-                    if (!isEditing && (event.key === 'Enter' || event.key === ' ')) {
+                    if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
                       onOpenUsuario(usuario)
                     }
@@ -1666,65 +1651,28 @@ export function UsuariosScreen({
                 >
                   <div className="name-cell" role="cell">
                     <span className="avatar-mini">{getUserInitials(usuario.nome)}</span>
-                    {isEditing ? (
-                      <input
-                        value={editForm.nome}
-                        onChange={(event) => onEditChange({ nome: event.target.value })}
-                        type="text"
-                        aria-label="Nome"
-                      />
-                    ) : (
-                      <strong>{usuario.nome}</strong>
-                    )}
+                    <strong>{usuario.nome}</strong>
                   </div>
 
                   <span role="cell" data-label="Perfil">
                     <span className={`profile-pill is-${profileClass}`}>{getManagedRoleLabel(usuario)}</span>
                   </span>
 
-                  <span className="gerencial-cell" role="cell" data-label="Gerencial">{getGerencialName(usuario)}</span>
-
                   <div className="email-cell" role="cell" data-label="E-mail">
-                    {isEditing ? (
-                      <>
-                        <input
-                          value={editForm.email}
-                          onChange={(event) => onEditChange({ email: event.target.value })}
-                          type="email"
-                          aria-label="E-mail"
-                        />
-                        <input
-                          value={editForm.senha}
-                          onChange={(event) => onEditChange({ senha: event.target.value })}
-                          placeholder="Nova senha (opcional)"
-                          type="password"
-                          minLength={PASSWORD_MIN_LENGTH}
-                          autoComplete="new-password"
-                          aria-label="Nova senha"
-                        />
-                      </>
-                    ) : usuario.email}
+                    {usuario.email}
                   </div>
 
                   <span className="uf-cell" role="cell" data-label="UF">{usuario.perfil === 'Admin' ? 'Todas' : (usuario.ufs?.length ? usuario.ufs.join(', ') : usuario.estado || '-')}</span>
 
+                  <span className="stores-count-cell" role="cell" data-label="Lojas">
+                    {usuario.perfil === 'Promotor' ? (storeCountByPromotor.get(usuario.id) ?? 0).toLocaleString('pt-BR') : '-'}
+                  </span>
+
                   <span className="status-cell" role="cell" data-label="Status">
-                    {isEditing ? (
-                      <label className="status-toggle">
-                        <input
-                          checked={editForm.ativo}
-                          disabled={cannotDeactivate}
-                          onChange={(event) => onEditChange({ ativo: event.target.checked })}
-                          type="checkbox"
-                        />
-                        <span>{editForm.ativo ? 'Ativo' : 'Inativo'}</span>
-                      </label>
-                    ) : (
-                      <span className={`status-pill ${isUserActive(usuario) ? 'is-active' : 'is-inactive'}`}>
-                        <span className="status-dot" aria-hidden="true" />
-                        {isUserActive(usuario) ? 'Ativo' : 'Inativo'}
-                      </span>
-                    )}
+                    <span className={`status-pill ${isUserActive(usuario) ? 'is-active' : 'is-inactive'}`}>
+                      <span className="status-dot" aria-hidden="true" />
+                      {isUserActive(usuario) ? 'Ativo' : 'Inativo'}
+                    </span>
                   </span>
 
                   <span className="last-access-cell" role="cell" data-label="Último acesso">
@@ -1736,32 +1684,6 @@ export function UsuariosScreen({
                       : 'Nunca'}
                   </span>
 
-                  <span className="actions-cell" role="cell">
-                    {isEditing ? (
-                      <>
-                        <button className="secondary-button" type="button" onClick={onCancelEdit}>Cancelar</button>
-                        <button className="primary-button" type="button" disabled={busy} onClick={onSaveEdit}>Salvar</button>
-                      </>
-                    ) : (
-                      <>
-                        <details className="user-actions-menu" onClick={(event) => event.stopPropagation()}>
-                          <summary aria-label={`Mais ações para ${usuario.nome}`}><Icon name="more" /></summary>
-                          <div className="user-actions-popover">
-                            <button type="button" disabled={Boolean(restrictedUfs.length > 0 && usuario.perfil !== 'Promotor')}>Resetar senha</button>
-                            <button type="button" disabled>{isUserActive(usuario) ? 'Desativar' : 'Ativar'}</button>
-                            <button
-                              className={isLegacyUser ? 'is-danger' : ''}
-                              type="button"
-                              disabled={!isLegacyUser}
-                              onClick={() => onDelete(usuario)}
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </details>
-                      </>
-                    )}
-                  </span>
                 </div>
               )
             })}
@@ -3407,6 +3329,7 @@ function GerencialApp({ capabilities }) {
           <UsuariosScreen
             currentUser={currentUser}
             usuarios={usuarios}
+            lojaPromotores={lojaPromotores}
             loading={loading}
             error={error || gerencialError}
             busy={gerencialBusy}

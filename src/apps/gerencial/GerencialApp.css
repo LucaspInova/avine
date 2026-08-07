@@ -2035,13 +2035,12 @@ select:focus-visible {
   grid-template-columns:
     minmax(200px, 1.2fr)
     minmax(100px, 0.55fr)
-    minmax(110px, 0.7fr)
     minmax(200px, 1.25fr)
     46px
+    52px
     minmax(88px, 0.55fr)
-    minmax(120px, 0.7fr)
-    minmax(116px, 0.65fr);
-  min-width: 1140px;
+    minmax(120px, 0.7fr);
+  min-width: 980px;
   padding-inline: 18px;
   box-sizing: border-box;
   column-gap: 18px;

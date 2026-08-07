@@ -86,11 +86,7 @@ export function AuthProvider({ children }) {
 
     if (hasApplicationAccess(profileWithAuthRole) && !accessRecordedFor.current.has(userId)) {
       accessRecordedFor.current.add(userId)
-      const lastAccessAt = new Date().toISOString()
-      const { error: accessError } = await supabase
-        .from('usuarios')
-        .update({ last_access_at: lastAccessAt })
-        .eq('auth_user_id', userId)
+      const { data: lastAccessAt, error: accessError } = await supabase.rpc('record_usuario_access')
 
       if (!accessError) profileWithAuthRole.last_access_at = lastAccessAt
     }
