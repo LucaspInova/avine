@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(45);
+select plan(49);
 
 insert into auth.users (id, email)
 values
@@ -201,6 +201,18 @@ select ok(
   'anon cannot execute the workflow RPC'
 );
 select ok(
+  to_regprocedure('public.record_usuario_access()') is not null,
+  'last-access RPC exists'
+);
+select ok(
+  not has_function_privilege('anon', 'public.record_usuario_access()', 'EXECUTE'),
+  'anon cannot record user access'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.record_usuario_access()', 'EXECUTE'),
+  'authenticated users can record their access'
+);
+select ok(
   to_regprocedure('public.is_current_user_gerencial_ativo()') is null,
   'the authorization helper is not exposed by the Data API'
 );
@@ -250,6 +262,12 @@ select ok(
 
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
 set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
+
+select results_eq(
+  'select public.record_usuario_access() is not null',
+  array[true],
+  'active authenticated user records last access'
+);
 
 select results_eq(
   'select count(*) from public.lojas',
