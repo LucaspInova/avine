@@ -85,10 +85,14 @@ export function AuthProvider({ children }) {
     }
 
     if (hasApplicationAccess(profileWithAuthRole) && !accessRecordedFor.current.has(userId)) {
-      accessRecordedFor.current.add(userId)
       const { data: lastAccessAt, error: accessError } = await supabase.rpc('record_usuario_access')
 
-      if (!accessError) profileWithAuthRole.last_access_at = lastAccessAt
+      if (!accessError) {
+        accessRecordedFor.current.add(userId)
+        profileWithAuthRole.last_access_at = lastAccessAt
+      } else {
+        console.error('Nao foi possivel registrar o ultimo acesso.', accessError)
+      }
     }
 
     if (version !== requestVersion.current) return profileWithAuthRole
