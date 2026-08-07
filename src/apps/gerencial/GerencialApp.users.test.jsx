@@ -16,6 +16,7 @@ const usuarios = [
     ativo: true,
     acesso_habilitado: true,
     fotos_habilitadas: false,
+    last_access_at: '2026-08-07T12:30:00.000Z',
   },
   {
     id: 'promotor-1',
@@ -76,6 +77,9 @@ describe('Cadastro de Usuários', () => {
     expect(within(table).getByText('ANA GERENCIAL')).toBeInTheDocument()
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     expect(within(table).getByText('CARLA PROMOTORA')).toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: 'ÚLTIMO ACESSO' })).toBeInTheDocument()
+    expect(within(table).getByText('07/08/2026, 12:30')).toBeInTheDocument()
+    expect(within(table).getAllByText('Nunca')).toHaveLength(2)
 
     fireEvent.change(screen.getByLabelText('Perfil'), { target: { value: 'Promotor' } })
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()

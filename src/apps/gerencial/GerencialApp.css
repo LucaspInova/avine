@@ -2039,8 +2039,9 @@ select:focus-visible {
     minmax(200px, 1.25fr)
     46px
     minmax(88px, 0.55fr)
+    minmax(120px, 0.7fr)
     minmax(116px, 0.65fr);
-  min-width: 1000px;
+  min-width: 1140px;
   padding-inline: 18px;
   box-sizing: border-box;
   column-gap: 18px;

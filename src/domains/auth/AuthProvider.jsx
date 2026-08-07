@@ -13,7 +13,7 @@ import { setAuthPersistence, supabase } from '../../shared/lib/supabaseClient'
 import { can as profileCan, getCapabilities } from './model/capabilities'
 
 const profileSelect =
-  'id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, foto_url, ativo, acesso_habilitado, created_at'
+  'id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, foto_url, ativo, acesso_habilitado, last_access_at, created_at'
 
 const AuthContext = createContext(null)
 
@@ -48,12 +48,14 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const requestVersion = useRef(0)
+  const accessRecordedFor = useRef(new Set())
 
   const resolveProfile = useCallback(async (activeSession) => {
     const version = ++requestVersion.current
     const userId = activeSession?.user?.id
 
     if (!userId) {
+      accessRecordedFor.current.clear()
       setSession(null)
       setProfile(null)
       setError('')
@@ -81,6 +83,19 @@ export function AuthProvider({ children }) {
       setLoading(false)
       return null
     }
+
+    if (hasApplicationAccess(profileWithAuthRole) && !accessRecordedFor.current.has(userId)) {
+      accessRecordedFor.current.add(userId)
+      const lastAccessAt = new Date().toISOString()
+      const { error: accessError } = await supabase
+        .from('usuarios')
+        .update({ last_access_at: lastAccessAt })
+        .eq('auth_user_id', userId)
+
+      if (!accessError) profileWithAuthRole.last_access_at = lastAccessAt
+    }
+
+    if (version !== requestVersion.current) return profileWithAuthRole
 
     setSession(activeSession)
     setProfile(profileWithAuthRole)
@@ -146,6 +161,7 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     requestVersion.current += 1
+    accessRecordedFor.current.clear()
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
