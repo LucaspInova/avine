@@ -84,7 +84,6 @@ const initialLojaForm = {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const NOTES_PAGE_SIZE = 10
 
 function isAdministrativeProfile(user) {
   return user?.perfil === 'Admin' || user?.perfil === 'Gerencial'
@@ -128,6 +127,14 @@ function formatNoteQuantity(value) {
 
 function getNoteDateKey(note) {
   return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
+}
+
+function getDefaultNoteDates(now = new Date()) {
+  const localDate = (date) => {
+    const offset = date.getTimezoneOffset() * 60000
+    return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+  }
+  return { start: localDate(new Date(now.getFullYear(), now.getMonth(), 1)), end: localDate(now) }
 }
 
 
@@ -1923,87 +1930,6 @@ function uniqueSortedValues(values, { uppercase = false } = {}) {
   return [...unique.values()].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
 }
 
-function NotesFilterPopover({
-  notes,
-  selectedStatuses,
-  selectedUfs,
-  selectedCities,
-  onToggleStatus,
-  onToggleUf,
-  onToggleCity,
-  onClear,
-  onClose,
-}) {
-  const [expandedSection, setExpandedSection] = useState(null)
-  const ufs = uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true })
-  const cities = uniqueSortedValues(notes.map((note) => note.cidade))
-  const sections = [
-    { id: 'status', label: 'Status', options: NOTE_STATUS_OPTIONS, selected: selectedStatuses, onToggle: onToggleStatus },
-    { id: 'estado', label: 'Estado', options: ufs, selected: selectedUfs, onToggle: onToggleUf },
-    { id: 'cidade', label: 'Cidade', options: cities, selected: selectedCities, onToggle: onToggleCity },
-  ]
-
-  return (
-    <div className="filter-popover notes-filter-popover">
-      {sections.map((section) => {
-        const isExpanded = expandedSection === section.id
-
-        return (
-          <div className="notes-filter-section" key={section.id}>
-            <button
-              className={`notes-filter-section-trigger ${isExpanded ? 'is-expanded' : ''}`}
-              type="button"
-              onClick={() => setExpandedSection(isExpanded ? null : section.id)}
-              aria-expanded={isExpanded}
-            >
-              <span>{section.label}</span>
-              <span className="filter-chevron" aria-hidden="true" />
-            </button>
-
-            {isExpanded && (
-              <div className="filter-options notes-filter-options">
-                {section.options.length === 0 ? (
-                  <p className="filter-empty">Nenhuma opção encontrada.</p>
-                ) : section.options.map((option) => (
-                  <label key={option} className="filter-option">
-                    <span>{option}</span>
-                    <input
-                      checked={section.selected.includes(option)}
-                      onChange={() => section.onToggle(option)}
-                      type="checkbox"
-                    />
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      <div className="filter-footer">
-        <button className="secondary-button" type="button" onClick={onClear}>
-          Limpar tudo
-        </button>
-        <button className="primary-button" type="button" onClick={onClose}>
-          Fechar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function NotesPagination({ page, pages, onChange }) {
-  return (
-    <Pagination
-      className="pagination notes-pagination"
-      currentPage={page + 1}
-      label="Páginas da lista de NFD"
-      onPageChange={(nextPage) => onChange(nextPage - 1)}
-      totalPages={pages}
-    />
-  )
-}
-
 function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   const [invoiceCopied, setInvoiceCopied] = useState(false)
   const [pendingBusy, setPendingBusy] = useState(false)
@@ -2222,71 +2148,42 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
 }
 
 export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
-  const invoiceFilters = useMemo(() => ({ restrictedUfs }), [restrictedUfs])
+  const defaults = useMemo(() => getDefaultNoteDates(), [])
+  const [startDate, setStartDate] = useState(defaults.start)
+  const [endDate, setEndDate] = useState(defaults.end)
+  const invoiceFilters = useMemo(() => ({ restrictedUfs, startDate, endDate }), [restrictedUfs, startDate, endDate])
   const invoicesQuery = useInvoices(invoiceFilters)
   const invoiceMutations = useInvoiceMutations()
   const notes = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data])
   const loading = invoicesQuery.isLoading
   const error = invoicesQuery.error?.message ?? ''
-  const [isFilterOpen, setFilterOpen] = useState(false)
-  const [selectedStatuses, setSelectedStatuses] = useState([])
-  const [selectedUfs, setSelectedUfs] = useState([])
-  const [selectedCities, setSelectedCities] = useState([])
-  const [pageByDate, setPageByDate] = useState({})
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedUf, setSelectedUf] = useState('')
+  const [selectedCity, setSelectedCity] = useState('')
   const [selectedNote, setSelectedNote] = useState(null)
   const [selectedFstd, setSelectedFstd] = useState(null)
   const [selectedFinalized, setSelectedFinalized] = useState(null)
   const [completionMessage, setCompletionMessage] = useState('')
   const query = search.trim().toLowerCase()
 
-  const filteredGroups = useMemo(() => {
-    const groups = new Map()
-
-    notes.forEach((note) => {
+  const filteredNotes = useMemo(() => notes.filter((note) => {
       const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
       const nfd = String(note.nota_fiscal ?? '-')
       const matchesQuery = `${storeName} ${nfd} ${note.status}`.toLowerCase().includes(query)
       const noteUf = String(note.uf ?? '').trim().toUpperCase()
       const noteCity = String(note.cidade ?? '').trim()
-      const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(note.status)
-      const matchesUf = selectedUfs.length === 0 || selectedUfs.includes(noteUf)
-      const matchesCity = selectedCities.length === 0 || selectedCities
-        .some((city) => city.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
-      if (!matchesQuery || !matchesStatus || !matchesUf || !matchesCity) return
-
-      const dateKey = getNoteDateKey(note)
-      if (!groups.has(dateKey)) {
-        groups.set(dateKey, {
-          key: dateKey,
-          date: dateKey === 'sem-data' ? 'Sem data' : formatNoteDate(dateKey),
-          rows: [],
-        })
-      }
-
-      groups.get(dateKey).rows.push({
-        key: note.chave_acesso || `${dateKey}-${nfd}-${storeName}`,
-        loja: storeName,
-        nfd,
-        status: note.status,
-        note,
-      })
-    })
-
-    return [...groups.values()]
-      .sort((a, b) => b.key.localeCompare(a.key))
-      .map((group) => {
-        const pages = Math.max(1, Math.ceil(group.rows.length / NOTES_PAGE_SIZE))
-        const page = Math.min(pageByDate[group.key] ?? 0, pages - 1)
-        return {
-          ...group,
-          pages,
-          page,
-          rows: group.rows.slice(page * NOTES_PAGE_SIZE, (page + 1) * NOTES_PAGE_SIZE),
-        }
-      })
-  }, [notes, pageByDate, query, selectedCities, selectedStatuses, selectedUfs])
-
-  const activeFiltersCount = selectedStatuses.length + selectedUfs.length + selectedCities.length
+      return matchesQuery && (!selectedStatus || selectedStatus === note.status)
+        && (!selectedUf || selectedUf === noteUf)
+        && (!selectedCity || selectedCity.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
+    }), [notes, query, selectedCity, selectedStatus, selectedUf])
+  const ufs = useMemo(() => uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true }), [notes])
+  const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => !selectedUf || note.uf === selectedUf).map((note) => note.cidade)), [notes, selectedUf])
+  const totals = useMemo(() => ({
+    Geral: filteredNotes.length,
+    Finalizada: filteredNotes.filter((note) => note.status === 'Finalizada').length,
+    Pendente: filteredNotes.filter((note) => note.status === 'Pendente').length,
+    Desconhecida: filteredNotes.filter((note) => note.status === 'Desconhecida').length,
+  }), [filteredNotes])
 
   function getStoreForNote(note) {
     return (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
@@ -2371,18 +2268,6 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedFinalized({ note: finalizedNote, store: selectedFstd.store })
   }
 
-  function toggleFilterValue(setter, value) {
-    setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])
-    setPageByDate({})
-  }
-
-  function clearFilters() {
-    setSelectedStatuses([])
-    setSelectedUfs([])
-    setSelectedCities([])
-    setPageByDate({})
-  }
-
   return (
     <section className="notes-page">
       <div className="notes-card">
@@ -2394,43 +2279,25 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
               <Icon name="search" />
               <input
                 value={search}
-                onChange={(event) => {
-                  onSearch(event.target.value)
-                  setPageByDate({})
-                }}
+                onChange={(event) => onSearch(event.target.value)}
                 placeholder="Procurar"
                 type="search"
               />
             </label>
 
-            <div className="filter-wrap">
-              <button
-                className={`filter-trigger ${isFilterOpen ? 'is-open' : ''}`}
-                type="button"
-                onClick={() => setFilterOpen((open) => !open)}
-                aria-expanded={isFilterOpen}
-                aria-haspopup="true"
-              >
-                <Icon name="filter" />
-                <span>{activeFiltersCount ? `${activeFiltersCount} filtro${activeFiltersCount > 1 ? 's' : ''}` : 'Filtrar'}</span>
-                <span className="select-chevron" />
-              </button>
-
-              {isFilterOpen && (
-                <NotesFilterPopover
-                  notes={notes}
-                  selectedStatuses={selectedStatuses}
-                  selectedUfs={selectedUfs}
-                  selectedCities={selectedCities}
-                  onToggleStatus={(value) => toggleFilterValue(setSelectedStatuses, value)}
-                  onToggleUf={(value) => toggleFilterValue(setSelectedUfs, value)}
-                  onToggleCity={(value) => toggleFilterValue(setSelectedCities, value)}
-                  onClear={clearFilters}
-                  onClose={() => setFilterOpen(false)}
-                />
-              )}
-            </div>
           </div>
+        </div>
+
+        <div className="notes-filters" aria-label="Filtros das notas">
+          <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+          <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label>
+          <label>Status<select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label>UF<select value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label>Cidade<select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
+        </div>
+
+        <div className="notes-summary" aria-label="Totais das notas">
+          {Object.entries(totals).map(([label, total]) => <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}><span>{label}</span><strong>{formatNoteQuantity(total)}</strong></article>)}
         </div>
 
         {completionMessage && (
@@ -2443,50 +2310,46 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
 
         {!loading && error && <p className="table-message">{error}</p>}
 
-        {!loading && !error && filteredGroups.map((group) => (
-          <section className="notes-date-group" key={group.date}>
-            <h3>{group.date}</h3>
-
-            <div className="notes-table" role="table" aria-label={`NFDs de ${group.date}`}>
+        {!loading && !error && filteredNotes.length > 0 && (
+            <div className="notes-table" role="table" aria-label="Notas fiscais">
               <div className="notes-row notes-head" role="row">
                 <span role="columnheader">LOJA</span>
                 <span role="columnheader">NFD</span>
+                <span role="columnheader">EMISSÃO</span>
+                <span role="columnheader">UF</span>
                 <span role="columnheader">STATUS</span>
               </div>
 
-              {group.rows.map((row) => (
+              {filteredNotes.map((note) => {
+                const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
+                return (
                 <div
                   className="notes-row notes-row-interactive"
                   role="row"
-                  key={`${group.key}-${row.key}`}
+                  key={note.chave_acesso || `${getNoteDateKey(note)}-${note.nota_fiscal}-${storeName}`}
                   tabIndex="0"
-                  onClick={() => handleSelectNote(row.note)}
+                  onClick={() => handleSelectNote(note)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      handleSelectNote(row.note)
+                      handleSelectNote(note)
                     }
                   }}
                 >
                   <span className="notes-store-cell" role="cell">
-                    <NotaStatusIcon status={row.status} />
-                    <strong>{row.loja}</strong>
+                    <NotaStatusIcon status={note.status} />
+                    <strong>{storeName}</strong>
                   </span>
-                  <span role="cell">{row.nfd}</span>
-                  <span role="cell">{row.status}</span>
+                  <span role="cell">{String(note.nota_fiscal ?? '-')}</span>
+                  <span role="cell">{formatNoteDate(note.data_emissao ?? note.data_referencia)}</span>
+                  <span role="cell">{note.uf || '-'}</span>
+                  <span role="cell">{note.status}</span>
                 </div>
-              ))}
+              )})}
             </div>
+        )}
 
-            <NotesPagination
-              page={group.page}
-              pages={group.pages}
-              onChange={(nextPage) => setPageByDate((current) => ({ ...current, [group.key]: nextPage }))}
-            />
-          </section>
-        ))}
-
-        {!loading && !error && filteredGroups.length === 0 && (
+        {!loading && !error && filteredNotes.length === 0 && (
           <p className="table-message">Nenhuma NFD encontrada.</p>
         )}
       </div>

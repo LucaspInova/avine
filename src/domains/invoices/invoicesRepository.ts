@@ -11,24 +11,16 @@ export async function fetchAllNfdNotas(select: string, configureQuery?: (query: 
   })
 }
 
-export async function listInvoicesOverview(restrictedUfs: string[] = []): Promise<InvoiceOverviewViewModel[]> {
+export async function listInvoicesOverview(restrictedUfs: string[] = [], startDate?: string, endDate?: string): Promise<InvoiceOverviewViewModel[]> {
   try {
-    const scope = (query: any) => restrictedUfs.length ? query.in('uf', restrictedUfs) : query
-    const [notes, processes, unknown, locations] = await Promise.all([
-      paginateSupabase<any>((from, to) => scope(supabase!.from('nfd_notas').select('chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total')).order('data_referencia', { ascending: false }).order('nota_fiscal', { ascending: false }).range(from, to)),
-      paginateSupabase<any>((from, to) => supabase!.from('fstd_processos').select('id, nfd_chave_acesso, status, created_at').order('created_at', { ascending: false }).range(from, to)),
-      paginateSupabase<any>((from, to) => supabase!.from('nfd_desconhecimentos').select('id, nfd_referencia, nfd_chave_acesso, nfd_numero, loja_codigo, created_at, reconhecida_em').is('reconhecida_em', null).order('created_at', { ascending: false }).range(from, to)),
-      paginateSupabase<any>((from, to) => scope(supabase!.from('nfd_itens').select('chave_acesso, uf, cidade')).order('chave_acesso', { ascending: true }).range(from, to)),
-    ])
-    const statusByKey = new Map(processes.map((item) => [String(item.nfd_chave_acesso), item.status]))
-    const unknownKeys = new Set<string>()
-    unknown.forEach((item) => {
-      if (item.nfd_chave_acesso) unknownKeys.add(`key:${item.nfd_chave_acesso}`)
-      if (item.nfd_referencia) unknownKeys.add(`ref:${item.nfd_referencia}`)
+    return await paginateSupabase<any>((from, to) => {
+      let query: any = (supabase as any).rpc('listar_nfd_notas_gerencial', {
+        p_data_inicial: startDate || null,
+        p_data_final: endDate || null,
+      })
+      if (restrictedUfs.length) query = query.in('uf', restrictedUfs)
+      return query.range(from, to)
     })
-    const locationByKey = new Map<string, any>()
-    locations.forEach((item) => locationByKey.set(String(item.chave_acesso), { ...locationByKey.get(String(item.chave_acesso)), uf: locationByKey.get(String(item.chave_acesso))?.uf || item.uf, cidade: locationByKey.get(String(item.chave_acesso))?.cidade || item.cidade }))
-    return notes.map((note) => ({ ...note, uf: note.uf || locationByKey.get(String(note.chave_acesso))?.uf || '', cidade: note.cidade || locationByKey.get(String(note.chave_acesso))?.cidade || '', status: unknownKeys.has(`key:${note.chave_acesso}`) || unknownKeys.has(`ref:${note.codigo_cliente}:${note.nota_fiscal}`) ? 'Desconhecida' : statusByKey.get(String(note.chave_acesso)) === 'concluida' ? 'Finalizada' : 'Pendente' }))
   } catch (error) { throw toAppError(error, 'Não foi possível carregar as notas fiscais.') }
 }
 
