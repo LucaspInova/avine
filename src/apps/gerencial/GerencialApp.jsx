@@ -2258,36 +2258,36 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
 
   return (
     <section className="notes-page">
+      <div className="notes-toolbar">
+        <h2>NFD</h2>
+
+        <div className="toolbar-actions">
+          <label className="search-field">
+            <Icon name="search" />
+            <input
+              value={search}
+              onChange={(event) => onSearch(event.target.value)}
+              placeholder="Procurar"
+              type="search"
+            />
+          </label>
+
+        </div>
+      </div>
+
+      <div className="notes-filters" aria-label="Filtros das notas">
+        <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+        <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label>
+        <label>Status<select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label>UF<select value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label>Cidade<select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
+      </div>
+
+      <div className="notes-summary" aria-label="Totais das notas">
+        {Object.entries(totals).map(([label, total]) => <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}><span>{label}</span><strong>{formatNoteQuantity(total)}</strong></article>)}
+      </div>
+
       <div className="notes-card">
-        <div className="notes-toolbar">
-          <h2>NFD</h2>
-
-          <div className="toolbar-actions">
-            <label className="search-field">
-              <Icon name="search" />
-              <input
-                value={search}
-                onChange={(event) => onSearch(event.target.value)}
-                placeholder="Procurar"
-                type="search"
-              />
-            </label>
-
-          </div>
-        </div>
-
-        <div className="notes-filters" aria-label="Filtros das notas">
-          <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label>
-          <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label>
-          <label>Status<select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>UF<select value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>Cidade<select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
-        </div>
-
-        <div className="notes-summary" aria-label="Totais das notas">
-          {Object.entries(totals).map(([label, total]) => <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}><span>{label}</span><strong>{formatNoteQuantity(total)}</strong></article>)}
-        </div>
-
         {completionMessage && (
           <p className="notes-completion-message" role="status">
             {completionMessage}
