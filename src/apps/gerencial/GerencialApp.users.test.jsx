@@ -75,6 +75,9 @@ describe('Cadastro de Usuários', () => {
   it('combina tabs de perfil, pesquisa, UF e status sobre a mesma tabela sem controles redundantes', () => {
     render(<UsersHarness />)
 
+    const pageToolbar = document.querySelector('.users-page-toolbar')
+    expect(within(pageToolbar).getByRole('heading', { name: 'Usuários' })).toBeInTheDocument()
+
     const table = screen.getByRole('table', { name: 'Cadastro de Usuários' })
     expect(within(table).getByText('ANA GERENCIAL')).toBeInTheDocument()
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()

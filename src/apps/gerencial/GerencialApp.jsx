@@ -1291,6 +1291,7 @@ export function UsuariosScreen({
     <section className="users-card user-registration-card">
       <PageToolbar
         className="users-page-toolbar"
+        title="Usuários"
         search={{
           value: search,
           onChange: (value) => { onSearch(value); setPage(1) },
