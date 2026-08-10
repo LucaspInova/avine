@@ -57,7 +57,7 @@ function getNextEnabledIndex(options, startIndex, direction) {
   return -1
 }
 
-export function AppSelect({ children, options, searchable = false, onChange, ...selectProps }) {
+export function AppSelect({ children, options, portalOwnerId, searchable = false, onChange, ...selectProps }) {
   const selectRef = useRef(null)
   const dropdownRef = useRef(null)
   const searchRef = useRef(null)
@@ -65,6 +65,7 @@ export function AppSelect({ children, options, searchable = false, onChange, ...
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [inferredPortalOwnerId, setInferredPortalOwnerId] = useState()
   const [position, setPosition] = useState(null)
   const currentValue = String(selectProps.value ?? selectProps.defaultValue ?? '')
   const normalizedOptions = useMemo(() => normalizeOptions(options, children), [options, children])
@@ -107,6 +108,7 @@ export function AppSelect({ children, options, searchable = false, onChange, ...
   const openDropdown = useCallback(() => {
     if (selectProps.disabled) return
     const firstEnabled = normalizedOptions.findIndex((option) => !option.disabled)
+    setInferredPortalOwnerId(selectRef.current?.closest('[data-app-select-portal-owner-id]')?.id)
     setActiveIndex(selectedIndex >= 0 && !normalizedOptions[selectedIndex]?.disabled ? selectedIndex : firstEnabled)
     setIsOpen(true)
     updatePosition()
@@ -213,6 +215,8 @@ export function AppSelect({ children, options, searchable = false, onChange, ...
   const menu = isOpen && position && typeof document !== 'undefined' ? createPortal(
     <div
       className="app-select-dropdown"
+      data-app-select-portal=""
+      data-app-select-portal-owner={portalOwnerId ?? inferredPortalOwnerId}
       id={dropdownId}
       ref={dropdownRef}
       role="presentation"

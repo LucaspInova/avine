@@ -47,7 +47,9 @@ export function FilterPopover({
   useEffect(() => {
     if (!isOpen) return undefined
     const closeOutside = (event) => {
-      if (!rootRef.current?.contains(event.target)) onToggle?.(false)
+      const appSelectPortal = event.target.closest?.('[data-app-select-portal]')
+      const isOwnedAppSelectPortal = appSelectPortal?.dataset.appSelectPortalOwner === popoverId
+      if (!rootRef.current?.contains(event.target) && !isOwnedAppSelectPortal) onToggle?.(false)
     }
     const closeOnEscape = (event) => {
       if (event.key === 'Escape') onToggle?.(false)
@@ -58,7 +60,7 @@ export function FilterPopover({
       document.removeEventListener('pointerdown', closeOutside)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isOpen, onToggle])
+  }, [isOpen, onToggle, popoverId])
 
   useEffect(() => {
     if (isOpen) {
@@ -94,7 +96,7 @@ export function FilterPopover({
     <div className="ui-filter-popover" ref={rootRef}>
       <FilterTrigger ref={triggerRef} activeFilterCount={activeFilterCount} controls={popoverId} isOpen={isOpen} label={label} onToggle={onToggle} />
       {isOpen && (
-        <div className="ui-filter-popover__panel" id={popoverId} ref={panelRef} style={position} role="dialog" aria-label="Filtros" aria-modal="true" onKeyDown={handlePanelKeyDown}>
+        <div className="ui-filter-popover__panel" data-app-select-portal-owner-id id={popoverId} ref={panelRef} style={position} role="dialog" aria-label="Filtros" aria-modal="true" onKeyDown={handlePanelKeyDown}>
           {activeFilterCount > 0 && <span className="ui-filter-popover__summary" aria-live="polite">{activeFilterCount} {activeFilterCount === 1 ? 'filtro ativo' : 'filtros ativos'}</span>}
           <div className="ui-filter-popover__sections">{children}</div>
           <footer className="ui-filter-popover__footer">
