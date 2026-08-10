@@ -2839,6 +2839,38 @@ select:focus-visible {
   font-weight: 800;
 }
 
+.notes-row.notes-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.notes-row.notes-head button:hover {
+  background: #f0f4f0;
+}
+
+.notes-row.notes-head button:focus-visible {
+  outline: 2px solid #377936;
+  outline-offset: 2px;
+}
+
+.notes-sort-indicator {
+  color: #7d847e;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.notes-row.notes-head [aria-sort] .notes-sort-indicator {
+  color: #377936;
+}
+
 .notes-store-cell {
   display: flex;
   align-items: center;

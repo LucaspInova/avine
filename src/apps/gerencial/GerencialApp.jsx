@@ -138,6 +138,39 @@ function getNoteDateKey(note) {
   return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
 }
 
+const noteTextCollator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
+
+const NOTE_SORT_COLUMNS = [
+  {
+    key: 'loja',
+    label: 'LOJA',
+    select: (note) => note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-'),
+    type: 'text',
+  },
+  { key: 'nota_fiscal', label: 'NFD', select: (note) => note.nota_fiscal, type: 'number' },
+  {
+    key: 'data_emissao',
+    label: 'EMISSÃO',
+    select: (note) => String(note.data_emissao ?? note.data_referencia ?? '').slice(0, 10),
+    type: 'date',
+  },
+  { key: 'uf', label: 'UF', select: (note) => note.uf, type: 'text' },
+  { key: 'status', label: 'STATUS', select: (note) => note.status, type: 'text' },
+]
+
+function compareNoteSortValues(left, right, type) {
+  if (type === 'number') {
+    const leftNumber = Number(left)
+    const rightNumber = Number(right)
+    if (String(left ?? '').trim() && String(right ?? '').trim()
+      && Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+      return leftNumber - rightNumber
+    }
+  }
+
+  return noteTextCollator.compare(String(left ?? ''), String(right ?? ''))
+}
+
 function getDefaultNoteDates(now = new Date()) {
   const localDate = (date) => {
     const offset = date.getTimezoneOffset() * 60000
@@ -2131,6 +2164,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [selectedFstd, setSelectedFstd] = useState(null)
   const [selectedFinalized, setSelectedFinalized] = useState(null)
   const [completionMessage, setCompletionMessage] = useState('')
+  const [sort, setSort] = useState({ key: 'data_emissao', direction: 'descending' })
   const query = search.trim().toLowerCase()
 
   const filteredNotes = useMemo(() => notes.filter((note) => {
@@ -2143,6 +2177,19 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         && (!selectedUf || selectedUf === noteUf)
         && (!selectedCity || selectedCity.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
     }), [notes, query, selectedCity, selectedStatus, selectedUf])
+  const sortedNotes = useMemo(() => {
+    const column = NOTE_SORT_COLUMNS.find((item) => item.key === sort.key)
+    if (!column) return [...filteredNotes]
+
+    const direction = sort.direction === 'ascending' ? 1 : -1
+    return filteredNotes
+      .map((note, index) => ({ note, index }))
+      .sort((left, right) => (
+        compareNoteSortValues(column.select(left.note), column.select(right.note), column.type) * direction
+        || left.index - right.index
+      ))
+      .map(({ note }) => note)
+  }, [filteredNotes, sort])
   const ufs = useMemo(() => uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true }), [notes])
   const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => (
     !selectedUf || String(note.uf ?? '').trim().toUpperCase() === selectedUf
@@ -2248,6 +2295,13 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     if (nextEndDate && startDate > nextEndDate) setStartDate(nextEndDate)
   }
 
+  function handleSort(key) {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending',
+    }))
+  }
+
   return (
     <section className="notes-page">
       <div className="notes-card">
@@ -2301,14 +2355,20 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         {!loading && !error && filteredNotes.length > 0 && (
             <div className="notes-table" role="table" aria-label="Notas fiscais">
               <div className="notes-row notes-head" role="row">
-                <span role="columnheader">LOJA</span>
-                <span role="columnheader">NFD</span>
-                <span role="columnheader">EMISSÃO</span>
-                <span role="columnheader">UF</span>
-                <span role="columnheader">STATUS</span>
+                {NOTE_SORT_COLUMNS.map((column) => {
+                  const isActive = sort.key === column.key
+                  const indicator = !isActive ? '↕' : sort.direction === 'ascending' ? '↑' : '↓'
+                  return (
+                    <span key={column.key} role="columnheader" aria-sort={isActive ? sort.direction : undefined}>
+                      <button type="button" onClick={() => handleSort(column.key)}>
+                        {column.label}<span className="notes-sort-indicator" aria-hidden="true">{indicator}</span>
+                      </button>
+                    </span>
+                  )
+                })}
               </div>
 
-              {filteredNotes.map((note) => {
+              {sortedNotes.map((note) => {
                 const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
                 return (
                 <div
