@@ -2105,6 +2105,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
 
 export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
   const defaults = useMemo(() => getDefaultNoteDates(), [])
+  const today = defaults.end
   const [startDate, setStartDate] = useState(defaults.start)
   const [endDate, setEndDate] = useState(defaults.end)
   const invoiceFilters = useMemo(() => ({ restrictedUfs, startDate, endDate }), [restrictedUfs, startDate, endDate])
@@ -2224,6 +2225,17 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedFinalized({ note: finalizedNote, store: selectedFstd.store })
   }
 
+  function handleStartDateChange(value) {
+    const latestStartDate = endDate && endDate < today ? endDate : today
+    setStartDate(value > latestStartDate ? latestStartDate : value)
+  }
+
+  function handleEndDateChange(value) {
+    const nextEndDate = value > today ? today : value
+    setEndDate(nextEndDate)
+    if (nextEndDate && startDate > nextEndDate) setStartDate(nextEndDate)
+  }
+
   return (
     <section className="notes-page">
       <div className="notes-card">
@@ -2245,8 +2257,8 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         </div>
 
         <div className="notes-filters" aria-label="Filtros das notas">
-          <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label>
-          <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label>
+          <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
+          <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
           <label>Status<AppSelect value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
           <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
           <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>

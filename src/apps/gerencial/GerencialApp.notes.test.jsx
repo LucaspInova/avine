@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invoiceBoundary = vi.hoisted(() => ({ useInvoices: vi.fn(), useInvoiceMutations: vi.fn() }))
 vi.mock('../../domains/invoices', () => ({
@@ -26,7 +26,14 @@ function setupQuery(overrides = {}) {
 }
 
 describe('tela proprietária de Notas gerencial', () => {
-  beforeEach(() => { vi.clearAllMocks(); setupQuery() })
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 7, 12))
+    vi.clearAllMocks()
+    setupQuery()
+  })
+
+  afterEach(() => vi.useRealTimers())
 
   it('representa carregamento, erro e vazio retornados pela fronteira de domínio', () => {
     setupQuery({ isLoading: true })
@@ -55,5 +62,32 @@ describe('tela proprietária de Notas gerencial', () => {
     expect(screen.getByRole('dialog', { name: '10 - 110' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Fechar nota fiscal' }))
     expect(screen.queryByRole('dialog', { name: '10 - 110' })).not.toBeInTheDocument()
+  })
+
+  it('limita as datas ao dia local atual', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    const startDate = screen.getByLabelText('Data inicial')
+    const endDate = screen.getByLabelText('Data final')
+
+    expect(endDate).toHaveAttribute('max', '2026-08-07')
+    expect(startDate).toHaveAttribute('max', '2026-08-07')
+
+    fireEvent.change(endDate, { target: { value: '2026-08-06' } })
+    fireEvent.change(endDate, { target: { value: '2026-08-07' } })
+    expect(endDate).toHaveValue('2026-08-07')
+  })
+
+  it('rejeita datas futuras e mantém a data inicial dentro do intervalo', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    const startDate = screen.getByLabelText('Data inicial')
+    const endDate = screen.getByLabelText('Data final')
+
+    fireEvent.change(endDate, { target: { value: '2026-08-08' } })
+    expect(endDate).toHaveValue('2026-08-07')
+
+    fireEvent.change(endDate, { target: { value: '2026-08-05' } })
+    expect(startDate).toHaveAttribute('max', '2026-08-05')
+    fireEvent.change(startDate, { target: { value: '2026-08-06' } })
+    expect(startDate).toHaveValue('2026-08-05')
   })
 })
