@@ -35,7 +35,7 @@ describe('auth capabilities', () => {
   it.each([
     [{ ...base, ativo: false, perfil: 'Admin', auth_role: 'admin' }],
     [{ ...base, acesso_habilitado: false, perfil: 'Admin', auth_role: 'admin' }],
-  ])('rejects inactive or access-disabled users', (profile) => {
-    expect(getCapabilities(profile)).toEqual([])
+  ])('does not use legacy status flags as access control', (profile) => {
+    expect(can(profile, 'admin.runRestrictedOperations')).toBe(true)
   })
 })

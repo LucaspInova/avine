@@ -28,6 +28,7 @@ const usuarios = [
     ativo: true,
     acesso_habilitado: true,
     fotos_habilitadas: true,
+    last_access_at: '2026-08-01T12:00:00.000Z',
   },
   {
     id: 'promotor-2',
@@ -85,7 +86,7 @@ describe('Cadastro de Usuários', () => {
     expect(screen.queryByLabelText(/Mais ações para/)).not.toBeInTheDocument()
     expect(screen.getByText('BRUNO PROMOTOR').closest('[role="row"]')).toHaveTextContent('2')
     expect(within(table).getByText('07/08/2026, 12:30')).toBeInTheDocument()
-    expect(within(table).getAllByText('Nunca')).toHaveLength(2)
+    expect(within(table).getAllByText('Nunca')).toHaveLength(1)
 
     expect(screen.queryByLabelText('Perfil')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Resumo de usuários')).not.toBeInTheDocument()
@@ -134,6 +135,20 @@ describe('Cadastro de Usuários', () => {
       onSubmit={noop} onDelete={noop} allowedProfiles={['Admin', 'Gerencial', 'Promotor']} />)
     expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Gerencial' })).toBeInTheDocument()
+  })
+
+  it('confirma a exclusão de acesso em um modal sem oferecer cancelamento redundante', () => {
+    const onDelete = vi.fn()
+    const onCancelDelete = vi.fn()
+    render(<EditarUsuarioModal form={{ ...usuarios[1], senha: '' }} usuarios={usuarios} usuarioId="promotor-1"
+      busy={false} deleting={false} error="" onChange={noop} onBack={noop} onClose={noop}
+      onSubmit={noop} onDelete={onDelete} deleteConfirmationOpen onCancelDelete={onCancelDelete} />)
+
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
+    expect(screen.getByRole('alertdialog', { name: 'Excluir acesso?' })).toHaveTextContent('não pode ser desfeita')
+    expect(screen.getByRole('alertdialog', { name: 'Excluir acesso?' })).toHaveTextContent('cadastrar o funcionário novamente')
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }))
+    expect(onDelete).toHaveBeenCalledOnce()
   })
 
   it('cadastra Promotor por UF sem vínculo de Gerencial ou seletor de fotos', () => {

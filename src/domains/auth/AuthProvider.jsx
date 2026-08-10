@@ -35,8 +35,6 @@ function routeForProfile(profile) {
 function hasApplicationAccess(profile) {
   return Boolean(
     profile &&
-      profile.ativo === true &&
-      profile.acesso_habilitado === true &&
       profile.auth_user_id &&
       hasConsistentRole(profile),
   )

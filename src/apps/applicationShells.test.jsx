@@ -76,7 +76,7 @@ describe('rotas e shells de aplicação', () => {
     const clear = vi.spyOn(QueryClient.prototype, 'clear')
     auth.useAuth.mockReturnValue({
       session: { user: { id: 'auth-1' } },
-      profile: { id: 'promotor-1', perfil: 'Promotor', ativo: true, acesso_habilitado: true },
+      profile: { id: 'promotor-1', auth_user_id: 'auth-1', perfil: 'Promotor', ativo: false, acesso_habilitado: false },
       loading: false,
       signOut,
     })

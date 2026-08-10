@@ -49,12 +49,10 @@ function RoleEntry() {
     }
 
     if (
-      !result.profile ||
-      result.profile.ativo !== true ||
-      result.profile.acesso_habilitado !== true
+      !result.profile || !result.profile.auth_user_id
     ) {
       await auth.signOut()
-      setError('Usuário sem perfil ativo associado.')
+      setError('Usuário sem cadastro associado.')
       setBusy(false)
       return
     }

@@ -30,8 +30,6 @@ export type UpdateManagedUserPayload = {
   perfil: PerfilUsuario
   estado: Estado
   ufs: Estado[]
-  ativo: boolean
-  acesso_habilitado: boolean
   password?: string
   auth_role?: 'admin' | 'gerencial' | 'promotor'
 }
@@ -100,21 +98,6 @@ export async function updateManagedUser(
   payload: UpdateManagedUserPayload,
 ): Promise<ManagedUserViewModel> {
   const data = await invokeManageUsers({ action: 'update', ...payload })
-  if (!data.usuario) throw new Error('A função não retornou o usuário atualizado.')
-  return data.usuario
-}
-
-export async function setManagedUserAccess(
-  usuarioId: string,
-  acessoHabilitado: boolean,
-  ativo = acessoHabilitado,
-): Promise<ManagedUserViewModel> {
-  const data = await invokeManageUsers({
-    action: 'set_access',
-    usuario_id: usuarioId,
-    acesso_habilitado: acessoHabilitado,
-    ativo,
-  })
   if (!data.usuario) throw new Error('A função não retornou o usuário atualizado.')
   return data.usuario
 }

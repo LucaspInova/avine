@@ -8,8 +8,8 @@ import {
   createGerencialUser,
   createOperationalUser,
   deleteManagedUser,
+  isUserActive,
   listManagedUsers,
-  setManagedUserAccess,
   updateManagedUser,
 } from '../../domains/users'
 import {
@@ -100,10 +100,6 @@ function getUserInitials(name) {
     .map((part) => part.charAt(0))
     .join('')
     .toUpperCase() || 'US'
-}
-
-function isUserActive(user) {
-  return user.ativo === true && user.acesso_habilitado === true
 }
 
 function getManagedRoleLabel(user) {
@@ -552,7 +548,8 @@ function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhot
 
 export function UsuarioModal({
   mode = 'create', form, usuarios, currentUser, usuarioId = '', busy, deleting = false, error,
-  onChange, onBack, onClose, onSubmit, onDelete, allowedProfiles = perfisCadastro,
+  onChange, onBack, onClose, onSubmit, onDelete, deleteConfirmationOpen = false,
+  onCancelDelete, allowedProfiles = perfisCadastro,
 }) {
   const [touched, setTouched] = useState({})
   const isEdit = mode === 'edit'
@@ -645,11 +642,21 @@ export function UsuarioModal({
         </div>
         {error && <p className="form-error">{error}</p>}
         {isEdit ? <div className="edit-actions">
+          <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>Excluir acesso</button>
           <button className="primary-button edit-submit" type="submit" disabled={!canSubmit}>{busy ? 'Salvando...' : 'Salvar'}</button>
-          <button className="secondary-button edit-cancel" type="button" onClick={onBack}>Cancelar</button>
-          <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>{deleting ? 'Bloqueando...' : 'Bloquear acesso'}</button>
         </div> : <button className="modal-submit" type="submit" disabled={!canSubmit}><Icon name="plus" /><span>{busy ? 'Cadastrando...' : 'Cadastrar'}</span></button>}
       </form>
+      {deleteConfirmationOpen && <div className="confirmation-backdrop" role="presentation">
+        <section className="delete-access-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-access-title">
+          <div className="delete-access-icon" aria-hidden="true">!</div>
+          <h3 id="delete-access-title">Excluir acesso?</h3>
+          <p>Esta ação não pode ser desfeita. Se a exclusão estiver errada, será necessário cadastrar o funcionário novamente.</p>
+          <div className="delete-confirm-actions">
+            <button className="secondary-button" type="button" onClick={onCancelDelete} disabled={deleting}>Voltar</button>
+            <button className="danger-button" type="button" onClick={onDelete} disabled={deleting}>{deleting ? 'Excluindo...' : 'Confirmar exclusão'}</button>
+          </div>
+        </section>
+      </div>}
     </div>
   )
 }
@@ -2234,6 +2241,7 @@ function GerencialApp({ capabilities }) {
   const [editError, setEditError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingUser, setDeletingUser] = useState(false)
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const [isEditOpen, setEditOpen] = useState(false)
 
   const [lojas, setLojas] = useState([])
@@ -2252,7 +2260,6 @@ function GerencialApp({ capabilities }) {
     nome: '',
     email: '',
     senha: '',
-    ativo: true,
   })
   const [gerencialBusy, setGerencialBusy] = useState(false)
   const [gerencialError, setGerencialError] = useState('')
@@ -2322,7 +2329,7 @@ function GerencialApp({ capabilities }) {
       setLojas(sortStoresByCode(lojasResult.data ?? []))
       setPromotores(
         (usuariosResult.data ?? []).filter(
-          (usuario) => usuario.perfil === 'Promotor' && usuario.ativo,
+          (usuario) => usuario.perfil === 'Promotor',
         ),
       )
       const visibleStoreIds = new Set((lojasResult.data ?? []).map((loja) => loja.id))
@@ -2345,9 +2352,7 @@ function GerencialApp({ capabilities }) {
       if (
         authLoading ||
         !session ||
-        !isAdministrativeProfile(currentUser) ||
-        currentUser.ativo !== true ||
-        currentUser.acesso_habilitado !== true
+        !isAdministrativeProfile(currentUser)
       ) {
         return
       }
@@ -2375,8 +2380,6 @@ function GerencialApp({ capabilities }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     authLoading,
-    currentUser?.acesso_habilitado,
-    currentUser?.ativo,
     currentUser?.auth_user_id,
     currentUser?.auth_role,
     currentUser?.foto_url,
@@ -2675,6 +2678,7 @@ function GerencialApp({ capabilities }) {
     setEditForm(initialUserForm)
     setEditError('')
     setEditOpen(false)
+    setDeleteConfirmationOpen(false)
   }
 
   async function handleEditUsuario(event) {
@@ -2718,8 +2722,6 @@ function GerencialApp({ capabilities }) {
       await updateManagedUser({
         usuario_id: selectedUsuario.id,
         ...payload,
-        ativo: selectedUsuario.ativo,
-        acesso_habilitado: selectedUsuario.acesso_habilitado,
       })
     } catch (updateError) {
       setEditError(
@@ -2738,18 +2740,18 @@ function GerencialApp({ capabilities }) {
   async function handleDeleteUsuario() {
     if (!selectedUsuario) return
 
-    const shouldBlock = window.confirm(
-      `Bloquear o acesso de ${selectedUsuario.nome}? O perfil operacional será preservado.`,
-    )
-    if (!shouldBlock) return
+    if (!deleteConfirmationOpen) {
+      setDeleteConfirmationOpen(true)
+      return
+    }
 
     setDeletingUser(true)
     setEditError('')
 
     try {
-      await setManagedUserAccess(selectedUsuario.id, false, false)
-    } catch (blockError) {
-      setEditError(blockError instanceof Error ? blockError.message : 'Não foi possível bloquear o usuário.')
+      await deleteManagedUser(selectedUsuario.id)
+    } catch (deleteError) {
+      setEditError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o acesso do usuário.')
       setDeletingUser(false)
       return
     }
@@ -2777,14 +2779,13 @@ function GerencialApp({ capabilities }) {
       nome: usuario.nome,
       email: usuario.email,
       senha: '',
-      ativo: usuario.ativo,
     })
     setGerencialError('')
   }
 
   function cancelEditGerencial() {
     setGerencialEditId('')
-    setGerencialEditForm({ nome: '', email: '', senha: '', ativo: true })
+    setGerencialEditForm({ nome: '', email: '', senha: '' })
     setGerencialError('')
   }
 
@@ -2794,7 +2795,6 @@ function GerencialApp({ capabilities }) {
       nome: normalizaTexto(gerencialEditForm.nome),
       email: gerencialEditForm.email.trim().toLowerCase(),
       senha: gerencialEditForm.senha,
-      ativo: gerencialEditForm.ativo,
     }
 
     if (
@@ -2826,8 +2826,6 @@ function GerencialApp({ capabilities }) {
         perfil: target.perfil === 'Admin' ? 'Admin' : 'Gerencial',
         estado: target.estado,
         ufs: target.ufs ?? (target.perfil === 'Admin' ? [] : [target.estado]),
-        ativo: payload.ativo,
-        acesso_habilitado: payload.ativo,
         auth_role: target.perfil === 'Admin' ? 'admin' : 'gerencial',
         password: payload.senha || undefined,
       })
@@ -3088,6 +3086,8 @@ function GerencialApp({ capabilities }) {
           onClose={closeUserModals}
           onSubmit={handleEditUsuario}
           onDelete={handleDeleteUsuario}
+          deleteConfirmationOpen={deleteConfirmationOpen}
+          onCancelDelete={() => setDeleteConfirmationOpen(false)}
           allowedProfiles={gerencialCapabilities.isAdmin ? perfisEditaveis : ['Promotor']}
         />
       )}
