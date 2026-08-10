@@ -2134,7 +2134,9 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         && (!selectedCity || selectedCity.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
     }), [notes, query, selectedCity, selectedStatus, selectedUf])
   const ufs = useMemo(() => uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true }), [notes])
-  const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => !selectedUf || note.uf === selectedUf).map((note) => note.cidade)), [notes, selectedUf])
+  const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => (
+    !selectedUf || String(note.uf ?? '').trim().toUpperCase() === selectedUf
+  )).map((note) => note.cidade)), [notes, selectedUf])
   const totals = useMemo(() => ({
     Geral: filteredNotes.length,
     Finalizada: filteredNotes.filter((note) => note.status === 'Finalizada').length,
@@ -2259,9 +2261,9 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         <div className="notes-filters" aria-label="Filtros das notas">
           <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
           <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
-          <label>Status<AppSelect value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
-          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
-          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
+          <label>Status<AppSelect value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
+          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
+          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
         </div>
 
         <div className="notes-summary" aria-label="Totais das notas">

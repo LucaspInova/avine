@@ -23,6 +23,21 @@ describe('AppSelect', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ target: expect.objectContaining({ value: 'inativo' }) }))
   })
 
+  it('usa o texto visível como valor quando a opção não declara value', () => {
+    const onChange = vi.fn()
+    render(
+      <AppSelect value="" onChange={onChange}>
+        <option value="">Todos</option>
+        <option>Pendente</option>
+      </AppSelect>,
+    )
+
+    fireEvent.mouseDown(screen.getByRole('combobox'))
+    fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: 'Pendente' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ target: expect.objectContaining({ value: 'Pendente' }) }))
+  })
+
   it('pesquisa o texto visível ignorando maiúsculas e acentos', () => {
     render(
       <AppSelect searchable value="" onChange={vi.fn()}>

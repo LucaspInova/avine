@@ -33,12 +33,16 @@ function normalizeOptions(options, children) {
 
   return Children.toArray(children)
     .filter((child) => child?.type === 'option')
-    .map((child, index) => ({
-      disabled: Boolean(child.props.disabled),
-      label: getOptionLabel(child.props.children),
-      value: String(child.props.value ?? ''),
-      key: child.key ?? `${child.props.value ?? index}`,
-    }))
+    .map((child, index) => {
+      const label = getOptionLabel(child.props.children)
+      const value = child.props.value == null ? label : String(child.props.value)
+      return {
+        disabled: Boolean(child.props.disabled),
+        label,
+        value,
+        key: child.key ?? `${value || index}`,
+      }
+    })
 }
 
 function getNextEnabledIndex(options, startIndex, direction) {
