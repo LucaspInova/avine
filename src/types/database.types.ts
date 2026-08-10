@@ -887,8 +887,8 @@ export type Database = {
         Returns: Database['public']['Tables']['fstd_legado']['Row'][]
       }
       listar_nfd_notas_gerencial: {
-        Args: { p_data_inicial?: string | null; p_data_final?: string | null }
-        Returns: { chave_acesso: string; estabelecimento: string; nota_fiscal: number; data_emissao: string; data_referencia: string; codigo_cliente: number; nome_abreviado: string; uf: string; cidade: string; quantidade_galinha: number; quantidade_codorna: number; valor_total: number; status: string; fstd_legado: boolean }[]
+        Args: { p_data_inicial?: string | null; p_data_final?: string | null; p_status?: string | null; p_uf?: string | null; p_cidade?: string | null; p_pesquisa?: string | null; p_ordenar_por?: string; p_direcao?: string; p_limite?: number; p_deslocamento?: number }
+        Returns: Json
       }
     }
     Enums: {

@@ -138,8 +138,6 @@ function getNoteDateKey(note) {
   return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
 }
 
-const noteTextCollator = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
-
 const NOTE_SORT_COLUMNS = [
   {
     key: 'loja',
@@ -157,19 +155,6 @@ const NOTE_SORT_COLUMNS = [
   { key: 'uf', label: 'UF', select: (note) => note.uf, type: 'text' },
   { key: 'status', label: 'STATUS', select: (note) => note.status, type: 'text' },
 ]
-
-function compareNoteSortValues(left, right, type) {
-  if (type === 'number') {
-    const leftNumber = Number(left)
-    const rightNumber = Number(right)
-    if (String(left ?? '').trim() && String(right ?? '').trim()
-      && Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
-      return leftNumber - rightNumber
-    }
-  }
-
-  return noteTextCollator.compare(String(left ?? ''), String(right ?? ''))
-}
 
 function getDefaultNoteDates(now = new Date()) {
   const localDate = (date) => {
@@ -1914,21 +1899,6 @@ function NotaStatusIcon({ status }) {
 
 const NOTE_STATUS_OPTIONS = ['Finalizada', 'Pendente', 'Desconhecida']
 
-function uniqueSortedValues(values, { uppercase = false } = {}) {
-  const unique = new Map()
-
-  values.forEach((value) => {
-    const normalized = String(value ?? '').trim()
-    if (!normalized) return
-
-    const display = uppercase ? normalized.toUpperCase() : normalized
-    const key = display.toLocaleLowerCase('pt-BR')
-    if (!unique.has(key)) unique.set(key, display)
-  })
-
-  return [...unique.values()].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }))
-}
-
 function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   const [invoiceCopied, setInvoiceCopied] = useState(false)
   const [pendingBusy, setPendingBusy] = useState(false)
@@ -2151,12 +2121,6 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const today = defaults.end
   const [startDate, setStartDate] = useState(defaults.start)
   const [endDate, setEndDate] = useState(defaults.end)
-  const invoiceFilters = useMemo(() => ({ restrictedUfs, startDate, endDate }), [restrictedUfs, startDate, endDate])
-  const invoicesQuery = useInvoices(invoiceFilters)
-  const invoiceMutations = useInvoiceMutations()
-  const notes = useMemo(() => invoicesQuery.data ?? [], [invoicesQuery.data])
-  const loading = invoicesQuery.isLoading
-  const error = invoicesQuery.error?.message ?? ''
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedUf, setSelectedUf] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
@@ -2167,49 +2131,29 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [sort, setSort] = useState({ key: 'data_emissao', direction: 'descending' })
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const query = search.trim().toLowerCase()
-
-  const filteredNotes = useMemo(() => notes.filter((note) => {
-      const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
-      const nfd = String(note.nota_fiscal ?? '-')
-      const matchesQuery = `${storeName} ${nfd} ${note.status}`.toLowerCase().includes(query)
-      const noteUf = String(note.uf ?? '').trim().toUpperCase()
-      const noteCity = String(note.cidade ?? '').trim()
-      return matchesQuery && (!selectedStatus || selectedStatus === note.status)
-        && (!selectedUf || selectedUf === noteUf)
-        && (!selectedCity || selectedCity.toLocaleLowerCase('pt-BR') === noteCity.toLocaleLowerCase('pt-BR'))
-    }), [notes, query, selectedCity, selectedStatus, selectedUf])
-  const sortedNotes = useMemo(() => {
-    const column = NOTE_SORT_COLUMNS.find((item) => item.key === sort.key)
-    if (!column) return [...filteredNotes]
-
-    const direction = sort.direction === 'ascending' ? 1 : -1
-    return filteredNotes
-      .map((note, index) => ({ note, index }))
-      .sort((left, right) => (
-        compareNoteSortValues(column.select(left.note), column.select(right.note), column.type) * direction
-        || left.index - right.index
-      ))
-      .map(({ note }) => note)
-  }, [filteredNotes, sort])
-  const totalPages = Math.max(1, Math.ceil(sortedNotes.length / pageSize))
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setCurrentPage(1); setDebouncedSearch(search) }, 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+  const invoiceFilters = useMemo(() => ({ restrictedUfs, startDate, endDate,
+    status: selectedStatus, uf: selectedUf, city: selectedCity, search: debouncedSearch,
+    sortBy: sort.key, direction: sort.direction === 'ascending' ? 'asc' : 'desc', page: currentPage, pageSize,
+  }), [restrictedUfs, startDate, endDate, selectedStatus, selectedUf, selectedCity, debouncedSearch, sort, currentPage, pageSize])
+  const invoicesQuery = useInvoices(invoiceFilters)
+  const invoiceMutations = useInvoiceMutations()
+  const result = invoicesQuery.data ?? { rows: [], total: 0, counts: {}, ufs: [], cities: [] }
+  const notes = result.rows ?? []
+  const loading = invoicesQuery.isLoading
+  const error = invoicesQuery.error?.message ?? ''
+  const totalPages = Math.max(1, Math.ceil(result.total / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-  const paginatedNotes = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize
-    return sortedNotes.slice(start, start + pageSize)
-  }, [pageSize, safeCurrentPage, sortedNotes])
-  const rangeStart = sortedNotes.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1
-  const rangeEnd = Math.min(safeCurrentPage * pageSize, sortedNotes.length)
-  const ufs = useMemo(() => uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true }), [notes])
-  const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => (
-    !selectedUf || String(note.uf ?? '').trim().toUpperCase() === selectedUf
-  )).map((note) => note.cidade)), [notes, selectedUf])
-  const totals = useMemo(() => ({
-    Geral: filteredNotes.length,
-    Finalizada: filteredNotes.filter((note) => note.status === 'Finalizada').length,
-    Pendente: filteredNotes.filter((note) => note.status === 'Pendente').length,
-    Desconhecida: filteredNotes.filter((note) => note.status === 'Desconhecida').length,
-  }), [filteredNotes])
+  const rangeStart = result.total === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(safeCurrentPage * pageSize, result.total)
+  const ufs = result.ufs ?? []
+  const cities = result.cities ?? []
+  const totals = { Geral: result.total, Finalizada: result.counts?.Finalizada ?? 0,
+    Pendente: result.counts?.Pendente ?? 0, Desconhecida: result.counts?.Desconhecida ?? 0 }
 
   function getStoreForNote(note) {
     return (lojas ?? []).find((item) => String(item.codigo) === String(note.codigo_cliente))
@@ -2368,7 +2312,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
 
         {!loading && error && <p className="table-message">{error}</p>}
 
-        {!loading && !error && filteredNotes.length > 0 && (
+        {!loading && !error && notes.length > 0 && (
             <div className="notes-table" role="table" aria-label="Notas fiscais">
               <div className="notes-row notes-head" role="row">
                 {NOTE_SORT_COLUMNS.map((column) => {
@@ -2384,7 +2328,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
                 })}
               </div>
 
-              {paginatedNotes.map((note) => {
+              {notes.map((note) => {
                 const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
                 return (
                 <div
@@ -2413,9 +2357,9 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
             </div>
         )}
 
-        {!loading && !error && filteredNotes.length > 0 && (
+        {!loading && !error && notes.length > 0 && (
           <footer className="notes-table-footer">
-            <p aria-live="polite">{rangeStart}–{rangeEnd} de {sortedNotes.length}</p>
+            <p aria-live="polite">{rangeStart}–{rangeEnd} de {result.total}</p>
             <label className="notes-page-size">
               <span>Linhas por página</span>
               <AppSelect
@@ -2439,7 +2383,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
           </footer>
         )}
 
-        {!loading && !error && filteredNotes.length === 0 && (
+        {!loading && !error && notes.length === 0 && (
           <p className="table-message">Nenhuma NFD encontrada.</p>
         )}
       </div>
