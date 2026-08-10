@@ -6,4 +6,6 @@ A migration `20260810121000_include_fstd_legado_in_status.sql` faz a função ge
 
 Para FSTDs legadas, o sistema gera uma visualização HTML a partir de `base-legado/template-pdf.html`; os campos `$...` são substituídos pelos valores da linha, o cliente é enriquecido com o nome da tabela `lojas`, e os cálculos de perdido são derivados dos totais menos os retornos. O documento legado não é persistido no bucket nem convertido em processo atual.
 
+O arquivo de upload `base-legado/fstd_legado_upload.csv` usa inteiros nas colunas de quantidade. A célula `IMPORTAR_LEGADO!H4157` continha o valor inválido `268p90`; ela foi deixada vazia no CSV para não inventar um número e deve ser revisada manualmente após a importação.
+
 Validações executadas: `npm run typecheck`, `npm run lint`, `npm run build` e 16 testes focados. A conexão local do Supabase não estava disponível; a checagem vinculada em dry-run também excedeu o timeout sem aplicar migrations.
