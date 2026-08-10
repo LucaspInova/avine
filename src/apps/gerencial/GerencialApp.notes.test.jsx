@@ -87,6 +87,41 @@ describe('tela proprietária de Notas gerencial', () => {
     expect(within(summary).getByText('Desconhecida').closest('article')).toHaveTextContent('Desconhecida350,0%')
   })
 
+  it('ordena inicialmente por Emissão decrescente e alterna colunas textual e numérica', () => {
+    setupQuery({ data: [
+      { ...notes[0], nome_abreviado: 'Beta', nota_fiscal: '10', data_referencia: '2026-08-02' },
+      { ...notes[1], nome_abreviado: 'Árvore', nota_fiscal: '2', data_referencia: '2026-08-06' },
+      { ...notes[2], nome_abreviado: 'Casa', nota_fiscal: '1', data_referencia: '2026-08-04' },
+    ] })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    const table = screen.getByRole('table', { name: 'Notas fiscais' })
+    const rows = () => within(table).getAllByRole('row').slice(1)
+    const rowNames = () => rows().map((row) => row.textContent)
+    const nfdValues = () => rows().map((row) => within(row).getAllByRole('cell')[1].textContent)
+    expect(screen.getByRole('columnheader', { name: 'EMISSÃO' })).toHaveAttribute('aria-sort', 'descending')
+    expect(rowNames()).toEqual([
+      expect.stringContaining('Árvore'),
+      expect.stringContaining('Casa'),
+      expect.stringContaining('Beta'),
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'LOJA' }))
+    expect(screen.getByRole('columnheader', { name: 'LOJA' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(rowNames()).toEqual([
+      expect.stringContaining('Árvore'),
+      expect.stringContaining('Beta'),
+      expect.stringContaining('Casa'),
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'LOJA' }))
+    expect(rowNames()[0]).toContain('Casa')
+
+    fireEvent.click(screen.getByRole('button', { name: 'NFD' }))
+    expect(nfdValues()).toEqual(['1', '2', '10'])
+    fireEvent.click(screen.getByRole('button', { name: 'NFD' }))
+    expect(nfdValues()).toEqual(['10', '2', '1'])
+  })
+
   it('exibe percentuais zerados quando o conjunto filtrado está vazio', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
 
