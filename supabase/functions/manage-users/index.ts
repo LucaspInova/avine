@@ -10,6 +10,7 @@ const corsHeaders = {
 const allowedRoles = new Set(["Promotor", "Gerencial", "Admin"]);
 const allowedAuthRoles = new Set(["admin", "gerencial", "promotor"]);
 const PASSWORD_MIN_LENGTH = 8;
+const DEFAULT_PROMOTER_PASSWORD = "Promotor12345";
 const PASSWORD_POLICY_ERROR =
   `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres, ` +
   "uma letra maiuscula, uma letra minuscula e um numero.";
@@ -120,6 +121,7 @@ function validateProfile(input: JsonRecord) {
   const estado = perfil === "Admin" ? "CE" : ufs[0] ?? "";
 
   if (nome.length < 4) throw new Error("Informe um nome valido.");
+  if (nome !== nome.toUpperCase()) throw new Error("O nome deve conter apenas letras maiusculas.");
   if (!isEmail(normalizedEmail)) throw new Error("Informe um e-mail valido.");
   if (!allowedRoles.has(perfil)) throw new Error("Perfil de acesso invalido.");
   if (ufs.some((uf) => !allowedStates.has(uf))) throw new Error("UF invalida.");
@@ -327,12 +329,22 @@ Deno.serve(async (request) => {
       });
     }
 
-    const password = typeof body.password === "string" ? body.password : "";
+    const password = profileInput.perfil === "Promotor"
+      ? DEFAULT_PROMOTER_PASSWORD
+      : typeof body.password === "string" ? body.password : "";
     if (!validatePassword(password)) {
       return jsonResponse(400, {
         error: PASSWORD_POLICY_ERROR,
       });
     }
+
+    const { count: duplicateNameCount, error: duplicateNameError } = await adminClient
+      .from("usuarios").select("id", { count: "exact", head: true })
+      .ilike("nome", profileInput.nome);
+    if (duplicateNameError) return jsonResponse(400, { error: duplicateNameError.message });
+    if ((duplicateNameCount ?? 0) > 0) return jsonResponse(409, {
+      error: "Este nome ja esta em uso. Inclua um sobrenome para diferenciar.",
+    });
 
     let authRole: string;
     try {
