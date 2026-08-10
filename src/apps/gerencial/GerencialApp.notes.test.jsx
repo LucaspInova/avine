@@ -14,7 +14,7 @@ vi.mock('../../domains/auth/AuthProvider.jsx', async (importOriginal) => ({
 import { NotasScreen } from './GerencialApp.jsx'
 
 const mutation = () => ({ mutateAsync: vi.fn() })
-const notes = Array.from({ length: 11 }, (_, index) => ({
+const notes = Array.from({ length: 120 }, (_, index) => ({
   chave_acesso: `chave-${index}`, nota_fiscal: `${100 + index}`, codigo_cliente: '10',
   nome_abreviado: `Loja ${index}`, status: 'Pendente', data_referencia: '2026-08-06',
   uf: 'CE', cidade: 'Fortaleza', quantidade_galinha: 1, quantidade_codorna: 0,
@@ -52,21 +52,34 @@ describe('tela proprietária de Notas gerencial', () => {
     expect(screen.getByText('Nenhuma NFD encontrada.')).toBeVisible()
   })
 
-  it('exibe filtros, totais e todas as notas sem paginação, e abre o modal', () => {
+  it('limita a página inicial a 10 notas e navega para a próxima página', () => {
     setupQuery({ data: notes })
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} restrictedUfs={['CE']} />)
     expect(screen.getByText('Loja 0')).toBeVisible()
-    expect(screen.getByText('Loja 10')).toBeVisible()
+    expect(screen.queryByText('Loja 10')).not.toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: 'EMISSÃO' })).toBeVisible()
     expect(screen.getByRole('columnheader', { name: 'UF' })).toBeVisible()
     expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-01')
     expect(screen.getByLabelText('Data final')).toHaveValue('2026-08-07')
-    expect(screen.getByLabelText('Totais das notas')).toHaveTextContent('Geral11')
-    expect(screen.queryByRole('button', { name: 'Próxima página' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Totais das notas')).toHaveTextContent('Geral120')
+    expect(screen.getByText('1–10 de 120')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    expect(screen.getByText('Loja 10')).toBeVisible()
+    expect(screen.getByText('11–20 de 120')).toBeVisible()
     fireEvent.click(screen.getByRole('row', { name: /Loja 10/ }))
     expect(screen.getByRole('dialog', { name: '10 - 110' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Fechar nota fiscal' }))
     expect(screen.queryByRole('dialog', { name: '10 - 110' })).not.toBeInTheDocument()
+  })
+
+  it.each([25, 50, 100])('altera o tamanho da página para %i linhas', (pageSize) => {
+    setupQuery({ data: notes })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    selectFilter('Linhas por página', String(pageSize))
+
+    expect(screen.getByText(`1–${pageSize} de 120`)).toBeVisible()
+    expect(within(screen.getByRole('table', { name: 'Notas fiscais' })).getAllByRole('row')).toHaveLength(pageSize + 1)
   })
 
   it('exibe quantidade e percentual de cada status sobre o conjunto filtrado', () => {
