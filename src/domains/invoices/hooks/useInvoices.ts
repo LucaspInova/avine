@@ -10,8 +10,7 @@ export const invoiceKeys = {
 export function useInvoices(filters: InvoiceListFilters) {
   return useQuery({
     queryKey: invoiceKeys.list(filters),
-    queryFn: () => listInvoicesOverview(filters),
-    placeholderData: (previousData) => previousData,
+    queryFn: ({ signal }) => listInvoicesOverview(filters, signal),
   })
 }
 

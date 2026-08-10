@@ -18,4 +18,14 @@ describe('repositório paginado de NFDs', () => {
       p_ordenar_por: 'nota_fiscal', p_direcao: 'asc', p_limite: 10, p_deslocamento: 20,
     }))
   })
+
+  it('encaminha o sinal de cancelamento ao cliente Supabase', async () => {
+    const response = { rows: [], total: 0, counts: {}, ufs: [], cities: [] }
+    const abortSignal = vi.fn().mockResolvedValue({ data: response, error: null })
+    rpc.mockReturnValue({ abortSignal })
+    const controller = new AbortController()
+
+    await expect(listInvoicesOverview({ page: 1, pageSize: 10 }, controller.signal)).resolves.toEqual(response)
+    expect(abortSignal).toHaveBeenCalledWith(controller.signal)
+  })
 })

@@ -2595,6 +2595,14 @@ select:focus-visible {
   margin-bottom: 22px;
 }
 
+.notes-loading {
+  min-height: 24rem;
+}
+
+.notes-loading .ui-spinner {
+  border-top-color: #196b42;
+}
+
 .notes-summary-card {
   display: grid;
   gap: var(--space-1);

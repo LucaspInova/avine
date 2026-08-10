@@ -28,7 +28,7 @@ import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
-import { AppSelect, FilterPopover, FilterSection, PageToolbar, Pagination } from '../../shared/ui'
+import { AppSelect, FilterPopover, FilterSection, LoadingState, PageToolbar, Pagination } from '../../shared/ui'
 import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -1879,6 +1879,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedUf, setSelectedUf] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
+  const [draftFilters, setDraftFilters] = useState(() => ({ startDate: defaults.start, endDate: defaults.end, status: '', uf: '', city: '' }))
   const [selectedNote, setSelectedNote] = useState(null)
   const [selectedFstd, setSelectedFstd] = useState(null)
   const [selectedFinalized, setSelectedFinalized] = useState(null)
@@ -1900,7 +1901,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const invoiceMutations = useInvoiceMutations()
   const result = invoicesQuery.data ?? { rows: [], total: 0, counts: {}, ufs: [], cities: [] }
   const notes = result.rows ?? []
-  const loading = invoicesQuery.isLoading
+  const loading = invoicesQuery.isFetching
   const error = invoicesQuery.error?.message ?? ''
   const totalPages = Math.max(1, Math.ceil(result.total / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -1910,8 +1911,8 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const cities = result.cities ?? []
   // The product's default reporting period is the neutral state: only dates that
   // differ from getDefaultNoteDates contribute to the active-filter badge.
-  const periodFilterCount = Number(startDate !== defaults.start) + Number(endDate !== defaults.end)
-  const activeFilterCount = periodFilterCount + Number(Boolean(selectedStatus)) + Number(Boolean(selectedUf)) + Number(Boolean(selectedCity))
+  const periodFilterCount = Number(draftFilters.startDate !== defaults.start) + Number(draftFilters.endDate !== defaults.end)
+  const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status)) + Number(Boolean(draftFilters.uf)) + Number(Boolean(draftFilters.city))
   const totals = { Geral: result.total, Finalizada: result.counts?.Finalizada ?? 0,
     Pendente: result.counts?.Pendente ?? 0, Desconhecida: result.counts?.Desconhecida ?? 0 }
 
@@ -1999,16 +2000,23 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   }
 
   function handleStartDateChange(value) {
-    const latestStartDate = endDate && endDate < today ? endDate : today
-    setCurrentPage(1)
-    setStartDate(value > latestStartDate ? latestStartDate : value)
+    const latestStartDate = draftFilters.endDate && draftFilters.endDate < today ? draftFilters.endDate : today
+    setDraftFilters((current) => ({ ...current, startDate: value > latestStartDate ? latestStartDate : value }))
   }
 
   function handleEndDateChange(value) {
     const nextEndDate = value > today ? today : value
+    setDraftFilters((current) => ({ ...current, endDate: nextEndDate, startDate: nextEndDate && current.startDate > nextEndDate ? nextEndDate : current.startDate }))
+  }
+
+  function handleApplyFilters() {
     setCurrentPage(1)
-    setEndDate(nextEndDate)
-    if (nextEndDate && startDate > nextEndDate) setStartDate(nextEndDate)
+    setStartDate(draftFilters.startDate)
+    setEndDate(draftFilters.endDate)
+    setSelectedStatus(draftFilters.status)
+    setSelectedUf(draftFilters.uf)
+    setSelectedCity(draftFilters.city)
+    setIsFilterOpen(false)
   }
 
   function handleClearFilters() {
@@ -2018,6 +2026,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedStatus('')
     setSelectedUf('')
     setSelectedCity('')
+    setDraftFilters({ startDate: defaults.start, endDate: defaults.end, status: '', uf: '', city: '' })
   }
 
   function handleSort(key) {
@@ -2040,28 +2049,28 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
             activeFilterCount={activeFilterCount}
             isOpen={isFilterOpen}
             onToggle={setIsFilterOpen}
-            onApply={() => setIsFilterOpen(false)}
+            onApply={handleApplyFilters}
             onClear={handleClearFilters}
           >
             <FilterSection title="Período" count={periodFilterCount} id="note-filter-period">
               <div className="notes-filter-fields">
-                <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
-                <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
+                <label>Data inicial<input aria-label="Data inicial" type="date" value={draftFilters.startDate} max={draftFilters.endDate && draftFilters.endDate < today ? draftFilters.endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
+                <label>Data final<input aria-label="Data final" type="date" value={draftFilters.endDate} min={draftFilters.startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
               </div>
             </FilterSection>
-            <FilterSection title="Status" count={Number(Boolean(selectedStatus))} id="note-filter-status">
-              <AppSelect aria-label="Status" value={selectedStatus} onChange={(event) => { setCurrentPage(1); setSelectedStatus(event.target.value) }}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            <FilterSection title="Status" count={Number(Boolean(draftFilters.status))} id="note-filter-status">
+              <AppSelect aria-label="Status" value={draftFilters.status} onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
-            <FilterSection title="UF" count={Number(Boolean(selectedUf))} id="note-filter-uf">
-              <AppSelect aria-label="UF" searchable value={selectedUf} onChange={(event) => { setCurrentPage(1); setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            <FilterSection title="UF" count={Number(Boolean(draftFilters.uf))} id="note-filter-uf">
+              <AppSelect aria-label="UF" searchable value={draftFilters.uf} onChange={(event) => setDraftFilters((current) => ({ ...current, uf: event.target.value, city: '' }))}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
-            <FilterSection title="Cidade" count={Number(Boolean(selectedCity))} id="note-filter-city">
-              <AppSelect aria-label="Cidade" searchable value={selectedCity} onChange={(event) => { setCurrentPage(1); setSelectedCity(event.target.value) }}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            <FilterSection title="Cidade" count={Number(Boolean(draftFilters.city))} id="note-filter-city">
+              <AppSelect aria-label="Cidade" searchable value={draftFilters.city} onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
           </FilterPopover>
         </PageToolbar>
 
-        <div className="notes-summary" aria-label="Totais das notas">
+        {!loading && <div className="notes-summary" aria-label="Totais das notas">
           {Object.entries(totals).map(([label, total]) => (
             <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}>
               <span>{label}</span>
@@ -2071,7 +2080,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
               </div>
             </article>
           ))}
-        </div>
+        </div>}
 
         {completionMessage && (
           <p className="notes-completion-message" role="status">
@@ -2079,7 +2088,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
           </p>
         )}
 
-        {loading && <p className="table-message">Carregando notas fiscais...</p>}
+        {loading && <LoadingState className="notes-loading">Carregando notas fiscais...</LoadingState>}
 
         {!loading && error && <p className="table-message">{error}</p>}
 

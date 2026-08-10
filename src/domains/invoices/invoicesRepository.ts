@@ -11,16 +11,17 @@ export async function fetchAllNfdNotas(select: string, configureQuery?: (query: 
   })
 }
 
-export async function listInvoicesOverview(filters: InvoiceListFilters): Promise<InvoiceOverviewPage> {
+export async function listInvoicesOverview(filters: InvoiceListFilters, signal?: AbortSignal): Promise<InvoiceOverviewPage> {
   try {
     const page = Math.max(1, filters.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 10))
-    const { data, error } = await (supabase as any).rpc('listar_nfd_notas_gerencial', {
+    const request = (supabase as any).rpc('listar_nfd_notas_gerencial', {
       p_data_inicial: filters.startDate || null, p_data_final: filters.endDate || null,
       p_status: filters.status || null, p_uf: filters.uf || null, p_cidade: filters.city || null,
       p_pesquisa: filters.search?.trim() || null, p_ordenar_por: filters.sortBy ?? 'data_emissao',
       p_direcao: filters.direction ?? 'desc', p_limite: pageSize, p_deslocamento: (page - 1) * pageSize,
     })
+    const { data, error } = await (signal ? request.abortSignal(signal) : request)
     if (error) throw error
     return data as InvoiceOverviewPage
   } catch (error) { throw toAppError(error, 'Não foi possível carregar as notas fiscais.') }
