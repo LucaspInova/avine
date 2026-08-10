@@ -2923,8 +2923,41 @@ select:focus-visible {
   background: #08752c;
 }
 
+.notes-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 58px;
+  gap: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.notes-table-footer p {
+  margin: 0 auto 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.notes-page-size {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.notes-page-size select {
+  width: 72px;
+  height: 34px;
+}
+
 .notes-pagination {
-  margin: 3px 0 24px;
+  margin: 0;
 }
 
 .notes-pagination button,
@@ -4186,10 +4219,16 @@ select:focus-visible {
   }
 
   .notes-pagination {
-    margin-bottom: 14px;
+    width: 100%;
     overflow-x: auto;
     justify-content: flex-start;
     padding-bottom: 3px;
+  }
+
+  .notes-table-footer {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-top: 10px;
   }
 
   .nota-modal-layer {

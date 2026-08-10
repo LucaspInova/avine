@@ -2165,6 +2165,8 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [selectedFinalized, setSelectedFinalized] = useState(null)
   const [completionMessage, setCompletionMessage] = useState('')
   const [sort, setSort] = useState({ key: 'data_emissao', direction: 'descending' })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const query = search.trim().toLowerCase()
 
   const filteredNotes = useMemo(() => notes.filter((note) => {
@@ -2190,6 +2192,14 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
       ))
       .map(({ note }) => note)
   }, [filteredNotes, sort])
+  const totalPages = Math.max(1, Math.ceil(sortedNotes.length / pageSize))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedNotes = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize
+    return sortedNotes.slice(start, start + pageSize)
+  }, [pageSize, safeCurrentPage, sortedNotes])
+  const rangeStart = sortedNotes.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1
+  const rangeEnd = Math.min(safeCurrentPage * pageSize, sortedNotes.length)
   const ufs = useMemo(() => uniqueSortedValues(notes.map((note) => note.uf), { uppercase: true }), [notes])
   const cities = useMemo(() => uniqueSortedValues(notes.filter((note) => (
     !selectedUf || String(note.uf ?? '').trim().toUpperCase() === selectedUf
@@ -2286,16 +2296,19 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
 
   function handleStartDateChange(value) {
     const latestStartDate = endDate && endDate < today ? endDate : today
+    setCurrentPage(1)
     setStartDate(value > latestStartDate ? latestStartDate : value)
   }
 
   function handleEndDateChange(value) {
     const nextEndDate = value > today ? today : value
+    setCurrentPage(1)
     setEndDate(nextEndDate)
     if (nextEndDate && startDate > nextEndDate) setStartDate(nextEndDate)
   }
 
   function handleSort(key) {
+    setCurrentPage(1)
     setSort((current) => ({
       key,
       direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending',
@@ -2313,7 +2326,10 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
               <Icon name="search" />
               <input
                 value={search}
-                onChange={(event) => onSearch(event.target.value)}
+                onChange={(event) => {
+                  setCurrentPage(1)
+                  onSearch(event.target.value)
+                }}
                 placeholder="Procurar"
                 type="search"
               />
@@ -2325,9 +2341,9 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         <div className="notes-filters" aria-label="Filtros das notas">
           <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
           <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
-          <label>Status<AppSelect value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
-          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
-          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
+          <label>Status<AppSelect value={selectedStatus} onChange={(event) => { setCurrentPage(1); setSelectedStatus(event.target.value) }}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
+          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setCurrentPage(1); setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
+          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => { setCurrentPage(1); setSelectedCity(event.target.value) }}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
         </div>
 
         <div className="notes-summary" aria-label="Totais das notas">
@@ -2368,7 +2384,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
                 })}
               </div>
 
-              {sortedNotes.map((note) => {
+              {paginatedNotes.map((note) => {
                 const storeName = note.nome_abreviado?.trim() || note.estabelecimento?.trim() || String(note.codigo_cliente ?? '-')
                 return (
                 <div
@@ -2395,6 +2411,32 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
                 </div>
               )})}
             </div>
+        )}
+
+        {!loading && !error && filteredNotes.length > 0 && (
+          <footer className="notes-table-footer">
+            <p aria-live="polite">{rangeStart}–{rangeEnd} de {sortedNotes.length}</p>
+            <label className="notes-page-size">
+              <span>Linhas por página</span>
+              <AppSelect
+                aria-label="Linhas por página"
+                value={String(pageSize)}
+                onChange={(event) => {
+                  setCurrentPage(1)
+                  setPageSize(Number(event.target.value))
+                }}
+              >
+                {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+              </AppSelect>
+            </label>
+            <Pagination
+              className="notes-pagination"
+              currentPage={safeCurrentPage}
+              label="Paginação das notas fiscais"
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </footer>
         )}
 
         {!loading && !error && filteredNotes.length === 0 && (
