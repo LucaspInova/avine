@@ -73,8 +73,8 @@ describe('fluxos proprietários de lojas/roteirização', () => {
     expect(within(ufHeading).getByLabelText('0 selecionados')).toBeVisible()
 
     fireEvent.click(screen.getByLabelText('CE'))
-    expect(within(ufHeading).getByLabelText('1 selecionados')).toHaveTextContent('1')
-    expect(within(trigger).getByLabelText('1 filtros ativos')).toHaveTextContent('1')
+    expect(within(ufHeading).getByLabelText('1 selecionado')).toHaveTextContent('1')
+    expect(within(trigger).getByLabelText('1 filtro ativo')).toHaveTextContent('1')
     fireEvent.click(ufHeading)
     expect(ufHeading).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByLabelText('CE')).not.toBeInTheDocument()
@@ -108,7 +108,7 @@ describe('fluxos proprietários de lojas/roteirização', () => {
     expect(within(screen.getByRole('button', { name: /Filtrar por Cidade/ })).getByLabelText('2 selecionados')).toBeVisible()
     fireEvent.click(screen.getByLabelText('PE'))
     expect(screen.queryByLabelText('Recife')).not.toBeInTheDocument()
-    expect(within(screen.getByRole('button', { name: /Filtrar por Cidade/ })).getByLabelText('1 selecionados')).toBeVisible()
+    expect(within(screen.getByRole('button', { name: /Filtrar por Cidade/ })).getByLabelText('1 selecionado')).toBeVisible()
     expect(screen.getByText('1 - Loja Ceará')).toBeVisible()
   })
 
