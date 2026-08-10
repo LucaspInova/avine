@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { applicationRoutes } from '../app/routePaths.js'
@@ -63,12 +63,17 @@ describe('rotas e shells de aplicação', () => {
 
   it('compõe navegação e conteúdo gerencial para uma sessão válida', () => {
     renderAt(
-      <GerencialApplicationShell authLoading={false} session={{ user: {} }} profile={{ perfil: 'Gerencial' }} sidebar={<nav>Navegação</nav>}>
-        <main>Fluxo vertical</main>
+      <GerencialApplicationShell
+        authLoading={false}
+        session={{ user: {} }}
+        profile={{ perfil: 'Gerencial' }}
+        sidebar={<nav aria-label="Menu principal"><button type="button">Notas</button></nav>}
+      >
+        <main><h1>Notas Fiscais de Devolução</h1></main>
       </GerencialApplicationShell>,
     )
-    expect(screen.getByText('Navegação')).toBeVisible()
-    expect(screen.getByText('Fluxo vertical')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Notas Fiscais de Devolução' })).toBeVisible()
+    expect(within(screen.getByRole('navigation', { name: 'Menu principal' })).getByRole('button', { name: 'Notas' })).toBeVisible()
   })
 
   it('restringe o shell promotor por perfil e executa todas as ações de saída', async () => {
