@@ -17,6 +17,10 @@ function select(name, option) {
   fireEvent.mouseDown(screen.getByRole('combobox', { name }))
   fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: option }))
 }
+function openFilters() {
+  fireEvent.click(screen.getByRole('button', { name: /Filtrar/ }))
+  return screen.getByRole('dialog', { name: 'Filtros' })
+}
 
 describe('fluxo paginado das Notas gerenciais', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 7, 7, 12)); vi.clearAllMocks(); setup() })
@@ -33,9 +37,12 @@ describe('fluxo paginado das Notas gerenciais', () => {
   it('inclui página, tamanho, filtros e ordenação na fronteira do hook', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    openFilters()
     select('Status', 'Pendente')
     select('UF', 'CE')
     select('Cidade', 'Fortaleza')
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
+    expect(screen.queryByRole('dialog', { name: 'Filtros' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'NFD' }))
     select('Linhas por página', '25')
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 25, status: 'Pendente', uf: 'CE', city: 'Fortaleza', sortBy: 'nota_fiscal', direction: 'asc' }))
@@ -69,8 +76,53 @@ describe('fluxo paginado das Notas gerenciais', () => {
   it('mantém datas no intervalo local e expõe estado vazio', () => {
     setup({ ...page, rows: [], total: 0 })
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    openFilters()
     expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-01')
     expect(screen.getByLabelText('Data final')).toHaveAttribute('max', '2026-08-07')
     expect(screen.getByText('Nenhuma NFD encontrada.')).toBeVisible()
+  })
+
+  it('trata o período padrão como neutro, conta mudanças e restaura todos os filtros', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('0')
+    openFilters()
+
+    fireEvent.change(screen.getByLabelText('Data inicial'), { target: { value: '2026-07-20' } })
+    fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-08-06' } })
+    select('Status', 'Finalizada')
+    expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('3')
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ startDate: '2026-07-20', endDate: '2026-08-06', status: 'Finalizada', page: 1 }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-01')
+    expect(screen.getByLabelText('Data final')).toHaveValue('2026-08-07')
+    expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('0')
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ startDate: '2026-08-01', endDate: '2026-08-07', status: '', uf: '', city: '', page: 1 }))
+  })
+
+  it('ajusta intervalos inválidos e limita a data final ao dia atual', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    openFilters()
+    fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-07-25' } })
+    expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-07-25')
+    fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-08-20' } })
+    expect(screen.getByLabelText('Data final')).toHaveValue('2026-08-07')
+    fireEvent.change(screen.getByLabelText('Data inicial'), { target: { value: '2026-08-20' } })
+    expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-07')
+  })
+
+  it('preserva o drill-down e não oferece UFs fora da restrição gerencial', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} restrictedUfs={['CE']} />)
+    openFilters()
+    select('UF', 'CE')
+    select('Cidade', 'Fortaleza')
+    select('UF', 'Todas')
+    expect(screen.getByRole('combobox', { name: 'Cidade' })).toHaveValue('')
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'UF' }))
+    const options = within(document.querySelector('.app-select-dropdown'))
+    expect(options.getByRole('option', { name: 'CE' })).toBeVisible()
+    expect(options.queryByRole('option', { name: 'PE' })).not.toBeInTheDocument()
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ restrictedUfs: ['CE'], uf: '', city: '', page: 1 }))
   })
 })

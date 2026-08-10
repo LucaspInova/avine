@@ -1877,6 +1877,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [sort, setSort] = useState({ key: 'data_emissao', direction: 'descending' })
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [debouncedSearch, setDebouncedSearch] = useState(search)
   useEffect(() => {
     const timer = window.setTimeout(() => { setCurrentPage(1); setDebouncedSearch(search) }, 300)
@@ -1896,8 +1897,12 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const rangeStart = result.total === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1
   const rangeEnd = Math.min(safeCurrentPage * pageSize, result.total)
-  const ufs = result.ufs ?? []
+  const ufs = (result.ufs ?? []).filter((uf) => restrictedUfs.length === 0 || restrictedUfs.includes(uf))
   const cities = result.cities ?? []
+  // The product's default reporting period is the neutral state: only dates that
+  // differ from getDefaultNoteDates contribute to the active-filter badge.
+  const periodFilterCount = Number(startDate !== defaults.start) + Number(endDate !== defaults.end)
+  const activeFilterCount = periodFilterCount + Number(Boolean(selectedStatus)) + Number(Boolean(selectedUf)) + Number(Boolean(selectedCity))
   const totals = { Geral: result.total, Finalizada: result.counts?.Finalizada ?? 0,
     Pendente: result.counts?.Pendente ?? 0, Desconhecida: result.counts?.Desconhecida ?? 0 }
 
@@ -1997,6 +2002,15 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     if (nextEndDate && startDate > nextEndDate) setStartDate(nextEndDate)
   }
 
+  function handleClearFilters() {
+    setCurrentPage(1)
+    setStartDate(defaults.start)
+    setEndDate(defaults.end)
+    setSelectedStatus('')
+    setSelectedUf('')
+    setSelectedCity('')
+  }
+
   function handleSort(key) {
     setCurrentPage(1)
     setSort((current) => ({
@@ -2008,33 +2022,35 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   return (
     <section className="notes-page">
       <div className="notes-card">
-        <div className="notes-toolbar">
-          <h2>NFD</h2>
-
-          <div className="toolbar-actions">
-            <label className="search-field">
-              <Icon name="search" />
-              <input
-                value={search}
-                onChange={(event) => {
-                  setCurrentPage(1)
-                  onSearch(event.target.value)
-                }}
-                placeholder="Procurar"
-                type="search"
-              />
-            </label>
-
-          </div>
-        </div>
-
-        <div className="notes-filters" aria-label="Filtros das notas">
-          <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
-          <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
-          <label>Status<AppSelect value={selectedStatus} onChange={(event) => { setCurrentPage(1); setSelectedStatus(event.target.value) }}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
-          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setCurrentPage(1); setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
-          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => { setCurrentPage(1); setSelectedCity(event.target.value) }}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect></label>
-        </div>
+        <PageToolbar
+          className="notes-page-toolbar"
+          title="NFD"
+          search={{ value: search, onChange: (value) => { setCurrentPage(1); onSearch(value) }, placeholder: 'Procurar', label: 'Procurar notas' }}
+        >
+          <FilterPopover
+            activeFilterCount={activeFilterCount}
+            isOpen={isFilterOpen}
+            onToggle={setIsFilterOpen}
+            onApply={() => setIsFilterOpen(false)}
+            onClear={handleClearFilters}
+          >
+            <FilterSection title="Período" count={periodFilterCount} id="note-filter-period">
+              <div className="notes-filter-fields">
+                <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate && endDate < today ? endDate : today} onChange={(event) => handleStartDateChange(event.target.value)} /></label>
+                <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} max={today} onChange={(event) => handleEndDateChange(event.target.value)} /></label>
+              </div>
+            </FilterSection>
+            <FilterSection title="Status" count={Number(Boolean(selectedStatus))} id="note-filter-status">
+              <AppSelect aria-label="Status" value={selectedStatus} onChange={(event) => { setCurrentPage(1); setSelectedStatus(event.target.value) }}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            </FilterSection>
+            <FilterSection title="UF" count={Number(Boolean(selectedUf))} id="note-filter-uf">
+              <AppSelect aria-label="UF" searchable value={selectedUf} onChange={(event) => { setCurrentPage(1); setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            </FilterSection>
+            <FilterSection title="Cidade" count={Number(Boolean(selectedCity))} id="note-filter-city">
+              <AppSelect aria-label="Cidade" searchable value={selectedCity} onChange={(event) => { setCurrentPage(1); setSelectedCity(event.target.value) }}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            </FilterSection>
+          </FilterPopover>
+        </PageToolbar>
 
         <div className="notes-summary" aria-label="Totais das notas">
           {Object.entries(totals).map(([label, total]) => (
