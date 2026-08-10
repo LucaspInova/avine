@@ -10,16 +10,23 @@ const mutation = () => ({ mutateAsync: vi.fn() })
 const rows = Array.from({ length: 10 }, (_, index) => ({ chave_acesso: `chave-${index}`, nota_fiscal: 100 + index, codigo_cliente: 10, nome_abreviado: `Loja ${index}`, status: 'Pendente', data_referencia: '2026-08-06', uf: 'CE', cidade: 'Fortaleza' }))
 const page = { rows, total: 120, counts: { Finalizada: 20, Pendente: 90, Desconhecida: 10 }, ufs: ['CE', 'PE'], cities: ['Fortaleza', 'Sobral'] }
 function setup(data = page) {
-  invoiceBoundary.useInvoices.mockReturnValue({ data, isLoading: false, error: null, refetch: vi.fn() })
+  invoiceBoundary.useInvoices.mockReturnValue({ data, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
   invoiceBoundary.useInvoiceMutations.mockReturnValue({ findStore: mutation(), start: mutation(), markUnknown: mutation(), recognize: mutation() })
 }
 function select(name, option) {
+  if (!screen.queryByRole('combobox', { name })) {
+    const dialog = screen.getByRole('dialog', { name: 'Filtros' })
+    fireEvent.click(within(dialog).getByRole('button', { name }))
+  }
   fireEvent.mouseDown(screen.getByRole('combobox', { name }))
   fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: option }))
 }
 function openFilters() {
   fireEvent.click(screen.getByRole('button', { name: /Filtrar/ }))
   return screen.getByRole('dialog', { name: 'Filtros' })
+}
+function openPeriod() {
+  if (!screen.queryByLabelText('Data inicial')) fireEvent.click(screen.getByRole('button', { name: 'Período' }))
 }
 
 describe('fluxo paginado das Notas gerenciais', () => {
@@ -78,6 +85,7 @@ describe('fluxo paginado das Notas gerenciais', () => {
     setup({ ...page, rows: [], total: 0 })
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     openFilters()
+    openPeriod()
     expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-01')
     expect(screen.getByLabelText('Data final')).toHaveAttribute('max', '2026-08-07')
     expect(screen.getByText('Nenhuma NFD encontrada.')).toBeVisible()
@@ -87,14 +95,19 @@ describe('fluxo paginado das Notas gerenciais', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('0')
     openFilters()
+    openPeriod()
 
     fireEvent.change(screen.getByLabelText('Data inicial'), { target: { value: '2026-07-20' } })
     fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-08-06' } })
     select('Status', 'Finalizada')
     expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('3')
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ startDate: '2026-08-01', endDate: '2026-08-07', status: '', page: 1 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ startDate: '2026-07-20', endDate: '2026-08-06', status: 'Finalizada', page: 1 }))
 
+    openFilters()
     fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    openPeriod()
     expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-08-01')
     expect(screen.getByLabelText('Data final')).toHaveValue('2026-08-07')
     expect(screen.getByRole('button', { name: /Filtrar/ })).toHaveTextContent('0')
@@ -104,6 +117,7 @@ describe('fluxo paginado das Notas gerenciais', () => {
   it('ajusta intervalos inválidos e limita a data final ao dia atual', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     openFilters()
+    openPeriod()
     fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-07-25' } })
     expect(screen.getByLabelText('Data inicial')).toHaveValue('2026-07-25')
     fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-08-20' } })
@@ -125,5 +139,27 @@ describe('fluxo paginado das Notas gerenciais', () => {
     expect(options.getByRole('option', { name: 'CE' })).toBeVisible()
     expect(options.queryByRole('option', { name: 'PE' })).not.toBeInTheDocument()
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ restrictedUfs: ['CE'], uf: '', city: '', page: 1 }))
+  })
+
+  it.each([
+    ['carga inicial', { data: undefined, isLoading: true, isFetching: true, error: null }],
+    ['refetch com dados anteriores', { data: page, isLoading: false, isFetching: true, error: null }],
+  ])('exibe loading acessível e oculta dados durante %s', (_label, query) => {
+    invoiceBoundary.useInvoices.mockReturnValue({ ...query, refetch: vi.fn() })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    const loading = screen.getByRole('status', { name: /Carregando notas fiscais/ })
+    expect(loading).toBeVisible()
+    expect(loading.querySelector('.ui-spinner')).toHaveStyle({ borderTopColor: '#196b42' })
+    expect(screen.queryByRole('table', { name: 'Notas fiscais' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Totais das notas')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Paginação das notas fiscais' })).not.toBeInTheDocument()
+  })
+
+  it('mostra o erro após a consulta terminar', () => {
+    invoiceBoundary.useInvoices.mockReturnValue({ data: undefined, isLoading: false, isFetching: false, error: new Error('Falha ao consultar'), refetch: vi.fn() })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    expect(screen.getByText('Falha ao consultar')).toBeVisible()
+    expect(screen.queryByRole('status', { name: /Carregando/ })).not.toBeInTheDocument()
   })
 })
