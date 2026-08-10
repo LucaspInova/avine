@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { CadastroLojaModal, InformacoesUsuarioModal, LojasScreen, UsuariosScreen } from './GerencialApp.jsx'
 
@@ -13,6 +14,24 @@ const userProps = {
   currentUser: { id: 'admin', perfil: 'Admin' }, usuarios: [], loading: false, error: '', busy: false,
   editId: '', editForm: {}, search: '', onSearch: noop, onOpenCadastro: noop, onOpenUsuario: noop,
   onEditChange: noop, onStartEdit: noop, onCancelEdit: noop, onSaveEdit: noop, onDelete: noop,
+}
+
+const filterStores = [
+  { id: 'ce', codigo: '1', nome: 'Loja Ceará', cidade: 'Fortaleza', uf: 'CE' },
+  { id: 'pe', codigo: '2', nome: 'Loja Pernambuco', cidade: 'Recife', uf: 'PE' },
+]
+
+function FilterableStores({ onApply = noop }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [ufs, setUfs] = useState([])
+  const [cities, setCities] = useState([])
+  const toggle = (setter) => (value) => setter((current) =>
+    current.includes(value) ? current.filter((item) => item !== value) : [...current, value])
+
+  return <LojasScreen {...storeProps} lojas={filterStores} isFilterOpen={isOpen}
+    selectedUfs={ufs} selectedCidades={cities} onToggleFilter={setIsOpen}
+    onToggleUf={toggle(setUfs)} onToggleCidade={toggle(setCities)}
+    onClearFilters={() => { setUfs([]); setCities([]) }} onCloseFilters={onApply} />
 }
 
 describe('fluxos proprietários de lojas/roteirização', () => {
@@ -36,6 +55,61 @@ describe('fluxos proprietários de lojas/roteirização', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Promotor da loja' })[0])
     fireEvent.click(screen.getByRole('option', { name: 'Paula' }))
     expect(onChangePromotor).toHaveBeenCalledWith('l24', 1, 'p1')
+  })
+
+  it('usa seções verticais com drill-down, contadores, aplicação e limpeza', () => {
+    const onApply = vi.fn()
+    render(<FilterableStores onApply={onApply} />)
+    const trigger = screen.getByRole('button', { name: /Filtrar/ })
+    expect(trigger).toHaveTextContent('Filtrar')
+    expect(within(trigger).getByLabelText('0 filtros ativos')).toHaveTextContent('0')
+    fireEvent.click(trigger)
+
+    const ufHeading = screen.getByRole('button', { name: /Filtrar por UF/ })
+    const cityHeading = screen.getByRole('button', { name: /Filtrar por Cidade/ })
+    expect(ufHeading.compareDocumentPosition(cityHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ufHeading).toHaveAttribute('aria-expanded', 'true')
+    expect(ufHeading.getAttribute('aria-controls')).toBe('store-filter-uf-options')
+    expect(within(ufHeading).getByLabelText('0 selecionados')).toBeVisible()
+
+    fireEvent.click(screen.getByLabelText('CE'))
+    expect(within(ufHeading).getByLabelText('1 selecionados')).toHaveTextContent('1')
+    expect(within(trigger).getByLabelText('1 filtros ativos')).toHaveTextContent('1')
+    fireEvent.click(ufHeading)
+    expect(ufHeading).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByLabelText('CE')).not.toBeInTheDocument()
+    fireEvent.click(ufHeading)
+    expect(screen.getByLabelText('CE')).toBeChecked()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
+    expect(onApply).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByLabelText('CE')).not.toBeChecked()
+    expect(within(trigger).getByLabelText('0 filtros ativos')).toBeVisible()
+  })
+
+  it('restringe cidades pelas UFs, remove seleções inválidas e preserva a filtragem', () => {
+    render(<FilterableStores />)
+    fireEvent.click(screen.getByRole('button', { name: /Filtrar/ }))
+    expect(screen.getByLabelText('Fortaleza')).toBeVisible()
+    expect(screen.getByLabelText('Recife')).toBeVisible()
+
+    fireEvent.click(screen.getByLabelText('CE'))
+    expect(screen.getByLabelText('Fortaleza')).toBeVisible()
+    expect(screen.queryByLabelText('Recife')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Fortaleza'))
+    expect(screen.getByText('1 - Loja Ceará')).toBeVisible()
+    expect(screen.queryByText('2 - Loja Pernambuco')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('PE'))
+    fireEvent.click(screen.getByLabelText('Recife'))
+    expect(within(screen.getByRole('button', { name: /Filtrar por Cidade/ })).getByLabelText('2 selecionados')).toBeVisible()
+    fireEvent.click(screen.getByLabelText('PE'))
+    expect(screen.queryByLabelText('Recife')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /Filtrar por Cidade/ })).getByLabelText('1 selecionados')).toBeVisible()
+    expect(screen.getByText('1 - Loja Ceará')).toBeVisible()
   })
 
   it('abre/fecha o modal proprietário e só confirma cadastro válido', () => {
