@@ -40,7 +40,7 @@ export const listReturnReasons = () => result<any[]>(supabase!.from('motivos_dev
 
 export async function listUnknownInvoices(profile: any) {
   let query = supabase!.from('nfd_desconhecimentos').select('nfd_referencia, comentario, created_at').is('reconhecida_em', null).order('created_at', { ascending: false })
-  if (!['Admin', 'Gerencial'].includes(profile.perfil)) query = query.eq('promotor_id', profile.id)
+  if (!['Admin', 'Gerencial'].includes(profile.perfil)) query = query.eq('usuario_id', profile.id)
   return (await result<any[]>(query)) ?? []
 }
 

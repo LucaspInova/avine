@@ -3412,7 +3412,7 @@ export function PromotorWorkspace({
         .from('nfd_desconhecimentos')
         .insert({
           loja_id: nfd.loja_id,
-          promotor_id: profile.id,
+          usuario_id: profile.id,
           nfd_referencia: getNfdKey(nfd),
           nfd_chave_acesso: nfd.chave_acesso ? String(nfd.chave_acesso) : null,
           nfd_numero: String(getNfdNumber(nfd)),

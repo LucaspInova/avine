@@ -285,7 +285,7 @@ export type Database = {
         Row: {
           id: string
           loja_id: string
-          promotor_id: string
+          usuario_id: string
           nfd_referencia: string
           nfd_chave_acesso: string | null
           nfd_numero: string
@@ -298,7 +298,7 @@ export type Database = {
         Insert: {
           id?: string
           loja_id: string
-          promotor_id: string
+          usuario_id: string
           nfd_referencia: string
           nfd_chave_acesso?: string | null
           nfd_numero: string
@@ -311,7 +311,7 @@ export type Database = {
         Update: {
           id?: string
           loja_id?: string
-          promotor_id?: string
+          usuario_id?: string
           nfd_referencia?: string
           nfd_chave_acesso?: string | null
           nfd_numero?: string
@@ -330,8 +330,8 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
-            foreignKeyName: 'nfd_desconhecimentos_promotor_id_fkey'
-            columns: ['promotor_id']
+            foreignKeyName: 'nfd_desconhecimentos_usuario_id_fkey'
+            columns: ['usuario_id']
             isOneToOne: false
             referencedRelation: 'usuarios'
             referencedColumns: ['id']
