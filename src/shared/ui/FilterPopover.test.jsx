@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { AppSelect } from './AppSelect.jsx'
 import { FilterPopover } from './FilterPopover.jsx'
 import { FilterSection } from './FilterSection.jsx'
 
@@ -10,6 +11,26 @@ function ControlledPopover({ onApply = vi.fn(), onClear = vi.fn() }) {
     <FilterPopover activeFilterCount={2} isOpen={open} onToggle={setOpen} onApply={onApply} onClear={onClear}>
       <FilterSection title="Estado" count={1}><label><input type="checkbox" /> Ceará</label></FilterSection>
       <FilterSection title="Cidade"><span>Fortaleza</span></FilterSection>
+    </FilterPopover>
+  )
+}
+
+function SelectPopover({ onApply = vi.fn() }) {
+  const [open, setOpen] = useState(false)
+  const [state, setState] = useState('')
+  const [city, setCity] = useState('')
+  return (
+    <FilterPopover isOpen={open} onToggle={setOpen} onApply={onApply}>
+      <FilterSection title="Localização">
+        <AppSelect aria-label="Estado" value={state} onChange={(event) => setState(event.target.value)}>
+          <option value="">Todos</option>
+          <option value="ce">Ceará</option>
+        </AppSelect>
+        <AppSelect aria-label="Cidade" value={city} onChange={(event) => setCity(event.target.value)}>
+          <option value="">Todas</option>
+          <option value="fortaleza">Fortaleza</option>
+        </AppSelect>
+      </FilterSection>
     </FilterPopover>
   )
 }
@@ -75,5 +96,41 @@ describe('FilterPopover', () => {
     fireEvent.click(trigger)
     fireEvent.pointerDown(document.body)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('mantém o filtro aberto ao selecionar opções portalizadas e fecha pelos controles esperados', () => {
+    const onApply = vi.fn()
+    render(<SelectPopover onApply={onApply} />)
+    const trigger = screen.getByRole('button', { name: /Filtrar/ })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Localização' }))
+
+    fireEvent.mouseDown(screen.getByLabelText('Estado'))
+    const stateOption = screen.getAllByRole('option', { name: 'Ceará' }).find((option) => option.tagName === 'BUTTON')
+    expect(stateOption.closest('[data-app-select-portal]')).toHaveAttribute(
+      'data-app-select-portal-owner',
+      screen.getByRole('dialog', { name: 'Filtros' }).id,
+    )
+    fireEvent.pointerDown(stateOption)
+    fireEvent.click(stateOption)
+    expect(screen.getByRole('dialog', { name: 'Filtros' })).toBeVisible()
+
+    fireEvent.mouseDown(screen.getByLabelText('Cidade'))
+    const cityOption = screen.getAllByRole('option', { name: 'Fortaleza' }).find((option) => option.tagName === 'BUTTON')
+    fireEvent.pointerDown(cityOption)
+    fireEvent.click(cityOption)
+    expect(screen.getByRole('dialog', { name: 'Filtros' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
+    expect(onApply).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog', { name: 'Filtros' })).not.toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('dialog', { name: 'Filtros' })).not.toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Filtros' })).not.toBeInTheDocument()
   })
 })
