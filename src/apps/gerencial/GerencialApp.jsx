@@ -816,7 +816,7 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
           <section className="user-routing-panel" aria-label="Roteirização do promotor">
             <div className="stores-toolbar">
               <h3>Lojas</h3>
-              <label className="stores-search user-search-field">
+              <label className="stores-search">
                 <Icon name="search" />
                 <input type="search" value={storeSearch} onChange={(event) => setStoreSearch(event.target.value)} placeholder="Procurar" aria-label="Procurar loja atribuída" />
               </label>
@@ -1225,6 +1225,7 @@ export function UsuariosScreen({
   const [profileFilter, setProfileFilter] = useState('all')
   const [ufFilter, setUfFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [page, setPage] = useState(1)
   const counts = useMemo(() => ({
     all: usuarios.length,
@@ -1233,9 +1234,10 @@ export function UsuariosScreen({
     Promotor: usuarios.filter((usuario) => usuario.perfil === 'Promotor').length,
   }), [usuarios])
   const availableUfs = useMemo(
-    () => [...new Set(usuarios.map((usuario) => usuario.estado).filter(Boolean))]
+    () => [...new Set(usuarios.map((usuario) => usuario.estado).filter((uf) =>
+      uf && (restrictedUfs.length === 0 || restrictedUfs.includes(uf))))]
       .sort((first, second) => first.localeCompare(second, 'pt-BR')),
-    [usuarios],
+    [restrictedUfs, usuarios],
   )
   const storeCountByPromotor = useMemo(() => lojaPromotores.reduce((counts, vinculo) => {
     counts.set(vinculo.promotor_id, (counts.get(vinculo.promotor_id) ?? 0) + 1)
@@ -1247,9 +1249,8 @@ export function UsuariosScreen({
     return usuarios.filter((usuario) => {
       const matchesSearch = !query || `${usuario.nome} ${usuario.email}`.toLowerCase().includes(query)
       const matchesProfile = profileFilter === 'all' || getManagedRoleKey(usuario) === profileFilter
-      const matchesUf = restrictedUfs.length
-        ? restrictedUfs.includes(usuario.estado)
-        : ufFilter === 'all' || usuario.estado === ufFilter
+      const matchesScope = restrictedUfs.length === 0 || restrictedUfs.includes(usuario.estado)
+      const matchesUf = matchesScope && (restrictedUfs.length === 1 || ufFilter === 'all' || usuario.estado === ufFilter)
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' ? isUserActive(usuario) : !isUserActive(usuario))
 
@@ -1275,61 +1276,68 @@ export function UsuariosScreen({
     return items
   }, [safePage, totalPages])
 
+  const canChooseUf = restrictedUfs.length !== 1
+  const ufFilterCount = Number(canChooseUf && ufFilter !== 'all')
+  const statusFilterCount = Number(statusFilter !== 'all')
+  const activeFilterCount = ufFilterCount + statusFilterCount
+
+  function handleClearFilters() {
+    setUfFilter('all')
+    setStatusFilter('all')
+    setPage(1)
+  }
+
   return (
     <section className="users-card user-registration-card">
-      <div className="user-filter-bar">
-        <label className="user-search-field">
-          <Icon name="search" />
-          <input
-            value={search}
-            onChange={(event) => {
-              onSearch(event.target.value)
-              setPage(1)
-            }}
-            placeholder="Pesquisar por nome ou e-mail..."
-            type="search"
-            aria-label="Pesquisar por nome ou e-mail"
-          />
-        </label>
+      <PageToolbar
+        className="users-page-toolbar"
+        search={{
+          value: search,
+          onChange: (value) => { onSearch(value); setPage(1) },
+          placeholder: 'Procurar',
+          label: 'Procurar usuários por nome ou e-mail',
+        }}
+      >
+        <FilterPopover
+          activeFilterCount={activeFilterCount}
+          isOpen={isFilterOpen}
+          onToggle={setIsFilterOpen}
+          onApply={() => setIsFilterOpen(false)}
+          onClear={handleClearFilters}
+        >
+          <FilterSection title="UF" count={ufFilterCount} id="user-filter-uf">
+            {canChooseUf ? (
+              <AppSelect
+                aria-label="UF"
+                searchable
+                value={ufFilter}
+                onChange={(event) => { setUfFilter(event.target.value); setPage(1) }}
+              >
+                <option value="all">Todas</option>
+                {availableUfs.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+              </AppSelect>
+            ) : <p className="filter-empty">UF de acesso: {restrictedUfs[0]}</p>}
+          </FilterSection>
+          <FilterSection title="Status" count={statusFilterCount} id="user-filter-status">
+            <AppSelect
+              aria-label="Status"
+              value={statusFilter}
+              onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+            </AppSelect>
+          </FilterSection>
+        </FilterPopover>
 
-        <label className="user-select-field">
-          <span>UF</span>
-          <AppSelect
-            searchable
-            value={restrictedUfs.length === 1 ? restrictedUfs[0] : ufFilter}
-            disabled={restrictedUfs.length > 0}
-            onChange={(event) => {
-              setUfFilter(event.target.value)
-              setPage(1)
-            }}
-          >
-            <option value="all">Todas</option>
-            {availableUfs.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-          </AppSelect>
-          <span className="select-chevron" />
-        </label>
-
-        <label className="user-select-field">
-          <span>Status</span>
-          <AppSelect
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value)
-              setPage(1)
-            }}
-          >
-            <option value="all">Todos</option>
-            <option value="active">Ativo</option>
-            <option value="inactive">Inativo</option>
-          </AppSelect>
-          <span className="select-chevron" />
-        </label>
-
-        <button className="create-button user-create-button" type="button" onClick={onOpenCadastro}>
-          <Icon name="plus" />
-          <span>Cadastrar Usuário</span>
-        </button>
-      </div>
+        <div className="toolbar-actions">
+          <button className="create-button user-create-button" type="button" onClick={onOpenCadastro}>
+            <Icon name="plus" />
+            <span>Cadastrar Usuário</span>
+          </button>
+        </div>
+      </PageToolbar>
 
       <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
         {[

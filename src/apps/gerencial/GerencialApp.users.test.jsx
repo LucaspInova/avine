@@ -94,9 +94,15 @@ describe('Cadastro de Usuários', () => {
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     expect(within(table).queryByText('ANA GERENCIAL')).not.toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('UF'), { target: { value: 'CE' } })
-    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'active' } })
-    fireEvent.change(screen.getByLabelText('Pesquisar por nome ou e-mail'), {
+    expect(screen.getByPlaceholderText('Procurar')).toHaveAccessibleName('Procurar usuários por nome ou e-mail')
+    const filterButton = screen.getByRole('button', { name: /Filtrar/ })
+    fireEvent.click(filterButton)
+    fireEvent.change(screen.getByRole('combobox', { name: 'UF' }), { target: { value: 'CE' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'active' } })
+    expect(within(screen.getByRole('button', { name: 'UF' })).getByLabelText('1 selecionados')).toBeVisible()
+    expect(within(screen.getByRole('button', { name: 'Status' })).getByLabelText('1 selecionados')).toBeVisible()
+    expect(within(filterButton).getByLabelText('2 filtros ativos')).toHaveTextContent('2')
+    fireEvent.change(screen.getByLabelText('Procurar usuários por nome ou e-mail'), {
       target: { value: 'bruno.promotor@avine.com' },
     })
 

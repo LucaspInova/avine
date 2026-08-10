@@ -143,4 +143,57 @@ describe('fluxo proprietário de usuários', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fechar informações' }))
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('respeita o escopo de UF e não contabiliza uma UF obrigatória como filtro', () => {
+    const scopedUsers = [
+      { id: 'ce', nome: 'Usuário CE', email: 'ce@avine.com', perfil: 'Promotor', estado: 'CE', ativo: true },
+      { id: 'pe', nome: 'Usuário PE', email: 'pe@avine.com', perfil: 'Promotor', estado: 'PE', ativo: true },
+      { id: 'ba', nome: 'Usuário BA', email: 'ba@avine.com', perfil: 'Promotor', estado: 'BA', ativo: true },
+    ]
+    const { rerender } = render(<UsuariosScreen {...userProps} usuarios={scopedUsers} restrictedUfs={['CE', 'PE']} />)
+    const trigger = screen.getByRole('button', { name: /Filtrar/ })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('combobox', { name: 'UF' })).toHaveTextContent('TodasCEPE')
+    expect(screen.getByRole('combobox', { name: 'UF' })).not.toHaveTextContent('BA')
+    fireEvent.change(screen.getByRole('combobox', { name: 'UF' }), { target: { value: 'PE' } })
+    expect(screen.getByText('Usuário PE')).toBeVisible()
+    expect(screen.queryByText('Usuário CE')).not.toBeInTheDocument()
+    expect(screen.queryByText('Usuário BA')).not.toBeInTheDocument()
+
+    rerender(<UsuariosScreen {...userProps} usuarios={scopedUsers} restrictedUfs={['CE']} />)
+    expect(screen.queryByRole('combobox', { name: 'UF' })).not.toBeInTheDocument()
+    expect(screen.getByText('UF de acesso: CE')).toBeVisible()
+    expect(within(trigger).getByLabelText('0 filtros ativos')).toBeVisible()
+  })
+
+  it('retorna à primeira página ao pesquisar e ao alterar filtros rápidos, UF ou status', () => {
+    const users = Array.from({ length: 12 }, (_, index) => ({
+      id: `${index}`,
+      nome: `Usuário ${index}`,
+      email: `usuario${index}@avine.com`,
+      perfil: index === 0 ? 'Admin' : 'Promotor',
+      estado: index === 0 ? '' : 'CE',
+      ativo: index !== 11,
+      acesso_habilitado: index !== 11,
+      last_access_at: index === 11 ? null : '2026-08-09T12:00:00.000Z',
+    }))
+    function Harness() {
+      const [search, setSearch] = useState('')
+      return <UsuariosScreen {...userProps} usuarios={users} search={search} onSearch={setSearch} />
+    }
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    expect(screen.getByRole('button', { name: 'Página anterior' })).not.toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Procurar usuários por nome ou e-mail'), { target: { value: 'Usuário' } })
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Promotor (11)' }))
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /Filtrar/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'UF' }), { target: { value: 'CE' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'inactive' } })
+    expect(screen.getByText('Usuário 11')).toBeVisible()
+    expect(within(screen.getByRole('button', { name: /Filtrar/ })).getByLabelText('2 filtros ativos')).toBeVisible()
+  })
 })
