@@ -174,7 +174,7 @@ describe('Cadastro de Usuários', () => {
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Gerencial responsável')).not.toBeInTheDocument()
-    expect(screen.getByText('Perfil válido.')).toBeInTheDocument()
+    expect(screen.queryByText('Perfil válido.')).not.toBeInTheDocument()
     expect(screen.queryByText('Habilitar fotos?')).not.toBeInTheDocument()
   })
 
@@ -210,6 +210,8 @@ describe('Cadastro de Usuários', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: /^Nome/ }), { target: { value: 'joão silva' } })
     expect(onChange).toHaveBeenCalledWith({ nome: 'JOÃO SILVA' })
+    expect(screen.queryByText('E-mail já usado; insira outro ou edite o usuário.')).not.toBeInTheDocument()
+    fireEvent.blur(screen.getByRole('textbox', { name: /^E-mail/ }))
     expect(screen.getByText('E-mail já usado; insira outro ou edite o usuário.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Senha')).not.toBeInTheDocument()
     expect(screen.getByText('Senha padrão definida automaticamente.')).toBeInTheDocument()
@@ -227,7 +229,18 @@ describe('Cadastro de Usuários', () => {
       expect(button).toBeDisabled()
       expect(button).toHaveClass('is-selected')
     })
-    expect(screen.getByText('Todas as UFs (seleção obrigatória).')).toBeInTheDocument()
+    expect(screen.queryByText('Todas as UFs (seleção obrigatória).')).not.toBeInTheDocument()
+  })
+
+  it('mantém UF visível e bloqueada enquanto o perfil está vazio, sem erros iniciais', () => {
+    render(<CadastroModal form={{ email: '', nome: '', senha: '', perfil: '', auth_role: '', estado: '', ufs: [] }}
+      usuarios={usuarios} currentUser={{ perfil: 'Admin', auth_role: 'admin', ufs: [] }} busy={false}
+      error="" onChange={noop} onClose={noop} onSubmit={noop} />)
+
+    const ufGroup = screen.getByRole('group', { name: 'UF' })
+    within(ufGroup).getAllByRole('button').forEach((button) => expect(button).toBeDisabled())
+    expect(screen.queryByText('Escolha um perfil.')).not.toBeInTheDocument()
+    expect(document.querySelectorAll('.field-error')).toHaveLength(0)
   })
 
   it('aplica os novos nomes visuais e rotas por perfil', () => {

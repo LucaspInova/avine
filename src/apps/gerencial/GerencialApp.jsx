@@ -33,7 +33,6 @@ import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
-const perfisOperacionais = ['Promotor']
 const perfisCadastro = ['Admin', 'Gerencial', 'Promotor']
 const perfisEditaveis = ['Admin', 'Gerencial', 'Promotor']
 const perfisCadastroUi = [
@@ -551,168 +550,112 @@ function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhot
   )
 }
 
-export function CadastroModal({ form, usuarios, currentUser, busy, error, onChange, onClose, onSubmit }) {
+export function UsuarioModal({
+  mode = 'create', form, usuarios, currentUser, usuarioId = '', busy, deleting = false, error,
+  onChange, onBack, onClose, onSubmit, onDelete, allowedProfiles = perfisCadastro,
+}) {
+  const [touched, setTouched] = useState({})
+  const isEdit = mode === 'edit'
+  const touch = (field) => setTouched((current) => ({ ...current, [field]: true }))
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
-  const password = form.senha
+  const password = form.senha ?? ''
   const isAdmin = form.perfil === 'Admin'
   const isGerencial = form.perfil === 'Gerencial'
-  const currentUserIsGerencial = isScopedGerencial(currentUser)
-  const isOperationalProfile = perfisOperacionais.includes(form.perfil)
-  const requiresState = isOperationalProfile || isGerencial || isAdmin
-  const allowedStates = currentUserIsGerencial ? currentUser.ufs : estados
-  const hasEmailInput = trimmedEmail.length > 0
-  const isEmailValid = emailPattern.test(trimmedEmail)
-  const isEmailInvalid = hasEmailInput && !isEmailValid
-  const hasEmailDuplicado = isEmailDuplicado(trimmedEmail, usuarios)
-  const isNameValid = trimmedName.length >= 4
-  const passwordError = getPasswordValidationMessage(password)
   const isPromotor = form.perfil === 'Promotor'
-  const isPasswordValid = isPromotor || !passwordError
-  const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
-  const expectedAuthRole = isAdmin ? 'admin' : isGerencial ? 'gerencial' : 'promotor'
-  const isAuthRoleValid = form.auth_role === expectedAuthRole
-  const isProfileValid = perfisCadastro.includes(form.perfil) && isAuthRoleValid &&
-    (!currentUserIsGerencial || form.perfil === 'Promotor')
+  const currentUserIsGerencial = isScopedGerencial(currentUser)
+  const availableProfiles = allowedProfiles.filter((profile) => !currentUserIsGerencial || profile === 'Promotor')
+  const allowedStates = currentUserIsGerencial ? currentUser.ufs : estados
+  const isEmailValid = emailPattern.test(trimmedEmail)
+  const hasEmailDuplicado = isEmailDuplicado(trimmedEmail, usuarios, usuarioId)
+  const isNameValid = trimmedName.length >= 4
+  const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
+  const passwordError = getPasswordValidationMessage(password, { optional: isEdit })
+  const isPasswordValid = (!isEdit && isPromotor) || !passwordError
+  const isProfileValid = availableProfiles.includes(form.perfil)
   const selectedUfs = isAdmin ? allowedStates : (form.ufs ?? (form.estado ? [form.estado] : []))
-  const isEstadoValid = isAdmin || (isGerencial ? selectedUfs.length > 0 && selectedUfs.every((uf) => allowedStates.includes(uf)) : selectedUfs.length === 1 && allowedStates.includes(selectedUfs[0]))
-  const canSubmit =
-    isEmailValid &&
-    !hasEmailDuplicado &&
-    isNameValid &&
-    isPasswordValid &&
-    !hasNomeDuplicado &&
-    isProfileValid &&
-    isEstadoValid &&
-    !busy
+  const isEstadoValid = isAdmin || (isGerencial
+    ? selectedUfs.length > 0 && selectedUfs.every((uf) => allowedStates.includes(uf))
+    : selectedUfs.length === 1 && allowedStates.includes(selectedUfs[0]))
+  const canSubmit = isEmailValid && !hasEmailDuplicado && isNameValid && !hasNomeDuplicado &&
+    isPasswordValid && isProfileValid && isEstadoValid && !busy && !deleting
+
+  const feedback = (field, valid, validText, invalidText) => touched[field] && (
+    <strong className={valid ? 'field-success' : 'field-error'}>{valid ? validText : invalidText}</strong>
+  )
 
   return (
     <div className="modal-backdrop" role="presentation">
       <form className="user-modal" onSubmit={onSubmit}>
         <div className="modal-titlebar">
-          <h3>Cadastrar Usuário</h3>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar cadastro">
-            <Icon name="x" />
-          </button>
+          {isEdit && <button className="back-button" type="button" onClick={onBack} aria-label="Voltar"><Icon name="arrow-left" /></button>}
+          <h3>{isEdit ? 'Editar Usuário' : 'Cadastrar Usuário'}</h3>
+          <button className="icon-button" type="button" onClick={onClose} aria-label={isEdit ? 'Fechar edição' : 'Fechar cadastro'}><Icon name="x" /></button>
         </div>
-
         <div className="modal-grid user-registration-modal-grid">
           <div className="modal-main">
-            <fieldset className="user-profile-field">
-              <legend>Perfil</legend>
-              <div className="chip-group">
-                {perfisCadastroUi
-                  .filter((perfil) => !currentUserIsGerencial || perfil.value === 'Promotor')
-                  .map((perfil) => (
-                  <button
-                    key={`${perfil.value}-${perfil.authRole ?? perfil.label}`}
-                    className={`choice-chip ${form.perfil === perfil.value && (!perfil.authRole || form.auth_role === perfil.authRole) ? 'is-selected' : ''}`}
-                    type="button"
-                    disabled={currentUserIsGerencial && !perfisOperacionais.includes(perfil.value)}
-                    title={currentUserIsGerencial && !perfisOperacionais.includes(perfil.value)
-                      ? 'Gerencial só pode cadastrar perfis operacionais.'
-                      : undefined}
-                    onClick={() => onChange({
-                      perfil: form.perfil === perfil.value && (!perfil.authRole || form.auth_role === perfil.authRole)
-                        ? ''
-                        : perfil.value,
-                      auth_role: perfil.authRole ?? '',
-                    })}
-                  >
-                    {perfil.label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <label className="form-row">
-              <span>Nome</span>
-              <input
-                value={form.nome}
-                onChange={(event) => onChange({ nome: event.target.value.toUpperCase() })}
-                minLength={4}
-                placeholder="Digite o nome completo"
-                type="text"
-                required
-              />
-              <strong className={isNameValid && !hasNomeDuplicado ? 'field-success' : 'field-error'}>
-                {hasNomeDuplicado ? 'Nome já usado; inclua um sobrenome.' : isNameValid ? 'Nome válido.' : 'Use pelo menos 4 letras maiúsculas.'}
-              </strong>
+            <div className="user-profile-field">
+              <fieldset>
+                <legend>Perfil</legend>
+                <div className="chip-group">
+                  {perfisCadastroUi.filter(({ value }) => availableProfiles.includes(value)).map((profile) => (
+                    <button key={profile.value} className={`choice-chip ${form.perfil === profile.value ? 'is-selected' : ''}`}
+                      type="button" onClick={() => {
+                        touch('perfil')
+                        const perfil = form.perfil === profile.value ? '' : profile.value
+                        const nextUfs = perfil === 'Admin' ? allowedStates : []
+                        onChange({ perfil, auth_role: perfil ? profile.authRole : '', ufs: nextUfs, estado: nextUfs[0] ?? '' })
+                      }}>{profile.label}</button>
+                  ))}
+                </div>
+              </fieldset>
+              {feedback('perfil', isProfileValid, 'Perfil válido.', 'Escolha um perfil.')}
+            </div>
+            <label className="form-row"><span>Nome</span>
+              <input value={form.nome} onChange={(event) => onChange({ nome: event.target.value.toUpperCase() })} onBlur={() => touch('nome')}
+                minLength={4} placeholder="Digite o nome completo" type="text" required />
+              {feedback('nome', isNameValid && !hasNomeDuplicado, 'Nome válido.', hasNomeDuplicado ? 'Nome já usado; inclua um sobrenome.' : 'Use pelo menos 4 letras maiúsculas.')}
             </label>
-
-            <label className="form-row">
-              <span>E-mail</span>
-              <input
-                className={isEmailInvalid || hasEmailDuplicado ? 'is-invalid' : ''}
-                value={form.email}
-                onChange={(event) => onChange({ email: event.target.value })}
-                placeholder="nome@empresa.com"
-                type="email"
-                required
-              />
-              <strong className={isEmailValid && !hasEmailDuplicado ? 'field-success' : 'field-error'}>
-                {hasEmailDuplicado ? 'E-mail já usado; insira outro ou edite o usuário.' : isEmailValid ? 'E-mail válido.' : 'Insira um e-mail válido.'}
-              </strong>
+            <label className="form-row"><span>E-mail</span>
+              <input className={touched.email && (!isEmailValid || hasEmailDuplicado) ? 'is-invalid' : ''} value={form.email}
+                onChange={(event) => onChange({ email: event.target.value })} onBlur={() => touch('email')} placeholder="nome@empresa.com" type="email" required />
+              {feedback('email', isEmailValid && !hasEmailDuplicado, 'E-mail válido.', hasEmailDuplicado ? 'E-mail já usado; insira outro ou edite o usuário.' : 'Insira um e-mail válido.')}
             </label>
-
-            {isPromotor ? (
-              <p className="field-success promoter-password-note">Senha padrão definida automaticamente.</p>
-            ) : (
-              <label className="form-row">
-                <span>Senha</span>
-                <input className={password && !isPasswordValid ? 'is-invalid' : ''} value={password}
-                  onChange={(event) => onChange({ senha: event.target.value })} minLength={PASSWORD_MIN_LENGTH}
-                  placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`} type="password" autoComplete="new-password" required />
-                <strong className={isPasswordValid ? 'field-success' : 'field-error'}>
-                  {isPasswordValid ? 'Senha válida.' : (passwordError || `Use no mínimo ${PASSWORD_MIN_LENGTH} caracteres.`)}
-                </strong>
-              </label>
-            )}
-
-            <strong className={isProfileValid ? 'field-success' : 'field-error'}>
-              {isProfileValid ? 'Perfil válido.' : 'Escolha um perfil.'}
-            </strong>
-
-            {requiresState && (
-              <>
-                <fieldset>
-                  <legend>UF</legend>
-                  <div className="chip-group state-chips">
-                    {allowedStates.map((estado) => (
-                      <button
-                        key={estado}
-                        className={`choice-chip ${selectedUfs.includes(estado) ? 'is-selected' : ''}`}
-                        type="button"
-                        disabled={isAdmin}
-                        onClick={() => {
-                          const nextUfs = isGerencial
-                            ? (selectedUfs.includes(estado) ? selectedUfs.filter((uf) => uf !== estado) : [...selectedUfs, estado])
-                            : (selectedUfs.includes(estado) ? [] : [estado])
-                          onChange({ ufs: nextUfs, estado: nextUfs[0] ?? '' })
-                        }}
-                      >
-                        {estado}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-                <strong className={isEstadoValid ? 'field-success' : 'field-error'}>
-                  {isAdmin ? 'Todas as UFs (seleção obrigatória).' : isGerencial ? (isEstadoValid ? 'Múltiplas UFs permitidas.' : 'Escolha uma ou mais UFs.') : (isEstadoValid ? 'Uma UF selecionada.' : 'Escolha uma única UF.')}
-                </strong>
-              </>
-            )}
+            {(!isPromotor || isEdit) ? <label className="form-row"><span>{isEdit ? 'Nova senha (opcional)' : 'Senha'}</span>
+              <input className={touched.senha && !isPasswordValid ? 'is-invalid' : ''} value={password} onChange={(event) => onChange({ senha: event.target.value })}
+                onBlur={() => touch('senha')} minLength={PASSWORD_MIN_LENGTH} placeholder={isEdit ? 'Deixe vazio para manter' : `Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
+                type="password" autoComplete="new-password" required={!isEdit} />
+              {feedback('senha', isPasswordValid, isEdit && !password ? 'Senha atual será mantida.' : 'Senha válida.', passwordError?.replace(/^A senha/, isEdit ? 'A nova senha' : 'A senha'))}
+            </label> : <p className="field-success promoter-password-note">Senha padrão definida automaticamente.</p>}
+            <div className="user-state-field">
+              <fieldset>
+                <legend>UF</legend>
+                <div className="chip-group state-chips">
+                  {allowedStates.map((uf) => <button key={uf} className={`choice-chip ${selectedUfs.includes(uf) ? 'is-selected' : ''}`} type="button"
+                    disabled={!form.perfil || isAdmin} onClick={() => {
+                      touch('estado')
+                      const nextUfs = isGerencial ? (selectedUfs.includes(uf) ? selectedUfs.filter((item) => item !== uf) : [...selectedUfs, uf]) : (selectedUfs.includes(uf) ? [] : [uf])
+                      onChange({ ufs: nextUfs, estado: nextUfs[0] ?? '' })
+                    }}>{uf}</button>)}
+                </div>
+              </fieldset>
+              {touched.estado && form.perfil && feedback('estado', isEstadoValid, isAdmin ? 'Todas as UFs (seleção obrigatória).' : isGerencial ? 'Múltiplas UFs permitidas.' : 'Uma UF selecionada.', isGerencial ? 'Escolha uma ou mais UFs.' : 'Escolha uma única UF.')}
+            </div>
           </div>
         </div>
-
         {error && <p className="form-error">{error}</p>}
-
-        <button className="modal-submit" type="submit" disabled={!canSubmit}>
-          <Icon name="plus" />
-          <span>{busy ? 'Cadastrando...' : 'Cadastrar'}</span>
-        </button>
+        {isEdit ? <div className="edit-actions">
+          <button className="primary-button edit-submit" type="submit" disabled={!canSubmit}>{busy ? 'Salvando...' : 'Salvar'}</button>
+          <button className="secondary-button edit-cancel" type="button" onClick={onBack}>Cancelar</button>
+          <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>{deleting ? 'Bloqueando...' : 'Bloquear acesso'}</button>
+        </div> : <button className="modal-submit" type="submit" disabled={!canSubmit}><Icon name="plus" /><span>{busy ? 'Cadastrando...' : 'Cadastrar'}</span></button>}
       </form>
     </div>
   )
+}
+
+export function CadastroModal(props) {
+  return <UsuarioModal {...props} mode="create" />
 }
 
 export function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, busy, error, onChange, onClose, onSubmit }) {
@@ -887,155 +830,8 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
   )
 }
 
-export function EditarUsuarioModal({
-  form,
-  usuarios,
-  usuarioId,
-  busy,
-  deleting,
-  error,
-  onChange,
-  onBack,
-  onClose,
-  onSubmit,
-  onDelete,
-  allowedProfiles = ['Promotor'],
-}) {
-  const trimmedEmail = form.email.trim()
-  const trimmedName = form.nome.trim()
-  const isEmailValid = emailPattern.test(trimmedEmail)
-  const isNameValid = trimmedName.length >= 4
-  const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios, usuarioId)
-  const passwordError = getPasswordValidationMessage(form.senha, { optional: true })
-  const isPasswordValid = !passwordError
-  const isProfileValid = allowedProfiles.includes(form.perfil)
-  const isEstadoValid = form.perfil === 'Admin' || estados.includes(form.estado)
-  const canSubmit =
-    isEmailValid && isNameValid && !hasNomeDuplicado && isProfileValid && isEstadoValid && !busy && !deleting && isPasswordValid
-
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <form className="edit-modal" onSubmit={onSubmit}>
-        <div className="modal-titlebar edit-titlebar">
-          <button className="back-button" type="button" onClick={onBack} aria-label="Voltar">
-            <Icon name="arrow-left" />
-          </button>
-          <h3>Editar</h3>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar edição">
-            <Icon name="x" />
-          </button>
-        </div>
-
-        <div className="edit-body">
-          <label className="edit-field">
-            <span>
-              Nome
-              <small>Necessário</small>
-            </span>
-            <input
-              value={form.nome}
-              onChange={(event) => onChange({ nome: event.target.value })}
-              minLength={4}
-              type="text"
-              required
-            />
-            {hasNomeDuplicado && (
-              <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
-            )}
-          </label>
-
-          <label className="edit-field">
-            <span>
-              E-mail
-              <small>Necessário</small>
-            </span>
-            <input
-              className={trimmedEmail && !isEmailValid ? 'is-invalid' : ''}
-              value={form.email}
-              onChange={(event) => onChange({ email: event.target.value })}
-              type="text"
-              required
-            />
-            {trimmedEmail && !isEmailValid && (
-              <strong className="field-error">Insira um endereço de e-mail válido.</strong>
-            )}
-          </label>
-
-          <label className="edit-field">
-            <span>
-              Nova senha
-              <small>Opcional</small>
-            </span>
-            <input
-              className={form.senha && !isPasswordValid ? 'is-invalid' : ''}
-              value={form.senha}
-              onChange={(event) => onChange({ senha: event.target.value })}
-              minLength={PASSWORD_MIN_LENGTH}
-              type="password"
-              autoComplete="new-password"
-              placeholder="Deixe vazio para manter"
-            />
-            {passwordError && (
-              <strong className="field-error">{passwordError.replace(/^A senha/, 'A nova senha')}</strong>
-            )}
-          </label>
-
-          <fieldset className="edit-field">
-            <legend>
-              Perfil
-              <small>Necessário</small>
-            </legend>
-            <div className="chip-group">
-              {allowedProfiles.map((perfil) => (
-                <button
-                  key={perfil}
-                  className={`choice-chip ${form.perfil === perfil ? 'is-selected' : ''}`}
-                  type="button"
-                  onClick={() => onChange({ perfil: form.perfil === perfil ? '' : perfil })}
-                >
-                  {getProfileLabel(perfil)}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {form.perfil !== 'Admin' && <fieldset className="edit-field">
-            <legend>
-              UF
-              <small>Necessário</small>
-            </legend>
-            <div className="chip-group state-chips">
-              {estados.map((estado) => (
-                <button
-                  key={estado}
-                  className={`choice-chip ${form.estado === estado ? 'is-selected' : ''}`}
-                  type="button"
-                  onClick={() => onChange({ estado: form.estado === estado ? '' : estado })}
-                >
-                  {estado}
-                </button>
-              ))}
-            </div>
-          </fieldset>}
-
-        </div>
-
-        {error && <p className="form-error">{error}</p>}
-
-        <div className="edit-actions">
-          <button className="primary-button edit-submit" type="submit" disabled={!canSubmit}>
-            {busy ? 'Salvando...' : 'Enviar'}
-          </button>
-          <button className="secondary-button edit-cancel" type="button" onClick={onBack}>
-            Cancelar
-          </button>
-          <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>
-            {deleting ? 'Bloqueando...' : 'Bloquear acesso'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
+export function EditarUsuarioModal(props) {
+  return <UsuarioModal {...props} mode="edit" />
 }
 
 export function StoreFilterPopover({
@@ -2891,7 +2687,7 @@ function GerencialApp({ capabilities }) {
       nome: normalizaNome(editForm.nome),
       perfil: editForm.perfil,
       estado: editForm.estado,
-      ufs: editForm.perfil === 'Admin' ? [] : [editForm.estado],
+      ufs: editForm.perfil === 'Admin' ? [] : (editForm.ufs ?? [editForm.estado]),
       auth_role: editForm.perfil === 'Admin' ? 'admin' : editForm.perfil.toLowerCase(),
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }
@@ -2902,9 +2698,9 @@ function GerencialApp({ capabilities }) {
       isNomeDuplicado(payload.nome, usuarios, selectedUsuario.id) ||
       getPasswordValidationMessage(editForm.senha, { optional: true }) ||
       !(gerencialCapabilities.isAdmin ? perfisEditaveis : ['Promotor']).includes(payload.perfil) ||
-      (payload.perfil !== 'Admin' && (isScopedGerencial(currentUser)
-        ? !currentUser.ufs.includes(payload.estado)
-        : !estados.includes(payload.estado))) ||
+      (payload.perfil !== 'Admin' && (payload.ufs.length === 0 || payload.ufs.some((uf) => isScopedGerencial(currentUser)
+        ? !currentUser.ufs.includes(uf)
+        : !estados.includes(uf)))) ||
       (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')
     ) {
       setEditError(
