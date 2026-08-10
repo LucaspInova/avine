@@ -4,6 +4,9 @@
   --green-soft: var(--color-brand-500);
   --line: var(--color-border);
   --muted: var(--color-text-muted);
+  --status-finalizada: #3c8a3a;
+  --status-pendente: #f20f18;
+  --status-desconhecida: #777d78;
   --sidebar-width: 72px;
   --content-width: min(1168px, calc(100% - 72px));
 
@@ -2733,9 +2736,9 @@ select:focus-visible {
   line-height: var(--line-height-tight);
   white-space: nowrap;
 }
-.notes-summary-card.is-finalizada { border-top-color: var(--color-brand-600); }
-.notes-summary-card.is-pendente { border-top-color: var(--color-warning-600); }
-.notes-summary-card.is-desconhecida { border-top-color: var(--color-neutral-500); }
+.notes-summary-card.is-finalizada { border-top-color: var(--status-finalizada); }
+.notes-summary-card.is-pendente { border-top-color: var(--status-pendente); }
+.notes-summary-card.is-desconhecida { border-top-color: var(--status-desconhecida); }
 
 .notes-filter-popover {
   width: 346px;
@@ -2787,15 +2790,15 @@ select:focus-visible {
 }
 
 .document-glyph.is-overdue {
-  color: #f20f18;
+  color: var(--status-pendente);
 }
 
 .document-glyph.is-sent {
-  color: #3c8a3a;
+  color: var(--status-finalizada);
 }
 
 .document-glyph.is-unknown {
-  color: #777d78;
+  color: var(--status-desconhecida);
 }
 
 .notes-date-group {
