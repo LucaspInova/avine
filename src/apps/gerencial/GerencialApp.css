@@ -425,6 +425,10 @@
   margin-bottom: 18px;
 }
 
+.stores-page-toolbar .create-button {
+  min-height: var(--control-height);
+}
+
 .card-toolbar {
   display: flex;
   align-items: center;
