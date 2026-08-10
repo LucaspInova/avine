@@ -4333,3 +4333,14 @@ select:focus-visible {
     margin-left: 0;
   }
 }
+
+.user-profile-field,
+.user-state-field {
+  display: grid;
+  gap: 9px;
+}
+
+.choice-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
