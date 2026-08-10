@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invoiceBoundary = vi.hoisted(() => ({ useInvoices: vi.fn(), useInvoiceMutations: vi.fn() }))
@@ -23,6 +23,11 @@ const notes = Array.from({ length: 11 }, (_, index) => ({
 function setupQuery(overrides = {}) {
   invoiceBoundary.useInvoices.mockReturnValue({ data: [], isLoading: false, error: null, refetch: vi.fn(), ...overrides })
   invoiceBoundary.useInvoiceMutations.mockReturnValue({ findStore: mutation(), start: mutation(), markUnknown: mutation(), recognize: mutation() })
+}
+
+function selectFilter(name, option) {
+  fireEvent.mouseDown(screen.getByRole('combobox', { name }))
+  fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: option }))
 }
 
 describe('tela proprietária de Notas gerencial', () => {
@@ -62,6 +67,30 @@ describe('tela proprietária de Notas gerencial', () => {
     expect(screen.getByRole('dialog', { name: '10 - 110' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Fechar nota fiscal' }))
     expect(screen.queryByRole('dialog', { name: '10 - 110' })).not.toBeInTheDocument()
+  })
+
+  it('filtra as linhas por Status, UF e Cidade', () => {
+    setupQuery({ data: [
+      { ...notes[0], nome_abreviado: 'Loja Fortaleza pendente', status: 'Pendente', uf: ' ce ', cidade: 'Fortaleza' },
+      { ...notes[1], nome_abreviado: 'Loja Sobral finalizada', status: 'Finalizada', uf: 'CE', cidade: 'Sobral' },
+      { ...notes[2], nome_abreviado: 'Loja Recife pendente', status: 'Pendente', uf: 'PE', cidade: 'Recife' },
+    ] })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    selectFilter('Status', 'Pendente')
+    expect(screen.getByText('Loja Fortaleza pendente')).toBeVisible()
+    expect(screen.getByText('Loja Recife pendente')).toBeVisible()
+    expect(screen.queryByText('Loja Sobral finalizada')).not.toBeInTheDocument()
+
+    selectFilter('UF', 'CE')
+    expect(screen.getByText('Loja Fortaleza pendente')).toBeVisible()
+    expect(screen.queryByText('Loja Recife pendente')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loja Sobral finalizada')).not.toBeInTheDocument()
+
+    selectFilter('Cidade', 'Fortaleza')
+    expect(screen.getByText('Loja Fortaleza pendente')).toBeVisible()
+    expect(screen.queryByText('Loja Recife pendente')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loja Sobral finalizada')).not.toBeInTheDocument()
   })
 
   it('limita as datas ao dia local atual', () => {
