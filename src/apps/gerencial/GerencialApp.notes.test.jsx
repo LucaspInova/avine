@@ -41,6 +41,20 @@ describe('fluxo paginado das Notas gerenciais', () => {
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 25, status: 'Pendente', uf: 'CE', city: 'Fortaleza', sortBy: 'nota_fiscal', direction: 'asc' }))
   })
 
+  it('exibe o indicador de ordenação somente na coluna ativa', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    const table = screen.getByRole('table', { name: 'Notas fiscais' })
+
+    expect(within(table).getAllByText('↓')).toHaveLength(1)
+    expect(within(table).queryByText('↕')).not.toBeInTheDocument()
+
+    fireEvent.click(within(table).getByRole('button', { name: 'NFD' }))
+
+    expect(within(table).getAllByText('↑')).toHaveLength(1)
+    expect(within(table).getByRole('columnheader', { name: 'NFD' })).toHaveAttribute('aria-sort', 'ascending')
+    expect(within(table).getByRole('columnheader', { name: 'EMISSÃO' })).not.toHaveAttribute('aria-sort')
+  })
+
   it('aplica debounce de 300ms antes de pesquisar no servidor', () => {
     const onSearch = vi.fn()
     const { rerender } = render(<NotasScreen search="" onSearch={onSearch} lojas={[]} currentUser={{ id: 'a1' }} />)

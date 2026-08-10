@@ -2104,11 +2104,12 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
               <div className="notes-row notes-head" role="row">
                 {NOTE_SORT_COLUMNS.map((column) => {
                   const isActive = sort.key === column.key
-                  const indicator = !isActive ? '↕' : sort.direction === 'ascending' ? '↑' : '↓'
+                  const indicator = sort.direction === 'ascending' ? '↑' : '↓'
                   return (
                     <span key={column.key} role="columnheader" aria-sort={isActive ? sort.direction : undefined}>
                       <button type="button" onClick={() => handleSort(column.key)}>
-                        {column.label}<span className="notes-sort-indicator" aria-hidden="true">{indicator}</span>
+                        {column.label}
+                        {isActive && <span className="notes-sort-indicator" aria-hidden="true">{indicator}</span>}
                       </button>
                     </span>
                   )
