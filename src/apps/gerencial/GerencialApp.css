@@ -2655,9 +2655,8 @@ select:focus-visible {
 .notes-card {
   min-height: 680px;
   padding: 16px 33px 26px 29px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
+  border: 0;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -2682,11 +2681,10 @@ select:focus-visible {
   grid-template-columns: repeat(5, minmax(130px, 1fr));
   gap: var(--space-3);
   margin-bottom: 18px;
-  padding: var(--space-4);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .notes-filters label {
@@ -2832,6 +2830,11 @@ select:focus-visible {
 .notes-table {
   display: grid;
   width: 100%;
+  overflow: hidden;
+  border: 1px solid #e1e6e2;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(31 41 55 / 4%);
 }
 
 .notes-row {
@@ -2840,8 +2843,10 @@ select:focus-visible {
   min-height: 47px;
   align-items: center;
   border-bottom: 1px solid #ececec;
+  padding-inline: 18px;
   color: #3b3d3b;
   font-size: 13px;
+  box-sizing: border-box;
 }
 
 .notes-row-interactive {
@@ -2862,8 +2867,9 @@ select:focus-visible {
 }
 
 .notes-row.notes-head {
-  min-height: 27px;
+  min-height: 48px;
   color: #2d302e;
+  background: #fafbfa;
   font-size: 10px;
   font-weight: 800;
 }
@@ -4183,7 +4189,6 @@ select:focus-visible {
 
   .notes-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 12px;
   }
 
   .notes-filters label:last-child { grid-column: 1 / -1; }
@@ -4204,6 +4209,11 @@ select:focus-visible {
 
   .notes-table {
     gap: 8px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .notes-row.notes-head {
