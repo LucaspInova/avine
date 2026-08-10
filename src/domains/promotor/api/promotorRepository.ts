@@ -2,6 +2,7 @@ import { supabase } from '../../../shared/lib/supabaseClient'
 import { toAppError } from '../../../shared/errors'
 import { fetchAllNfdNotas } from '../../invoices'
 import { sortStoresByCode } from '../../stores'
+import { paginateSupabase } from '../../../shared/api/pagination'
 
 async function result<T>(request: any): Promise<T> {
   const { data, error } = await request
@@ -19,7 +20,19 @@ export async function listPromotorInvoices(stores: any[]) {
   const codes = [...byCode.keys()].map(Number).filter(Number.isFinite)
   if (!codes.length) return []
   const notes = await fetchAllNfdNotas('chave_acesso, nota_fiscal, data_emissao, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total, detalhes', (query) => query.in('codigo_cliente', codes).order('data_emissao', { ascending: false }).order('nota_fiscal', { ascending: false }))
-  return notes.map((note: any) => { const store = byCode.get(String(note.codigo_cliente)); return { ...note, id: note.chave_acesso, loja_id: store?.id ?? null, loja_codigo: String(note.codigo_cliente), loja_nome: note.nome_abreviado, numero: String(note.nota_fiscal), status_nfd: 'outros', fstd_id: null, fstd_status: null } })
+  const legacy = await paginateSupabase<any>((from, to) => supabase!.from('fstd_legado').select('legado_id, codigo_loja, numero_nfd, numero_controle, data_preenchimento, responsavel_fstd, motivo, qtd_total_galinha, qtd_retorno_galinha, qtd_total_codorna, qtd_retorno_codorna, id').in('codigo_loja', codes.map(String)).order('legado_id', { ascending: false }).range(from, to))
+  const legacyByKey = new Map(legacy.map((item) => [`${item.codigo_loja}:${item.numero_nfd}`, item]))
+  return notes.map((note: any) => {
+    const store = byCode.get(String(note.codigo_cliente))
+    const legado = legacyByKey.get(`${note.codigo_cliente}:${note.nota_fiscal}`)
+    return { ...note, id: note.chave_acesso, loja_id: store?.id ?? null, loja_codigo: String(note.codigo_cliente), loja_nome: note.nome_abreviado, numero: String(note.nota_fiscal), status_nfd: legado ? 'finalizada' : 'outros', visual_status: legado ? 'sent' : undefined, fstd_legado: legado ?? null, fstd_id: null, fstd_status: null }
+  })
+}
+
+export async function getLegacyFstd(codigoLoja: string | number, numeroNfd: string | number) {
+  const { data, error } = await supabase!.rpc('obter_fstd_legado', { p_codigo_loja: String(codigoLoja), p_numero_nfd: String(numeroNfd) })
+  if (error) throw toAppError(error)
+  return Array.isArray(data) ? data[0] ?? null : data
 }
 
 export const listProductCatalog = () => result<any[]>(supabase!.from('produtos_expandidos').select('produto_id, codigo_produto, nome, ovos_und, categoria, imagem_url').eq('status', true).order('nome', { ascending: true })).then((data) => data ?? [])

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../shared/lib/supabaseClient'
 import { usePromotorWorkspace } from '../../promotor/hooks/usePromotorWorkspace'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../../../shared/lib/fstdPdf'
+import { createLegacyFstdDocument } from '../services/fstdLegadoPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../../../shared/lib/profilePhoto'
 import { getProfileLabel } from '../../../shared/lib/profileLabels.js'
 import LogoutConfirmDialog from '../../../shared/components/LogoutConfirmDialog.jsx'
@@ -2865,7 +2866,9 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
   const products = nfd?.fstd_process?.produtos ?? []
   const billedGalinha = Number(nfd?.quantidade_galinha ?? 0)
   const billedCodorna = Number(nfd?.quantidade_codorna ?? 0)
-  const returnedTotal = products.reduce((total, product) => total + Number(product.quantidade_retorno ?? 0), 0)
+  const returnedTotal = nfd?.fstd_legado
+    ? Number(nfd.fstd_legado.qtd_retorno_galinha ?? 0) + Number(nfd.fstd_legado.qtd_retorno_codorna ?? 0)
+    : products.reduce((total, product) => total + Number(product.quantidade_retorno ?? 0), 0)
   const title = `${getStoreCode(store, nfd)} - ${getNfdNumber(nfd)}`
   const error = documentLoadError || documentError
 
@@ -2893,7 +2896,7 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
           <InvoiceIcon status="sent" />
           <span>
             <strong>FSTD</strong>
-            <small>Finalizada em {formatDate(nfd?.fstd_process?.finalizada_em)}</small>
+            <small>Finalizada em {formatDate(nfd?.fstd_legado?.data_preenchimento ?? nfd?.fstd_process?.finalizada_em)}</small>
           </span>
           <span className="gerencial-finalized-edit-hint">Editar</span>
         </button>
@@ -3047,7 +3050,9 @@ export function PromotorWorkspace({
         const processo = fstdProcessosByNfd.get(String(nfd.chave_acesso))
           ?? fstdProcessosByNfd.get(getManualNfdKey(nfd.loja_id, nfd.numero))
         const isAvulsa = Boolean(processo?.is_avulsa)
-        const visualStatus = isAvulsa
+        const visualStatus = nfd.fstd_legado
+          ? 'sent'
+          : isAvulsa
           ? getNfdVisualStatus({
             is_avulsa: true,
             fstd_process_status: processo?.status,
@@ -3074,6 +3079,8 @@ export function PromotorWorkspace({
             ? 'finalizada'
             : isAvulsa
               ? 'avulsa'
+            : nfd.fstd_legado
+              ? 'finalizada'
               : getNfdTabStatus(nfd, allUnknownNfdComments),
         }
       })
@@ -3316,6 +3323,7 @@ export function PromotorWorkspace({
   const fstdDocumentMutation = useMutation({
     mutationFn: async (targetOverride) => {
       const documentTarget = targetOverride ?? currentFstdTarget
+      if (documentTarget?.fstd_legado) return createLegacyFstdDocument(documentTarget.fstd_legado, selectedStore)
       const processoId = documentTarget?.fstd_process_id
       if (!processoId || documentTarget?.fstd_process?.status !== 'concluida') {
         throw new Error('Finalize a FSTD antes de gerar o documento.')

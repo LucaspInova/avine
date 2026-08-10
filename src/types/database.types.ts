@@ -647,6 +647,27 @@ export type Database = {
           },
         ]
       }
+      fstd_legado: {
+        Row: {
+          legado_id: number
+          codigo_loja: string
+          numero_nfd: string
+          id: string
+          numero_controle: string | null
+          data_preenchimento: string | null
+          responsavel_fstd: string | null
+          motivo: string | null
+          qtd_total_galinha: number | null
+          qtd_retorno_galinha: number | null
+          qtd_total_codorna: number | null
+          qtd_retorno_codorna: number | null
+          origem: string
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['fstd_legado']['Row'], 'legado_id' | 'created_at'> & { legado_id?: number; created_at?: string }
+        Update: Partial<Database['public']['Tables']['fstd_legado']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       lojas_com_promotores: {
@@ -860,6 +881,14 @@ export type Database = {
           p_pdf_metadata?: Json
         }
         Returns: Database['public']['Tables']['fstd_documentos']['Row']
+      }
+      obter_fstd_legado: {
+        Args: { p_codigo_loja: string; p_numero_nfd: string }
+        Returns: Database['public']['Tables']['fstd_legado']['Row'][]
+      }
+      listar_nfd_notas_gerencial: {
+        Args: { p_data_inicial?: string | null; p_data_final?: string | null }
+        Returns: { chave_acesso: string; estabelecimento: string; nota_fiscal: number; data_emissao: string; data_referencia: string; codigo_cliente: number; nome_abreviado: string; uf: string; cidade: string; quantidade_galinha: number; quantidade_codorna: number; valor_total: number; status: string; fstd_legado: boolean }[]
       }
     }
     Enums: {
