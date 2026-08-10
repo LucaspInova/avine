@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { findInvoiceStore, listInvoicesOverview, markInvoiceUnknown, recognizeInvoice, startInvoiceProcess } from '../invoicesRepository'
-import type { FindInvoiceStoreCommand, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand, StartInvoiceProcessCommand } from '../types'
+import type { FindInvoiceStoreCommand, InvoiceListFilters, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand, StartInvoiceProcessCommand } from '../types'
 
 export const invoiceKeys = {
   all: ['invoices'] as const,
   list: (filters: unknown) => ['invoices', filters] as const,
 }
 
-export function useInvoices(filters: { restrictedUfs: string[]; startDate?: string; endDate?: string }) {
+export function useInvoices(filters: InvoiceListFilters) {
   return useQuery({
     queryKey: invoiceKeys.list(filters),
-    queryFn: () => listInvoicesOverview(filters.restrictedUfs, filters.startDate, filters.endDate),
+    queryFn: () => listInvoicesOverview(filters),
+    placeholderData: (previousData) => previousData,
   })
 }
 

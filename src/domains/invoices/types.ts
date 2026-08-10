@@ -11,6 +11,20 @@ export type InvoiceOverviewViewModel = Pick<InvoiceRecord,
   'quantidade_codorna' | 'valor_total'
 > & { uf: string; cidade: string; status: 'Desconhecida' | 'Finalizada' | 'Pendente' }
 
+export type InvoiceListFilters = {
+  restrictedUfs?: string[]
+  startDate?: string; endDate?: string; status?: string; uf?: string; city?: string
+  search?: string; sortBy?: 'loja' | 'nota_fiscal' | 'data_emissao' | 'uf' | 'status'
+  direction?: 'asc' | 'desc'; page?: number; pageSize?: number
+}
+export type InvoiceOverviewPage = {
+  rows: InvoiceOverviewViewModel[]
+  total: number
+  counts: { Finalizada: number; Pendente: number; Desconhecida: number }
+  ufs: string[]
+  cities: string[]
+}
+
 export type StartInvoiceProcessCommand = { storeId: string; accessKey: string }
 export type FindInvoiceStoreCommand = { code: string | number; restrictedUfs: string[] }
 export type MarkInvoiceUnknownCommand = {

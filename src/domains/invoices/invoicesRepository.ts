@@ -1,7 +1,7 @@
 import { supabase } from '../../shared/lib/supabaseClient'
 import { paginateSupabase } from '../../shared/api/pagination'
 import { toAppError } from '../../shared/errors'
-import type { InvoiceOverviewViewModel, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand } from './types'
+import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand } from './types'
 
 export async function fetchAllNfdNotas(select: string, configureQuery?: (query: any) => any) {
   return paginateSupabase<any>((from, to) => {
@@ -11,16 +11,18 @@ export async function fetchAllNfdNotas(select: string, configureQuery?: (query: 
   })
 }
 
-export async function listInvoicesOverview(restrictedUfs: string[] = [], startDate?: string, endDate?: string): Promise<InvoiceOverviewViewModel[]> {
+export async function listInvoicesOverview(filters: InvoiceListFilters): Promise<InvoiceOverviewPage> {
   try {
-    return await paginateSupabase<any>((from, to) => {
-      let query: any = (supabase as any).rpc('listar_nfd_notas_gerencial', {
-        p_data_inicial: startDate || null,
-        p_data_final: endDate || null,
-      })
-      if (restrictedUfs.length) query = query.in('uf', restrictedUfs)
-      return query.range(from, to)
+    const page = Math.max(1, filters.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 10))
+    const { data, error } = await (supabase as any).rpc('listar_nfd_notas_gerencial', {
+      p_data_inicial: filters.startDate || null, p_data_final: filters.endDate || null,
+      p_status: filters.status || null, p_uf: filters.uf || null, p_cidade: filters.city || null,
+      p_pesquisa: filters.search?.trim() || null, p_ordenar_por: filters.sortBy ?? 'data_emissao',
+      p_direcao: filters.direction ?? 'desc', p_limite: pageSize, p_deslocamento: (page - 1) * pageSize,
     })
+    if (error) throw error
+    return data as InvoiceOverviewPage
   } catch (error) { throw toAppError(error, 'Não foi possível carregar as notas fiscais.') }
 }
 
