@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 
-export function FilterSection({ children, count = 0, defaultOpen = true, id, isOpen, onToggle, title }) {
+export function FilterSection({ children, count = 0, defaultOpen = false, id, isOpen, onToggle, title }) {
   const generatedId = useId()
   const contentId = id ?? `filter-section-${generatedId.replaceAll(':', '')}`
   const [internalOpen, setInternalOpen] = useState(defaultOpen)

@@ -9,13 +9,13 @@ function ControlledPopover({ onApply = vi.fn(), onClear = vi.fn() }) {
   return (
     <FilterPopover activeFilterCount={2} isOpen={open} onToggle={setOpen} onApply={onApply} onClear={onClear}>
       <FilterSection title="Estado" count={1}><label><input type="checkbox" /> Ceará</label></FilterSection>
-      <FilterSection title="Cidade" defaultOpen={false}><span>Fortaleza</span></FilterSection>
+      <FilterSection title="Cidade"><span>Fortaleza</span></FilterSection>
     </FilterPopover>
   )
 }
 
 describe('FilterPopover', () => {
-  it('abre com atributos acessíveis, exibe contadores e expande seções', () => {
+  it('abre com as seções fechadas e reinicia esse estado a cada abertura', () => {
     render(<ControlledPopover />)
     const trigger = screen.getByRole('button', { name: /Filtrar/ })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
@@ -25,12 +25,21 @@ describe('FilterPopover', () => {
     expect(trigger.getAttribute('aria-controls')).toBe(screen.getByRole('dialog').id)
     expect(screen.getAllByText('2').length).toBeGreaterThan(0)
 
-    const city = screen.getByRole('button', { name: 'Cidade' })
-    expect(city).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(city)
-    expect(city).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('Fortaleza')).toBeVisible()
+    const headings = screen.getAllByRole('button', { name: /^(Estado|Cidade)$/ })
+    headings.forEach((heading) => expect(heading).toHaveAttribute('aria-expanded', 'false'))
+
+    fireEvent.click(headings[0])
+    expect(headings[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Ceará')).toBeVisible()
     expect(screen.getByLabelText('1 selecionado')).toBeVisible()
+
+    fireEvent.click(trigger)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    fireEvent.click(trigger)
+    screen.getAllByRole('button', { name: /^(Estado|Cidade)$/ }).forEach((heading) => {
+      expect(heading).toHaveAttribute('aria-expanded', 'false')
+    })
   })
 
   it('limpa, aplica e fecha ao aplicar', () => {
