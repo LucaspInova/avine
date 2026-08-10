@@ -124,6 +124,16 @@ function formatNoteQuantity(value) {
   return Number(value ?? 0).toLocaleString('pt-BR')
 }
 
+const notePercentageFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'percent',
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
+function formatNotePercentage(value, total) {
+  return notePercentageFormatter.format(total === 0 ? 0 : value / total)
+}
+
 function getNoteDateKey(note) {
   return String(note.data_referencia ?? note.data_emissao ?? '').slice(0, 10) || 'sem-data'
 }
@@ -2267,7 +2277,15 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         </div>
 
         <div className="notes-summary" aria-label="Totais das notas">
-          {Object.entries(totals).map(([label, total]) => <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}><span>{label}</span><strong>{formatNoteQuantity(total)}</strong></article>)}
+          {Object.entries(totals).map(([label, total]) => (
+            <article className={`notes-summary-card is-${label.toLowerCase()}`} key={label}>
+              <span>{label}</span>
+              <div className="notes-summary-value">
+                <strong>{formatNoteQuantity(total)}</strong>
+                {label !== 'Geral' && <small>{formatNotePercentage(total, totals.Geral)}</small>}
+              </div>
+            </article>
+          ))}
         </div>
 
         {completionMessage && (

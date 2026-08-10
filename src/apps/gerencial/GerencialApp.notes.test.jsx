@@ -69,6 +69,35 @@ describe('tela proprietária de Notas gerencial', () => {
     expect(screen.queryByRole('dialog', { name: '10 - 110' })).not.toBeInTheDocument()
   })
 
+  it('exibe quantidade e percentual de cada status sobre o conjunto filtrado', () => {
+    setupQuery({ data: [
+      { ...notes[0], status: 'Finalizada' },
+      { ...notes[1], status: 'Pendente' },
+      { ...notes[2], status: 'Pendente' },
+      { ...notes[3], status: 'Desconhecida' },
+      { ...notes[4], status: 'Desconhecida' },
+      { ...notes[5], status: 'Desconhecida' },
+    ] })
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    const summary = screen.getByLabelText('Totais das notas')
+    expect(within(summary).getByText('Geral').closest('article')).toHaveTextContent('Geral6')
+    expect(within(summary).getByText('Finalizada').closest('article')).toHaveTextContent('Finalizada116,7%')
+    expect(within(summary).getByText('Pendente').closest('article')).toHaveTextContent('Pendente233,3%')
+    expect(within(summary).getByText('Desconhecida').closest('article')).toHaveTextContent('Desconhecida350,0%')
+  })
+
+  it('exibe percentuais zerados quando o conjunto filtrado está vazio', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    const summary = screen.getByLabelText('Totais das notas')
+    expect(within(summary).getByText('Geral').closest('article')).toHaveTextContent('Geral0')
+    expect(within(summary).getByText('Finalizada').closest('article')).toHaveTextContent('Finalizada00,0%')
+    expect(within(summary).getByText('Pendente').closest('article')).toHaveTextContent('Pendente00,0%')
+    expect(within(summary).getByText('Desconhecida').closest('article')).toHaveTextContent('Desconhecida00,0%')
+    expect(summary).not.toHaveTextContent(/NaN|Infinity/)
+  })
+
   it('filtra as linhas por Status, UF e Cidade', () => {
     setupQuery({ data: [
       { ...notes[0], nome_abreviado: 'Loja Fortaleza pendente', status: 'Pendente', uf: ' ce ', cidade: 'Fortaleza' },
