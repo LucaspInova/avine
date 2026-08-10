@@ -19,6 +19,8 @@ export function FilterPopover({
   const popoverId = id ?? `filter-popover-${generatedId.replaceAll(':', '')}`
   const rootRef = useRef(null)
   const panelRef = useRef(null)
+  const triggerRef = useRef(null)
+  const wasOpenRef = useRef(false)
   const [position, setPosition] = useState()
 
   useLayoutEffect(() => {
@@ -58,12 +60,42 @@ export function FilterPopover({
     }
   }, [isOpen, onToggle])
 
+  useEffect(() => {
+    if (isOpen) {
+      wasOpenRef.current = true
+      const frame = window.requestAnimationFrame(() => {
+        panelRef.current?.querySelector('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')?.focus()
+      })
+      return () => window.cancelAnimationFrame(frame)
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false
+      triggerRef.current?.focus()
+    }
+    return undefined
+  }, [isOpen])
+
+  const handlePanelKeyDown = (event) => {
+    if (event.key !== 'Tab') return
+    const focusable = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])')]
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
     <div className="ui-filter-popover" ref={rootRef}>
-      <FilterTrigger activeFilterCount={activeFilterCount} controls={popoverId} isOpen={isOpen} label={label} onToggle={onToggle} />
+      <FilterTrigger ref={triggerRef} activeFilterCount={activeFilterCount} controls={popoverId} isOpen={isOpen} label={label} onToggle={onToggle} />
       {isOpen && (
-        <div className="ui-filter-popover__panel" id={popoverId} ref={panelRef} style={position} role="dialog" aria-label="Filtros">
-          {activeFilterCount > 0 && <span className="ui-filter-popover__summary">{activeFilterCount} filtros ativos</span>}
+        <div className="ui-filter-popover__panel" id={popoverId} ref={panelRef} style={position} role="dialog" aria-label="Filtros" aria-modal="true" onKeyDown={handlePanelKeyDown}>
+          {activeFilterCount > 0 && <span className="ui-filter-popover__summary" aria-live="polite">{activeFilterCount} {activeFilterCount === 1 ? 'filtro ativo' : 'filtros ativos'}</span>}
           <div className="ui-filter-popover__sections">{children}</div>
           <footer className="ui-filter-popover__footer">
             <button type="button" className="ui-filter-popover__clear" onClick={onClear}>{clearLabel}</button>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { FilterPopover } from './FilterPopover.jsx'
@@ -30,7 +30,7 @@ describe('FilterPopover', () => {
     fireEvent.click(city)
     expect(city).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Fortaleza')).toBeVisible()
-    expect(screen.getByLabelText('1 selecionados')).toBeVisible()
+    expect(screen.getByLabelText('1 selecionado')).toBeVisible()
   })
 
   it('limpa, aplica e fecha ao aplicar', () => {
@@ -44,6 +44,17 @@ describe('FilterPopover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
     expect(onApply).toHaveBeenCalledOnce()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('gerencia foco, navegação cíclica e anúncio dos badges', async () => {
+    render(<ControlledPopover />)
+    const trigger = screen.getByRole('button', { name: /Filtrar/ })
+    fireEvent.click(trigger)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Estado' })).toHaveFocus())
+    expect(screen.getByRole('status', { name: '2 filtros ativos' })).toBeVisible()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 
   it('fecha com Escape e clique fora', () => {
