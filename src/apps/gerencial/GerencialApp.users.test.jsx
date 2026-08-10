@@ -78,6 +78,16 @@ describe('Cadastro de Usuários', () => {
     const pageToolbar = document.querySelector('.users-page-toolbar')
     expect(within(pageToolbar).getByRole('heading', { name: 'Usuários' })).toBeInTheDocument()
 
+    const toolbarControls = pageToolbar.querySelector('.ui-page-toolbar__controls')
+    const searchField = screen.getByLabelText('Procurar usuários por nome ou e-mail').closest('.ui-search-field')
+    const filterTrigger = screen.getByRole('button', { name: /Filtrar/ })
+    const createButton = screen.getByRole('button', { name: 'Cadastrar Usuário' })
+    expect(toolbarControls).toContainElement(searchField)
+    expect(toolbarControls).toContainElement(filterTrigger)
+    expect(toolbarControls).toContainElement(createButton)
+    expect(filterTrigger).toHaveClass('ui-filter-trigger')
+    expect(createButton).toHaveClass('user-create-button')
+
     const table = screen.getByRole('table', { name: 'Cadastro de Usuários' })
     expect(within(table).getByText('ANA GERENCIAL')).toBeInTheDocument()
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
