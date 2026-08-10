@@ -20,8 +20,6 @@ export type Estado =
   | 'AL'
 
 export type PerfilUsuario = 'Promotor' | 'Gerencial' | 'Admin'
-export type StatusFstd = 'solicitada' | 'validada' | 'cancelada' | 'recolhida'
-export type OrigemFstd = 'mobile' | 'gerencial' | 'importacao'
 
 export type Database = {
   public: {
@@ -382,73 +380,6 @@ export type Database = {
           id?: string
         }
         Relationships: []
-      }
-      fstds: {
-        Row: {
-          id: string
-          nfd_id: string | null
-          loja_id: string
-          promotor_id: string
-          motivo_id: string
-          status: StatusFstd
-          origem: OrigemFstd
-          observacao: string | null
-          solicitada_em: string
-          validada_em: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          nfd_id?: string | null
-          loja_id: string
-          promotor_id: string
-          motivo_id: string
-          status?: StatusFstd
-          origem?: OrigemFstd
-          observacao?: string | null
-          solicitada_em?: string
-          validada_em?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          nfd_id?: string | null
-          loja_id?: string
-          promotor_id?: string
-          motivo_id?: string
-          status?: StatusFstd
-          origem?: OrigemFstd
-          observacao?: string | null
-          solicitada_em?: string
-          validada_em?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'fstds_loja_id_fkey'
-            columns: ['loja_id']
-            isOneToOne: false
-            referencedRelation: 'lojas'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'fstds_promotor_id_fkey'
-            columns: ['promotor_id']
-            isOneToOne: false
-            referencedRelation: 'usuarios'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'fstds_motivo_id_fkey'
-            columns: ['motivo_id']
-            isOneToOne: false
-            referencedRelation: 'motivos_devolucao'
-            referencedColumns: ['id']
-          },
-        ]
       }
       fstd_processos: {
         Row: {
@@ -916,5 +847,4 @@ export type LojaComPromotores = Database['public']['Views']['lojas_com_promotore
 
 export type MotivoDevolucao = Database['public']['Tables']['motivos_devolucao']['Row']
 export type NfdDesconhecimento = Database['public']['Tables']['nfd_desconhecimentos']['Row']
-export type Fstd = Database['public']['Tables']['fstds']['Row']
 export type NfdNota = Database['public']['Views']['nfd_notas']['Row']
