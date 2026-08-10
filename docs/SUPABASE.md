@@ -17,10 +17,9 @@ feitas por migrations, testadas localmente e nunca por reset do banco remoto.
 - `motivos_devolucao`: catalogo administravel de motivos.
 - `nfd_logs`: log interno da sincronizacao.
 
-`fstds` pertence ao dominio anterior e o cliente nao recebe grants para usa-la.
-`solicitar_fstd` e seus overloads antigos ja foram removidos depois da
-verificacao de chamadas; a remocao fisica da tabela fica para uma entrega
-posterior.
+`fstds` pertencia ao dominio anterior e foi removida depois da verificacao de
+que nao havia chamadas no aplicativo. `solicitar_fstd` e seus overloads antigos
+tambem ja foram removidos.
 
 ## Autenticacao e usuarios
 
