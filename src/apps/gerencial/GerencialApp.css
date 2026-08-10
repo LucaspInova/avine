@@ -1751,7 +1751,7 @@ select:focus-visible {
 }
 
 .user-create-button {
-  height: 56px;
+  height: var(--control-height);
   padding-inline: 24px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -3326,7 +3326,6 @@ select:focus-visible {
 
   .user-create-button {
     grid-column: auto;
-    height: 50px;
   }
 
   .user-summary-grid {
