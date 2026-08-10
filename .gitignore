@@ -14,6 +14,11 @@ dist-ssr
 playwright-report/
 test-results/
 
+# Local legacy-data workbench and generated import artifacts
+.tmp-sheet/
+base-legado/
+~$*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
