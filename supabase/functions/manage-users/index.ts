@@ -303,16 +303,36 @@ Deno.serve(async (request) => {
         .update({ promotor_id: null }).eq("promotor_id", target.id);
       if (routeError) return jsonResponse(400, { error: routeError.message });
     }
-    if (target.auth_user_id) {
-      const { error } = await adminClient.auth.admin.deleteUser(target.auth_user_id);
-      if (error) return jsonResponse(400, { error: error.message });
-    }
-    const { error } = await adminClient.from("usuarios").update({
+
+    // Keep the operational profile as historical data. In particular,
+    // fstd_processos intentionally restricts deletion of the Promotor that
+    // performed the process. Detaching Auth first prevents deleteUser from
+    // cascading into usuarios and violating that historical reference.
+    const { error: detachError } = await adminClient.from("usuarios").update({
       auth_user_id: null,
       ativo: false,
       acesso_habilitado: false,
     }).eq("id", target.id);
-    if (error) return jsonResponse(400, { error: error.message });
+    if (detachError) return jsonResponse(400, { error: detachError.message });
+
+    if (target.auth_user_id) {
+      const { error } = await adminClient.auth.admin.deleteUser(target.auth_user_id);
+      if (error) {
+        // Auth still exists, so restore the association and leave the account
+        // usable instead of producing an inaccessible orphan on a transient
+        // Auth Admin failure.
+        const { error: restoreError } = await adminClient.from("usuarios").update({
+          auth_user_id: target.auth_user_id,
+          ativo: target.ativo,
+          acesso_habilitado: target.acesso_habilitado,
+        }).eq("id", target.id);
+        return jsonResponse(400, {
+          error: restoreError
+            ? `Falha ao excluir a conta e restaurar o perfil: ${error.message}`
+            : error.message,
+        });
+      }
+    }
     return jsonResponse(200, { deleted: true });
   }
 

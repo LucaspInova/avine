@@ -31,3 +31,10 @@ Gerencial e Promotor; ao salvar, a Edge Function sincroniza simultaneamente
 O servidor impede que o último Admin ativo seja rebaixado ou bloqueado e impede
 que um usuário bloqueie o próprio acesso. Gerenciais exigem ao menos uma UF,
 Promotores exatamente uma UF e Admins sempre têm escopo global.
+
+## Exclusão de acesso
+
+Excluir um acesso remove a conta de autenticação e desvincula o usuário das lojas,
+mas preserva o perfil operacional sem acesso. Essa retenção é necessária porque
+processos FSTD anteriores continuam referenciando o Promotor que realizou o
+trabalho; o histórico não deve ser apagado junto com as credenciais.

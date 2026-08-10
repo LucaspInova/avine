@@ -212,6 +212,16 @@ select ok(
   has_function_privilege('authenticated', 'public.record_usuario_access()', 'EXECUTE'),
   'authenticated users can record their access'
 );
+select is(
+  (
+    select c.confdeltype::text
+    from pg_constraint as c
+    where c.conrelid = 'public.usuarios'::regclass
+      and c.conname = 'usuarios_auth_user_id_fkey'
+  ),
+  'n',
+  'deleting an Auth account preserves its operational user profile'
+);
 select ok(
   to_regprocedure('public.is_current_user_gerencial_ativo()') is null,
   'the authorization helper is not exposed by the Data API'
