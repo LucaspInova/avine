@@ -60,13 +60,12 @@ describe('fluxo proprietário de usuários', () => {
 
   it('confirma ações sensíveis somente pelo modal e respeita canManage', () => {
     const user = { nome: 'Paula', email: 'p@a.com', perfil: 'Promotor', estado: 'CE', fotos_habilitadas: false }
-    const onClose = vi.fn(); const onTogglePhotos = vi.fn()
-    const { rerender } = render(<InformacoesUsuarioModal usuario={user} onClose={onClose} onEdit={noop} onTogglePhotos={onTogglePhotos} photoBusy={false} canManage={false} />)
+    const onClose = vi.fn()
+    const { rerender } = render(<InformacoesUsuarioModal usuario={user} onClose={onClose} onEdit={noop} canManage={false} />)
     expect(screen.getByRole('button', { name: 'Paula p@a.com' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Fotos habilitadas' })).not.toBeInTheDocument()
-    rerender(<InformacoesUsuarioModal usuario={user} onClose={onClose} onEdit={noop} onTogglePhotos={onTogglePhotos} photoBusy={false} canManage />)
+    rerender(<InformacoesUsuarioModal usuario={user} onClose={onClose} onEdit={noop} canManage />)
     expect(screen.queryByRole('button', { name: 'Fotos habilitadas' })).not.toBeInTheDocument()
-    expect(onTogglePhotos).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Fechar informações' }))
     expect(onClose).toHaveBeenCalledOnce()
   })

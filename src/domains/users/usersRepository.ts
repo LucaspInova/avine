@@ -21,7 +21,6 @@ export type CreateOperationalUserPayload = {
   perfil: PerfilUsuario
   estado: Estado
   ufs: Estado[]
-  fotos_habilitadas: boolean
 }
 
 export type UpdateManagedUserPayload = {
@@ -31,7 +30,6 @@ export type UpdateManagedUserPayload = {
   perfil: PerfilUsuario
   estado: Estado
   ufs: Estado[]
-  fotos_habilitadas: boolean
   ativo: boolean
   acesso_habilitado: boolean
   password?: string
@@ -91,7 +89,6 @@ export async function createGerencialUser(payload: CreateGerencialUserPayload): 
     ...payload,
     perfil: 'Admin',
     estado: 'CE',
-    fotos_habilitadas: false,
   })
 }
 

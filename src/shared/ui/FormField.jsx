@@ -1,3 +1,5 @@
+import { AppSelect } from './AppSelect.jsx'
+
 export function FormField({ children, className = '', error, hint, label, required = false }) {
   return (
     <label className={`ui-form-field ${className}`.trim()}>
@@ -14,7 +16,7 @@ export function TextField({ error, hint, label, required, ...inputProps }) {
 }
 
 export function SelectField({ children, error, hint, label, required, ...selectProps }) {
-  return <FormField error={error} hint={hint} label={label} required={required}><select {...selectProps} required={required}>{children}</select></FormField>
+  return <FormField error={error} hint={hint} label={label} required={required}><AppSelect {...selectProps} required={required}>{children}</AppSelect></FormField>
 }
 
 export function TextAreaField({ error, hint, label, required, ...textareaProps }) {

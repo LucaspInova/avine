@@ -9,7 +9,7 @@ import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../../../shared/lib/
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../../../shared/lib/profilePhoto'
 import { getProfileLabel } from '../../../shared/lib/profileLabels.js'
 import LogoutConfirmDialog from '../../../shared/components/LogoutConfirmDialog.jsx'
-import { EmptyState, SearchField } from '../../../shared/ui'
+import { AppSelect, EmptyState, SearchField } from '../../../shared/ui'
 import avineLogo from '../../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../../shared/assets/ui-icons/arquivo-pdf.png'
@@ -1312,7 +1312,8 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
                 Motivo
                 <small className="required-label">Obrigatório</small>
               </span>
-              <select
+              <AppSelect
+                searchable
                 value={form.motivoId}
                 onChange={(event) => updateForm({ motivoId: event.target.value })}
               >
@@ -1322,7 +1323,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
                     {motivo.nome}
                   </option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
           </FieldCard>
 
@@ -1757,7 +1758,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
                     {index === 0 ? 'Motivo' : `Outro motivo ${index + 1}`}
                     <small aria-label="Obrigatório" className="required-label">*</small>
                   </span>
-                  <select required value={division.motivoId} onChange={(event) => updateDivision(index, { motivoId: event.target.value })}>
+                  <AppSelect required searchable value={division.motivoId} onChange={(event) => updateDivision(index, { motivoId: event.target.value })}>
                     <option value="">Selecione</option>
                     {motivos.filter((motivo) => motivo.ativo || motivo.id === division.motivoId).map((motivo) => (
                       <option
@@ -1768,7 +1769,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
                         {motivo.nome}
                       </option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </label>
                 <label className="mobile-field">
                   <span>Faturado <small aria-label="Obrigatório" className="required-label">*</small></span>
@@ -2070,12 +2071,12 @@ function FstdQuickProductForm({ product, motivos, busy, error, initialDraft = nu
       <div className="fstd-quick-fields">
         <label className="mobile-field">
           <span>Motivo <small aria-label="Obrigatório" className="required-label">*</small></span>
-          <select required value={motivoId} onChange={(event) => setMotivoId(event.target.value)}>
+          <AppSelect required searchable value={motivoId} onChange={(event) => setMotivoId(event.target.value)}>
             <option value="">Selecione</option>
             {motivos.filter((motivo) => motivo.ativo || motivo.id === motivoId).map((motivo) => (
               <option key={motivo.id} value={motivo.id}>{motivo.nome}</option>
             ))}
-          </select>
+          </AppSelect>
         </label>
 
         <label className="mobile-field">
@@ -2555,16 +2556,17 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
                     </th>
                     <td className="fstd-spreadsheet-cell fstd-motivo-spreadsheet-cell">
                       <div className="fstd-motivo-cell">
-                        <select
+                        <AppSelect
                           aria-label={`Motivo de ${product.nome}`}
                           disabled={rowDisabled}
                           required
+                          searchable
                           value={row.motivoId}
                           onChange={(event) => updateRow(product, row.id, { motivoId: event.target.value })}
                         >
                           <option value="">Selecione</option>
                           {renderMotivoOptions(row, draft.rows)}
-                        </select>
+                        </AppSelect>
                         {(row.isAdditional || canAddAdditional) && <div className="fstd-motivo-actions">
                           <button
                           aria-label={row.isAdditional

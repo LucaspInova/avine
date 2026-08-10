@@ -133,7 +133,7 @@ function validateProfile(input: JsonRecord) {
     perfil,
     estado,
     ufs,
-    fotos_habilitadas: perfil === "Promotor" || boolean(input.fotos_habilitadas),
+    fotos_habilitadas: true,
   };
 }
 

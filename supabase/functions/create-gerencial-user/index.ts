@@ -71,7 +71,6 @@ Deno.serve(async (request) => {
     password?: unknown
     perfil?: unknown
     estado?: unknown
-    fotos_habilitadas?: unknown
   }
   try {
     body = await request.json()
@@ -84,7 +83,6 @@ Deno.serve(async (request) => {
   const password = typeof body.password === 'string' ? body.password : ''
   const perfil = typeof body.perfil === 'string' ? body.perfil : 'Gerencial'
   const estado = typeof body.estado === 'string' ? body.estado : 'CE'
-  const fotosHabilitadas = perfil === 'Promotor' || body.fotos_habilitadas === true
   const perfisPermitidos = ['Promotor', 'Gerencial', 'Admin']
   const estadosPermitidos = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 
@@ -158,7 +156,7 @@ Deno.serve(async (request) => {
         email,
         perfil,
         estado,
-        fotos_habilitadas: fotosHabilitadas,
+        fotos_habilitadas: true,
         ativo: true,
         acesso_habilitado: true,
       },

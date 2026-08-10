@@ -28,7 +28,7 @@ import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
-import { Pagination } from '../../shared/ui'
+import { AppSelect, Pagination } from '../../shared/ui'
 import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -39,7 +39,7 @@ const perfisEditaveis = ['Admin', 'Gerencial', 'Promotor']
 const perfisCadastroUi = [
   { value: 'Admin', label: 'Admin', authRole: 'admin' },
   { value: 'Gerencial', label: 'Gerencial', authRole: 'gerencial' },
-  { value: 'Promotor', label: 'Promotor' },
+  { value: 'Promotor', label: 'Promotor', authRole: 'promotor' },
 ]
 const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
@@ -73,7 +73,6 @@ const initialUserForm = {
   auth_role: 'admin',
   estado: '',
   ufs: [],
-  fotos_habilitadas: false,
 }
 
 const initialLojaForm = {
@@ -144,6 +143,14 @@ function normalizaNome(nome) {
 
 function normalizaTexto(texto) {
   return texto.trim().replace(/\s+/g, ' ')
+}
+
+function normalizaPesquisa(texto) {
+  return String(texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 function isNomeDuplicado(nome, usuarios, ignoredId = '') {
@@ -509,24 +516,6 @@ function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhot
   )
 }
 
-function PhotoSwitch({ checked, disabled = false, onChange, label }) {
-  return (
-    <button
-      className={`photo-switch ${checked ? 'is-on' : ''}`}
-      type="button"
-      aria-label={label}
-      aria-pressed={checked}
-      disabled={disabled}
-      onClick={(event) => {
-        event.stopPropagation()
-        onChange?.()
-      }}
-    >
-      <span />
-    </button>
-  )
-}
-
 export function CadastroModal({ form, usuarios, currentUser, busy, error, onChange, onClose, onSubmit }) {
   const trimmedEmail = form.email.trim()
   const trimmedName = form.nome.trim()
@@ -669,16 +658,6 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                   </div>
                 </fieldset>
 
-                {form.perfil !== 'Promotor' && (
-                  <label className="switch-field">
-                    <span>Habilitar fotos?</span>
-                    <PhotoSwitch
-                      checked={form.fotos_habilitadas}
-                      label="Habilitar fotos"
-                      onChange={() => onChange({ fotos_habilitadas: !form.fotos_habilitadas })}
-                    />
-                  </label>
-                )}
               </>
             )}
           </div>
@@ -828,7 +807,7 @@ export function CadastroLojaModal({ form, lojas, allowedStates = estadosLojas, b
   )
 }
 
-export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, onTogglePhotos, photoBusy, canManage = true }) {
+export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, canManage = true }) {
   const [storeSearch, setStoreSearch] = useState('')
   if (!usuario) return null
   const query = storeSearch.trim().toLocaleLowerCase('pt-BR')
@@ -858,18 +837,6 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
               <Icon name="edit" />
             </span>
           </button>
-
-          {usuario.perfil !== 'Promotor' && (
-            <div className="info-toggle">
-              <span>Habilitar fotos</span>
-              <PhotoSwitch
-                checked={usuario.fotos_habilitadas}
-                disabled={photoBusy || !canManage}
-                label="Fotos habilitadas"
-                onChange={() => onTogglePhotos(usuario)}
-              />
-            </div>
-          )}
 
           <dl className="info-data">
             <div>
@@ -1039,16 +1006,6 @@ export function EditarUsuarioModal({
             </div>
           </fieldset>}
 
-          {form.perfil !== 'Promotor' && (
-            <label className="edit-checkbox">
-              <input
-                checked={form.fotos_habilitadas}
-                onChange={(event) => onChange({ fotos_habilitadas: event.target.checked })}
-                type="checkbox"
-              />
-              <span>Habilitar envio de fotos?</span>
-            </label>
-          )}
         </div>
 
         {error && <p className="form-error">{error}</p>}
@@ -1134,11 +1091,11 @@ export function PromotorSelect({ value, promotores, disabled, onChange }) {
   const [query, setQuery] = useState('')
   const selectedPromotor = promotores.find((promotor) => promotor.id === value)
   const filteredPromotores = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = normalizaPesquisa(query)
 
     return promotores
       .filter((promotor) => !promotor.perfil || promotor.perfil === 'Promotor')
-      .filter((promotor) => !normalizedQuery || promotor.nome.toLowerCase().includes(normalizedQuery))
+      .filter((promotor) => !normalizedQuery || normalizaPesquisa(promotor.nome).includes(normalizedQuery))
   }, [promotores, query])
 
   function handleSelect(promotorId) {
@@ -1171,6 +1128,16 @@ export function PromotorSelect({ value, promotores, disabled, onChange }) {
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            setIsOpen(false)
+            setQuery('')
+          } else if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setIsOpen(true)
+          }
+        }}
       >
         <span>{selectedPromotor?.nome ?? '-'}</span>
       </button>
@@ -1553,7 +1520,8 @@ export function UsuariosScreen({
 
         <label className="user-select-field">
           <span>UF</span>
-          <select
+          <AppSelect
+            searchable
             value={restrictedUfs.length === 1 ? restrictedUfs[0] : ufFilter}
             disabled={restrictedUfs.length > 0}
             onChange={(event) => {
@@ -1563,13 +1531,13 @@ export function UsuariosScreen({
           >
             <option value="all">Todas</option>
             {availableUfs.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-          </select>
+          </AppSelect>
           <span className="select-chevron" />
         </label>
 
         <label className="user-select-field">
           <span>Status</span>
-          <select
+          <AppSelect
             value={statusFilter}
             onChange={(event) => {
               setStatusFilter(event.target.value)
@@ -1579,7 +1547,7 @@ export function UsuariosScreen({
             <option value="all">Todos</option>
             <option value="active">Ativo</option>
             <option value="inactive">Inativo</option>
-          </select>
+          </AppSelect>
           <span className="select-chevron" />
         </label>
 
@@ -2279,9 +2247,9 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         <div className="notes-filters" aria-label="Filtros das notas">
           <label>Data inicial<input aria-label="Data inicial" type="date" value={startDate} max={endDate} onChange={(event) => setStartDate(event.target.value)} /></label>
           <label>Data final<input aria-label="Data final" type="date" value={endDate} min={startDate} onChange={(event) => setEndDate(event.target.value)} /></label>
-          <label>Status<select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>UF<select value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>Cidade<select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label>Status<AppSelect value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
+          <label>UF<AppSelect searchable value={selectedUf} onChange={(event) => { setSelectedUf(event.target.value); setSelectedCity('') }}><option value="">Todas</option>{ufs.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
+          <label>Cidade<AppSelect searchable value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}><option value="">Todas</option>{cities.map((item) => <option key={item}>{item}</option>)}</AppSelect></label>
         </div>
 
         <div className="notes-summary" aria-label="Totais das notas">
@@ -2400,7 +2368,6 @@ function GerencialApp({ capabilities }) {
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [updatingId, setUpdatingId] = useState('')
   const [isCadastroOpen, setCadastroOpen] = useState(false)
   const [isFilterOpen, setFilterOpen] = useState(false)
   const [form, setForm] = useState(initialUserForm)
@@ -2671,7 +2638,6 @@ function GerencialApp({ capabilities }) {
       perfil: form.perfil,
       estado: form.ufs?.[0] ?? form.estado,
       ufs: form.perfil === 'Admin' ? [] : form.ufs,
-      fotos_habilitadas: form.perfil === 'Promotor' ? true : form.fotos_habilitadas,
     }
 
     if (
@@ -2766,38 +2732,6 @@ function GerencialApp({ capabilities }) {
     await loadLojas()
   }
 
-  async function handlePhotoToggle(usuario) {
-    const nextValue = !usuario.fotos_habilitadas
-    setUpdatingId(usuario.id)
-    setError('')
-
-    try {
-      await updateManagedUser({
-        usuario_id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        perfil: usuario.perfil,
-        estado: usuario.estado,
-        ufs: usuario.ufs ?? [usuario.estado],
-        fotos_habilitadas: nextValue,
-        ativo: usuario.ativo,
-        acesso_habilitado: usuario.acesso_habilitado,
-      })
-      setUsuarios((current) =>
-        current
-          .map((item) => (item.id === usuario.id ? { ...item, fotos_habilitadas: nextValue } : item))
-          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
-      )
-      setSelectedUsuario((current) =>
-        current?.id === usuario.id ? { ...current, fotos_habilitadas: nextValue } : current,
-      )
-    } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : 'Não foi possível atualizar o usuário.')
-    }
-
-    setUpdatingId('')
-  }
-
   async function handlePromotorChange(lojaId, posicao, promotorId) {
     const key = `${lojaId}-${posicao}`
     setStoreSavingKey(key)
@@ -2872,7 +2806,6 @@ function GerencialApp({ capabilities }) {
       perfil: selectedUsuario.perfil,
       estado: selectedUsuario.estado,
       ufs: selectedUsuario.ufs ?? [selectedUsuario.estado],
-      fotos_habilitadas: selectedUsuario.fotos_habilitadas,
     })
     setEditError('')
     setEditOpen(true)
@@ -2896,7 +2829,6 @@ function GerencialApp({ capabilities }) {
       perfil: editForm.perfil,
       estado: editForm.estado,
       ufs: editForm.perfil === 'Admin' ? [] : [editForm.estado],
-      fotos_habilitadas: editForm.perfil === 'Promotor' ? true : editForm.fotos_habilitadas,
       auth_role: editForm.perfil === 'Admin' ? 'admin' : editForm.perfil.toLowerCase(),
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }
@@ -3035,7 +2967,6 @@ function GerencialApp({ capabilities }) {
         perfil: target.perfil === 'Admin' ? 'Admin' : 'Gerencial',
         estado: target.estado,
         ufs: target.ufs ?? (target.perfil === 'Admin' ? [] : [target.estado]),
-        fotos_habilitadas: target.fotos_habilitadas,
         ativo: payload.ativo,
         acesso_habilitado: payload.ativo,
         auth_role: target.perfil === 'Admin' ? 'admin' : 'gerencial',
@@ -3276,8 +3207,6 @@ function GerencialApp({ capabilities }) {
             .filter(Boolean)}
           onClose={closeUserModals}
           onEdit={openEditModal}
-          onTogglePhotos={handlePhotoToggle}
-          photoBusy={updatingId === selectedUsuario.id}
           canManage={selectedUsuario.perfil === 'Promotor'
             ? can(currentUser, 'users.managePromoters')
             : can(currentUser, 'users.manageGerencial')}

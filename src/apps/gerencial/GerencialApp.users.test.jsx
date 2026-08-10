@@ -158,10 +158,11 @@ describe('Cadastro de Usuários', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Gerencial' })).not.toBeDisabled()
+    expect(screen.queryByText('Habilitar fotos?')).not.toBeInTheDocument()
 
     rerender(
       <CadastroModal
-        form={{ ...gerencialForm, perfil: 'Promotor' }}
+        form={{ ...gerencialForm, perfil: 'Promotor', auth_role: 'promotor' }}
         usuarios={usuarios}
         busy={false}
         error=""
@@ -173,7 +174,8 @@ describe('Cadastro de Usuários', () => {
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Gerencial responsável')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Habilitar fotos' })).not.toBeInTheDocument()
+    expect(screen.getByText('Perfil de acesso escolhido')).toBeInTheDocument()
+    expect(screen.queryByText('Habilitar fotos?')).not.toBeInTheDocument()
   })
 
 

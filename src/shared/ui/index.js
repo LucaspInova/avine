@@ -1,5 +1,6 @@
 import './ui.css'
 
+export { AppSelect } from './AppSelect.jsx'
 export { Button } from './Button.jsx'
 export { ConfirmDialog } from './ConfirmDialog.jsx'
 export { EmptyState, ErrorMessage, LoadingState } from './Feedback.jsx'
