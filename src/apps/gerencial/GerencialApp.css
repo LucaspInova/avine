@@ -1767,84 +1767,6 @@ select:focus-visible {
   gap: 22px;
 }
 
-.user-filter-bar {
-  display: grid;
-  grid-template-columns: minmax(280px, 2.2fr) repeat(2, minmax(130px, 0.85fr)) auto;
-  align-items: stretch;
-  gap: var(--space-4);
-}
-
-.user-search-field,
-.user-select-field {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  height: 56px;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  box-sizing: border-box;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.user-search-field:focus-within,
-.user-select-field:focus-within {
-  border-color: var(--color-brand-500);
-  box-shadow: var(--focus-ring);
-}
-
-.user-search-field {
-  align-items: center;
-}
-
-.user-search-field .icon {
-  position: absolute;
-  left: 17px;
-  width: 20px;
-  height: 20px;
-}
-
-.user-search-field input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  padding: 0 18px 0 48px;
-  outline: 0;
-  color: #303630;
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-}
-
-.user-search-field input::placeholder {
-  color: #7b827d;
-}
-
-.user-select-field {
-  display: grid;
-  align-content: center;
-  padding: 7px 34px 6px 15px;
-}
-
-.user-select-field > span:first-child {
-  color: #717873;
-  font-size: 11px;
-  line-height: 1.1;
-}
-
-.user-select-field select {
-  width: 100%;
-  border: 0;
-  appearance: none;
-  outline: 0;
-  color: #252a26;
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
 .user-create-button {
   height: 56px;
   padding-inline: 24px;
@@ -3400,14 +3322,6 @@ select:focus-visible {
     padding: 22px;
   }
 
-  .user-filter-bar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .user-search-field {
-    grid-column: 1 / -1;
-  }
-
   .user-create-button {
     grid-column: 1 / -1;
   }
@@ -3431,13 +3345,6 @@ select:focus-visible {
     padding: 14px;
   }
 
-  .user-filter-bar {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .user-search-field,
-  .user-select-field,
   .user-create-button {
     grid-column: auto;
     height: 50px;

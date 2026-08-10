@@ -266,6 +266,7 @@ export function AppSelect({ children, options, searchable = false, onChange, ...
         aria-controls={isOpen ? dropdownId : undefined}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        onChange={onChange}
         onKeyDown={handleKeyDown}
         onMouseDown={(event) => {
           if (selectProps.disabled) return
