@@ -421,6 +421,10 @@
   box-sizing: border-box;
 }
 
+.stores-page-toolbar {
+  margin-bottom: 18px;
+}
+
 .card-toolbar {
   display: flex;
   align-items: center;
@@ -608,16 +612,6 @@
   gap: 13px;
   border-top: 1px solid #ececec;
   padding-top: 12px;
-}
-
-.store-filter-popover {
-  width: 520px;
-}
-
-.store-filter-columns {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr;
-  gap: 12px;
 }
 
 .filter-empty {
@@ -1712,14 +1706,6 @@ select:focus-visible {
     left: 0;
     right: auto;
     width: min(346px, calc(100vw - 48px));
-  }
-
-  .store-filter-popover {
-    width: min(520px, calc(100vw - 48px));
-  }
-
-  .store-filter-columns {
-    grid-template-columns: 1fr;
   }
 
   .store-cards-grid {

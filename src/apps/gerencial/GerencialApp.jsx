@@ -28,7 +28,7 @@ import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
-import { AppSelect, Pagination } from '../../shared/ui'
+import { AppSelect, FilterPopover, FilterSection, PageToolbar, Pagination } from '../../shared/ui'
 import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -841,66 +841,6 @@ export function EditarUsuarioModal(props) {
   return <UsuarioModal {...props} mode="edit" />
 }
 
-export function StoreFilterPopover({
-  cidades,
-  selectedUfs,
-  selectedCidades,
-  onToggleUf,
-  onToggleCidade,
-  onClear,
-  onClose,
-}) {
-  return (
-    <div className="filter-popover store-filter-popover">
-      <div className="store-filter-columns">
-        <div>
-          <div className="filter-title">
-            <strong>Filtrar por UF</strong>
-            <span className="filter-chevron" />
-          </div>
-          <div className="filter-options">
-            {estadosLojas.map((estado) => (
-              <label key={estado} className="filter-option">
-                <span>{estado}</span>
-                <input checked={selectedUfs.includes(estado)} onChange={() => onToggleUf(estado)} type="checkbox" />
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="filter-title">
-            <strong>Filtrar por Cidade</strong>
-            <span className="filter-chevron" />
-          </div>
-          <div className="filter-options">
-            {cidades.map((cidade) => (
-              <label key={cidade} className="filter-option">
-                <span>{cidade}</span>
-                <input
-                  checked={selectedCidades.includes(cidade)}
-                  onChange={() => onToggleCidade(cidade)}
-                  type="checkbox"
-                />
-              </label>
-            ))}
-            {cidades.length === 0 && <p className="filter-empty">Nenhuma cidade cadastrada.</p>}
-          </div>
-        </div>
-      </div>
-
-      <div className="filter-footer">
-        <button className="secondary-button" type="button" onClick={onClear}>
-          Limpar filtros
-        </button>
-        <button className="primary-button" type="button" onClick={onClose}>
-          Fechar
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function PromotorSelect({ value, promotores, disabled, onChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -1029,10 +969,13 @@ export function LojasScreen({
 }) {
   const cidades = useMemo(
     () =>
-      [...new Set(lojas.map((loja) => loja.cidade).filter(Boolean))].sort((a, b) =>
+      [...new Set(lojas
+        .filter((loja) => selectedUfs.length === 0 || selectedUfs.includes(loja.uf))
+        .map((loja) => loja.cidade)
+        .filter(Boolean))].sort((a, b) =>
         a.localeCompare(b, 'pt-BR'),
       ),
-    [lojas],
+    [lojas, selectedUfs],
   )
 
   const filteredLojas = useMemo(() => {
@@ -1057,43 +1000,59 @@ export function LojasScreen({
 
 
   const activeFilterCount = selectedUfs.length + selectedCidades.length
-  const activeFilterLabel = activeFilterCount ? `${activeFilterCount} filtros` : 'Filtrar'
+  function handleToggleUf(estado) {
+    const nextUfs = selectedUfs.includes(estado)
+      ? selectedUfs.filter((item) => item !== estado)
+      : [...selectedUfs, estado]
+    const validCities = new Set(lojas
+      .filter((loja) => nextUfs.length === 0 || nextUfs.includes(loja.uf))
+      .map((loja) => loja.cidade)
+      .filter(Boolean))
+
+    selectedCidades
+      .filter((cidade) => !validCities.has(cidade))
+      .forEach(onToggleCidade)
+    onToggleUf(estado)
+  }
 
   return (
     <section className="stores-page">
-      <div className="card-toolbar">
-        <h2>Lojas</h2>
+      <PageToolbar
+        className="stores-page-toolbar"
+        title="Lojas"
+        search={{ value: search, onChange: onSearch, placeholder: 'Procurar', label: 'Procurar lojas' }}
+      >
+        <FilterPopover
+          activeFilterCount={activeFilterCount}
+          isOpen={isFilterOpen}
+          onToggle={onToggleFilter}
+          onApply={onCloseFilters}
+          onClear={onClearFilters}
+        >
+          <FilterSection title="Filtrar por UF" count={selectedUfs.length} id="store-filter-uf-options">
+            <div className="filter-options">
+              {estadosLojas.map((estado) => (
+                <label key={estado} className="filter-option">
+                  <span>{estado}</span>
+                  <input checked={selectedUfs.includes(estado)} onChange={() => handleToggleUf(estado)} type="checkbox" />
+                </label>
+              ))}
+            </div>
+          </FilterSection>
+          <FilterSection title="Filtrar por Cidade" count={selectedCidades.length} id="store-filter-city-options">
+            <div className="filter-options">
+              {cidades.map((cidade) => (
+                <label key={cidade} className="filter-option">
+                  <span>{cidade}</span>
+                  <input checked={selectedCidades.includes(cidade)} onChange={() => onToggleCidade(cidade)} type="checkbox" />
+                </label>
+              ))}
+              {cidades.length === 0 && <p className="filter-empty">Nenhuma cidade cadastrada.</p>}
+            </div>
+          </FilterSection>
+        </FilterPopover>
 
         <div className="toolbar-actions">
-          <label className="search-field">
-            <Icon name="search" />
-            <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Procurar" type="search" />
-          </label>
-
-          <div className="filter-wrap">
-            <button
-              className={`filter-trigger ${isFilterOpen ? 'is-open' : ''}`}
-              type="button"
-              onClick={onToggleFilter}
-            >
-              <Icon name="filter" />
-              <span>{activeFilterLabel}</span>
-              <span className="select-chevron" />
-            </button>
-
-            {isFilterOpen && (
-              <StoreFilterPopover
-                cidades={cidades}
-                selectedUfs={selectedUfs}
-                selectedCidades={selectedCidades}
-                onToggleUf={onToggleUf}
-                onToggleCidade={onToggleCidade}
-                onClear={onClearFilters}
-                onClose={onCloseFilters}
-              />
-            )}
-          </div>
-
           {canCreateStore && (
             <button className="create-button" type="button" onClick={onOpenCadastro}>
               <Icon name="plus" />
@@ -1101,7 +1060,7 @@ export function LojasScreen({
             </button>
           )}
         </div>
-      </div>
+      </PageToolbar>
 
       {error && <p className="table-message is-error">{error}</p>}
       {loading && <p className="table-message">Carregando lojas...</p>}
@@ -3010,7 +2969,7 @@ function GerencialApp({ capabilities }) {
             selectedUfs={storeSelectedUfs}
             selectedCidades={storeSelectedCidades}
             onSearch={setSearch}
-            onToggleFilter={() => setFilterOpen((open) => !open)}
+            onToggleFilter={(open) => setFilterOpen(open)}
             onToggleUf={toggleStoreUf}
             onToggleCidade={toggleStoreCidade}
             onClearFilters={() => {

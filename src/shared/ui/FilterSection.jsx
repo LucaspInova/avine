@@ -12,9 +12,9 @@ export function FilterSection({ children, count = 0, defaultOpen = true, id, isO
 
   return (
     <section className="ui-filter-section">
-      <button type="button" className="ui-filter-section__heading" aria-expanded={open} aria-controls={contentId} onClick={toggle}>
+      <button type="button" className="ui-filter-section__heading" aria-label={title} aria-expanded={open} aria-controls={contentId} onClick={toggle}>
         <span>{title}</span>
-        {count > 0 && <span className="ui-filter-section__count" aria-label={`${count} selecionados`}>{count}</span>}
+        <span className="ui-filter-section__count" aria-label={`${count} selecionados`}>{count}</span>
         <span className="ui-filter-section__chevron" aria-hidden="true">⌄</span>
       </button>
       {open && <div className="ui-filter-section__content" id={contentId}>{children}</div>}
