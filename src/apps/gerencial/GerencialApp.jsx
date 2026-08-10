@@ -2033,7 +2033,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
       <div className="notes-card">
         <PageToolbar
           className="notes-page-toolbar"
-          title="NFD"
+          title="Notas Fiscais de Devolução"
           search={{ value: search, onChange: (value) => { setCurrentPage(1); onSearch(value) }, placeholder: 'Procurar', label: 'Procurar notas' }}
         >
           <FilterPopover
@@ -2395,7 +2395,7 @@ function GerencialApp({ capabilities }) {
     : isDashboard
           ? 'Dashboard'
           : isNotas
-            ? 'Nota Fiscal'
+            ? 'Notas Fiscais de Devolução'
             : isMotivos
               ? 'Motivos'
               : isRecolhimento

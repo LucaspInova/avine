@@ -28,6 +28,7 @@ describe('fluxo paginado das Notas gerenciais', () => {
 
   it('renderiza somente a página e os agregados devolvidos pelo servidor', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} restrictedUfs={['CE']} />)
+    expect(screen.getByRole('heading', { name: 'Notas Fiscais de Devolução' })).toBeVisible()
     expect(within(screen.getByRole('table', { name: 'Notas fiscais' })).getAllByRole('row')).toHaveLength(11)
     expect(screen.getByText('1–10 de 120')).toBeVisible()
     expect(screen.getByText('Geral').closest('article')).toHaveTextContent('120')
