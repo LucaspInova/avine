@@ -15,6 +15,7 @@ export const capabilities = [
 export type Capability = (typeof capabilities)[number]
 
 export type AuthProfile = {
+  auth_user_id?: string | null
   perfil?: string | null
   auth_role?: string | null
   ativo?: boolean | null
@@ -49,7 +50,7 @@ function normalizedUfs(profile: AuthProfile): string[] {
  * enforced by RLS, grants, RPCs and server-side validation.
  */
 export function getCapabilities(profile: AuthProfile | null | undefined): readonly Capability[] {
-  if (!profile || profile.ativo !== true || profile.acesso_habilitado !== true) return []
+  if (!profile) return []
 
   if (profile.perfil === 'Admin' && profile.auth_role === 'admin') return adminCapabilities
 

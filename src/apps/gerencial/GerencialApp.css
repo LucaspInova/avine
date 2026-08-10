@@ -1622,6 +1622,10 @@ fieldset legend {
   padding: 18px 20px;
 }
 
+.edit-actions .edit-submit {
+  margin-left: auto;
+}
+
 .edit-submit,
 .edit-cancel,
 .danger-button {
@@ -1630,12 +1634,11 @@ fieldset legend {
 }
 
 .danger-button {
-  margin-left: auto;
   height: 34px;
-  border: 0;
+  border: 1px solid #efb8b8;
   border-radius: 7px;
-  color: #fff;
-  background: #c93f3f;
+  color: #a12f2f;
+  background: #fff3f3;
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -1643,8 +1646,15 @@ fieldset legend {
 }
 
 .danger-button:hover {
-  background: #ad3030;
+  background: #fbe3e3;
 }
+
+.confirmation-backdrop { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgb(20 24 21 / 55%); }
+.delete-access-modal { width: min(430px, 100%); border-radius: 16px; padding: 28px; text-align: center; background: #fff; box-shadow: 0 24px 70px rgb(0 0 0 / 24%); }
+.delete-access-modal h3 { margin: 12px 0 8px; color: #333; }
+.delete-access-modal p { margin: 0; color: #656b67; line-height: 1.55; }
+.delete-access-icon { display: grid; place-items: center; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; color: #a12f2f; background: #fff0f0; font-size: 24px; font-weight: 800; }
+.delete-confirm-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
 
 .danger-button:disabled,
 .edit-submit:disabled {

@@ -80,10 +80,6 @@ function email(value: unknown) {
   return text(value).toLowerCase();
 }
 
-function boolean(value: unknown, fallback = false) {
-  return typeof value === "boolean" ? value : fallback;
-}
-
 function isEmail(value: string) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
 }
@@ -216,18 +212,16 @@ Deno.serve(async (request) => {
 
   const { data: callerProfile, error: callerProfileError } = await adminClient
     .from("usuarios")
-    .select("id, perfil, estado, ufs, ativo, acesso_habilitado")
+    .select("id, perfil, estado, ufs")
     .eq("auth_user_id", caller.id)
     .maybeSingle();
 
   if (
     callerProfileError ||
-    !["Admin", "Gerencial"].includes(callerProfile?.perfil ?? "") ||
-    callerProfile?.ativo !== true ||
-    callerProfile?.acesso_habilitado !== true
+    !["Admin", "Gerencial"].includes(callerProfile?.perfil ?? "")
   ) {
     return jsonResponse(403, {
-      error: "Apenas Admins ou Gerenciais com acesso ativo podem administrar usuarios.",
+      error: "Apenas Admins ou Gerenciais cadastrados podem administrar usuarios.",
     });
   }
 
@@ -252,7 +246,8 @@ Deno.serve(async (request) => {
       .from("usuarios")
       .select(
         "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
-      );
+      )
+      .not("auth_user_id", "is", null);
 
     if (isScopedGerencial) {
       listQuery = listQuery.in("estado", callerUfs);
@@ -294,20 +289,29 @@ Deno.serve(async (request) => {
     if (target.auth_user_id === caller.id) return jsonResponse(400, {
       error: "Voce nao pode excluir o proprio acesso.",
     });
-    if (target.perfil === "Admin" && target.ativo && target.acesso_habilitado) {
+    if (target.perfil === "Admin" && target.auth_user_id) {
       const { count, error: countError } = await adminClient.from("usuarios")
         .select("id", { count: "exact", head: true }).eq("perfil", "Admin")
-        .eq("ativo", true).eq("acesso_habilitado", true).neq("id", target.id);
+        .not("auth_user_id", "is", null).neq("id", target.id);
       if (countError) return jsonResponse(400, { error: countError.message });
       if ((count ?? 0) === 0) return jsonResponse(400, {
         error: "Nao e permitido remover o ultimo Admin com acesso.",
       });
     }
+    if (target.perfil === "Promotor") {
+      const { error: routeError } = await adminClient.from("loja_promotores")
+        .update({ promotor_id: null }).eq("promotor_id", target.id);
+      if (routeError) return jsonResponse(400, { error: routeError.message });
+    }
     if (target.auth_user_id) {
       const { error } = await adminClient.auth.admin.deleteUser(target.auth_user_id);
       if (error) return jsonResponse(400, { error: error.message });
     }
-    const { error } = await adminClient.from("usuarios").delete().eq("id", target.id);
+    const { error } = await adminClient.from("usuarios").update({
+      auth_user_id: null,
+      ativo: false,
+      acesso_habilitado: false,
+    }).eq("id", target.id);
     if (error) return jsonResponse(400, { error: error.message });
     return jsonResponse(200, { deleted: true });
   }
@@ -340,7 +344,7 @@ Deno.serve(async (request) => {
 
     const { count: duplicateNameCount, error: duplicateNameError } = await adminClient
       .from("usuarios").select("id", { count: "exact", head: true })
-      .ilike("nome", profileInput.nome);
+      .ilike("nome", profileInput.nome).not("auth_user_id", "is", null);
     if (duplicateNameError) return jsonResponse(400, { error: duplicateNameError.message });
     if ((duplicateNameCount ?? 0) > 0) return jsonResponse(409, {
       error: "Este nome ja esta em uso. Inclua um sobrenome para diferenciar.",
@@ -377,7 +381,6 @@ Deno.serve(async (request) => {
         email_confirm: true,
         app_metadata: {
           role: authRole,
-          access_enabled: true,
         },
         user_metadata: { nome: profileInput.nome },
       });
@@ -421,7 +424,7 @@ Deno.serve(async (request) => {
     return jsonResponse(200, { usuario: publicProfile(profile as UserProfile, authRole) });
   }
 
-  if (action === "update" || action === "set_access") {
+  if (action === "update") {
     const usuarioId = text(body.usuario_id);
     if (!usuarioId) {
       return jsonResponse(400, { error: "Usuario alvo obrigatorio." });
@@ -447,9 +450,7 @@ Deno.serve(async (request) => {
 
     let nextProfile: ReturnType<typeof validateProfile>;
     try {
-      nextProfile = action === "update"
-        ? validateProfile({ ...target, ...body })
-        : validateProfile(target);
+      nextProfile = validateProfile({ ...target, ...body });
     } catch (error) {
       return jsonResponse(400, {
         error: error instanceof Error ? error.message : "Dados invalidos.",
@@ -461,45 +462,20 @@ Deno.serve(async (request) => {
       return jsonResponse(403, { error: "O Gerencial somente pode salvar Promotores das suas UFs." });
     }
 
-    const nextActive = action === "update"
-      ? boolean(body.ativo, target.ativo)
-      : boolean(body.ativo, target.ativo);
-    const nextAccess = action === "set_access"
-      ? boolean(body.acesso_habilitado, target.acesso_habilitado)
-      : boolean(body.acesso_habilitado, target.acesso_habilitado);
-
-    if (target.auth_user_id === caller.id && (!nextActive || !nextAccess)) {
-      return jsonResponse(400, {
-        error: "Voce nao pode bloquear o proprio acesso.",
-      });
-    }
-
-    if (
-      target.perfil === "Admin" &&
-      target.ativo &&
-      target.acesso_habilitado &&
-      (!nextActive || !nextAccess || nextProfile.perfil !== "Admin")
-    ) {
+    if (target.perfil === "Admin" && nextProfile.perfil !== "Admin") {
       const { count, error: countError } = await adminClient
         .from("usuarios")
         .select("id", { count: "exact", head: true })
         .eq("perfil", "Admin")
-        .eq("ativo", true)
-        .eq("acesso_habilitado", true)
+        .not("auth_user_id", "is", null)
         .neq("id", target.id);
 
       if (countError) return jsonResponse(400, { error: countError.message });
       if ((count ?? 0) === 0) {
         return jsonResponse(400, {
-          error: "Nao e permitido bloquear o ultimo Admin com acesso.",
+          error: "Nao e permitido alterar o perfil do ultimo Admin cadastrado.",
         });
       }
-    }
-
-    if (nextAccess && !target.auth_user_id) {
-      return jsonResponse(400, {
-        error: "Crie uma conta Auth antes de habilitar o acesso deste perfil.",
-      });
     }
 
     const password = typeof body.password === "string" ? body.password : "";
@@ -535,9 +511,8 @@ Deno.serve(async (request) => {
       user_metadata: { nome: nextProfile.nome },
       app_metadata: {
         role: authRole,
-        access_enabled: nextAccess && nextActive,
       },
-      ban_duration: nextAccess && nextActive ? "none" : "876000h",
+      ban_duration: "none",
     };
 
     if (target.auth_user_id) {
@@ -556,8 +531,8 @@ Deno.serve(async (request) => {
       .from("usuarios")
       .update({
         ...nextProfile,
-        ativo: nextActive,
-        acesso_habilitado: nextAccess && nextActive,
+        ativo: true,
+        acesso_habilitado: true,
       })
       .eq("id", target.id)
       .select(
@@ -572,11 +547,8 @@ Deno.serve(async (request) => {
           user_metadata: { nome: target.nome },
           app_metadata: {
             role: target.perfil === "Admin" ? "admin" : target.perfil.toLowerCase(),
-            access_enabled: target.acesso_habilitado && target.ativo,
           },
-          ban_duration: target.acesso_habilitado && target.ativo
-            ? "none"
-            : "876000h",
+          ban_duration: "none",
         });
       }
 

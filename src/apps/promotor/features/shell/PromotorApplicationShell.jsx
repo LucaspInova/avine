@@ -7,9 +7,7 @@ export function PromotorApplicationShell({ children }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { session, profile, loading, signOut } = useAuth()
-  const isAllowed = profile?.perfil === 'Promotor'
-    && profile?.ativo
-    && profile?.acesso_habilitado
+  const isAllowed = profile?.perfil === 'Promotor' && profile?.auth_user_id
 
   async function handleLogout() {
     if (profile?.id) clearPromotorNavigation(profile.id)
