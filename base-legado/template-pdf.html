@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FSTD DIGITAL</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Calibri', sans-serif;
+            font-size: 13px;
+            background: #ffffff;
+            color: #333;
+        }
+
+        .header {
+            background: #3b750a;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            flex-wrap: nowrap;
+        }
+
+        .header .left {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .logo {
+            height: 50px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .title-area {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .title-area h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .title-area small {
+            font-size: 12px;
+            margin-top: 2px;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .right {
+            flex-shrink: 0;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .control-number {
+            color: #f25e94;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        @media (max-width: 500px) {
+            .header {
+                align-items: flex-start;
+            }
+
+            .right {
+                text-align: left;
+                margin-top: 10px;
+            }
+        }
+
+        h2.section-title {
+            background: #3b750a;
+            color: white;
+            padding: 6px;
+            margin: 20px 0 10px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .section {
+            padding: 0 20px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .data-value {
+            color: #5c6d87;
+        }
+
+        .highlight-green {
+            color: green;
+        }
+
+        .highlight-red {
+            color: red;
+            font-weight: bold;
+        }
+
+        .gray-box {
+            background-color: #eef1f8;
+            padding: 4px 12px;
+            display: inline-block;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            margin-top: 2px;
+        }
+
+        .input-line {
+            border-bottom: 1px solid #000;
+            display: inline-block;
+            width: 90px;
+            height: 18px;
+            margin-top: 4px;
+        }
+
+        .grid-4col {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px 10px;
+        }
+
+        .footer-space {
+            margin-bottom: 60px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="left">
+            <img src="src\shared\assets\foto_logoavine.png" alt="Logo Avine" class="logo" />
+            <div class="title-area">
+                <h1>FSTD DIGITAL</h1>
+                <small>Formulário de Solicitação de Trocas e Devoluções</small>
+            </div>
+        </div>
+        <div class="right">
+            <div>Número de Controle</div>
+            <div class="control-number">$id</div> <!-- Não usaremos o "numero_controle" aqui, usaremos o próprio "id"  -->
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Informações Gerais:</h2>
+        <div class="row">
+            <div class="label">Data da Requisição:</div>
+            <div class="data-value">$data_preenchimento</div>
+        </div>
+        <div class="row">
+            <div class="label">Cliente Requisitante:</div>
+            <div class="data-value">$codigo_loja</div> <!-- Na planilha está o "codigo_loja", porem exibir no .pdf o nome real da loja relacionando o "codigo_loja" com a coluna "codigo" da tabela "lojas" no supabase trazendo o "nome" como valor exibido   -->
+        </div>
+        <div class="row">
+            <div class="label">Data da Entrega:</div>
+            <div class="data-value">-</div>
+        </div>
+        <div class="row">
+            <div class="label">Responsável Avine:</div>
+            <div class="data-value">$responsavel_fstd</div>
+        </div>
+        <div class="row">
+            <div class="label">Motivo</div>
+            <div>
+                <div class="gray-box">$motivo</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Identificadores:</h2>
+        <div class="row">
+            <div class="label">Nº NFD</div>
+            <div class="data-value">$numero_nfd</div>
+        </div>
+        <div class="row">
+            <div class="label">Código Loja</div>
+            <div class="data-value">$codigo_loja</div>
+        </div>
+        <div class="row">
+            <div class="label">Nº Nota de Venda</div>
+            <div class="data-value"> - </div>
+        </div>
+        <div class="row">
+            <div class="label">Data do ovo (Mais Velho)</div>
+            <div class="data-value"> - </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">DADOS PARA COLETA - GALINHA</h2>
+        <div class="row">
+            <div class="label">Total de Ovos - Faturado</div>
+            <div class="data-value">qtd_total_galinha</div>
+        </div>
+        <div class="row">
+            <div class="label">Total de Ovos - Perdido no Cliente</div>
+            <div class="highlight-red">- $calcular-perdido-gal</div> <!-- Cálcular aqui o $qtd_total_galinha - $qtd_retorno_galinha -->
+        </div>
+        <div class="row">
+            <div class="label">Total de Ovos - Retorno</div>
+            <div class="highlight-green">$qtd_retorno_galinha</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">DADOS PARA COLETA - CODORNA</h2>
+        <div class="row">
+            <div class="label">Total de Ovos - Faturado</div>
+            <div class="data-value">qtd_total_codorna</div>
+        </div>
+        <div class="row">
+            <div class="label">Total de Ovos - Perdido no Cliente</div>
+            <div class="highlight-red">- $calcular-perdido-cod</div> <!-- Cálcular aqui o $qtd_total_codorna - $qtd_retorno_codorna -->
+        <div class="row">
+            <div class="label">Total de Ovos - Retorno</div>
+            <div class="highlight-green">$qtd_retorno_codorna</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">RESERVADO PARA RECEBIMENTO</h2>
+        <div class="grid-4col">
+            <div>
+                <div class="label">MOTORISTA:<br><br></div>
+                <div class="input-line"></div>
+            </div>
+            <div>
+                <div class="label">QTDE GAL RECOLHIDO</div>
+                <div class="input-line"></div>
+            </div>
+            <div>
+                <div class="label">QTDE COD RECOLHIDO</div>
+                <div class="input-line"></div>
+            </div>
+            <div>
+                <div class="label">DATA RECOLHIMENTO</div>
+                <div class="input-line"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section footer-space">
+        <h2 class="section-title">RESERVADO PARA TRIAGEM</h2>
+        <div class="grid-4col">
+            <div>
+                <div class="label">RESP TRIAGEM:<br><br></div>
+                <div class="input-line"></div>
+            </div>
+            <div>
+                <div class="label">QTDE GAL ÍNTEGROS</div>
+                <div class="input-line"></div>
+            </div>
+            <div>
+                <div class="label">QTDE COD ÍNTEGROS</div>
+                <div class="input-line"></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
