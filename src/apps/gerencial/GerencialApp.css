@@ -863,6 +863,10 @@
   gap: 16px;
 }
 
+.user-registration-modal-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .form-row {
   display: grid;
   gap: 9px;
@@ -888,8 +892,8 @@ fieldset legend {
 }
 
 .form-row input.is-invalid {
-  border-color: var(--green);
-  box-shadow: inset 0 0 0 1px var(--green);
+  border-color: #f36d72;
+  box-shadow: inset 0 0 0 1px #f36d72;
 }
 
 .edit-field input.is-invalid {
@@ -914,6 +918,18 @@ fieldset legend {
   color: #f36d72;
   font-size: 10px;
   font-weight: 700;
+}
+
+.field-success {
+  margin-top: -4px;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.promoter-password-note {
+  margin: 0;
+  font-size: 12px;
 }
 
 fieldset {

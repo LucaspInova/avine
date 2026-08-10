@@ -43,6 +43,7 @@ const perfisCadastroUi = [
 ]
 const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
+const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 
 const navItems = [
   { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
@@ -204,6 +205,12 @@ function isNomeDuplicado(nome, usuarios, ignoredId = '') {
   return usuarios.some(
     (usuario) => usuario.id !== ignoredId && normalizaNome(usuario.nome) === nomeNormalizado,
   )
+}
+
+function isEmailDuplicado(email, usuarios, ignoredId = '') {
+  const normalizedEmail = String(email ?? '').trim().toLowerCase()
+  return normalizedEmail.length > 0 && usuarios.some((usuario) =>
+    usuario.id !== ignoredId && String(usuario.email ?? '').trim().toLowerCase() === normalizedEmail)
 }
 
 function isCodigoDuplicado(codigo, lojas) {
@@ -567,23 +574,26 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
   const isGerencial = form.perfil === 'Gerencial'
   const currentUserIsGerencial = isScopedGerencial(currentUser)
   const isOperationalProfile = perfisOperacionais.includes(form.perfil)
-  const requiresState = isOperationalProfile || isGerencial
+  const requiresState = isOperationalProfile || isGerencial || isAdmin
   const allowedStates = currentUserIsGerencial ? currentUser.ufs : estados
   const hasEmailInput = trimmedEmail.length > 0
   const isEmailValid = emailPattern.test(trimmedEmail)
   const isEmailInvalid = hasEmailInput && !isEmailValid
+  const hasEmailDuplicado = isEmailDuplicado(trimmedEmail, usuarios)
   const isNameValid = trimmedName.length >= 4
   const passwordError = getPasswordValidationMessage(password)
-  const isPasswordValid = !passwordError
+  const isPromotor = form.perfil === 'Promotor'
+  const isPasswordValid = isPromotor || !passwordError
   const hasNomeDuplicado = isNomeDuplicado(trimmedName, usuarios)
   const expectedAuthRole = isAdmin ? 'admin' : isGerencial ? 'gerencial' : 'promotor'
   const isAuthRoleValid = form.auth_role === expectedAuthRole
   const isProfileValid = perfisCadastro.includes(form.perfil) && isAuthRoleValid &&
     (!currentUserIsGerencial || form.perfil === 'Promotor')
-  const selectedUfs = form.ufs ?? (form.estado ? [form.estado] : [])
+  const selectedUfs = isAdmin ? allowedStates : (form.ufs ?? (form.estado ? [form.estado] : []))
   const isEstadoValid = isAdmin || (isGerencial ? selectedUfs.length > 0 && selectedUfs.every((uf) => allowedStates.includes(uf)) : selectedUfs.length === 1 && allowedStates.includes(selectedUfs[0]))
   const canSubmit =
     isEmailValid &&
+    !hasEmailDuplicado &&
     isNameValid &&
     isPasswordValid &&
     !hasNomeDuplicado &&
@@ -601,7 +611,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
           </button>
         </div>
 
-        <div className="modal-grid">
+        <div className="modal-grid user-registration-modal-grid">
           <div className="modal-main">
             <fieldset className="user-profile-field">
               <legend>Perfil</legend>
@@ -634,48 +644,49 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
               <span>Nome</span>
               <input
                 value={form.nome}
-                onChange={(event) => onChange({ nome: event.target.value })}
+                onChange={(event) => onChange({ nome: event.target.value.toUpperCase() })}
                 minLength={4}
                 placeholder="Digite o nome completo"
                 type="text"
                 required
               />
-              {hasNomeDuplicado && (
-                <strong className="field-error">Informe o sobrenome para diferenciar este usuário.</strong>
-              )}
+              <strong className={isNameValid && !hasNomeDuplicado ? 'field-success' : 'field-error'}>
+                {hasNomeDuplicado ? 'Nome já usado; inclua um sobrenome.' : isNameValid ? 'Nome válido.' : 'Use pelo menos 4 letras maiúsculas.'}
+              </strong>
             </label>
 
             <label className="form-row">
               <span>E-mail</span>
               <input
-                className={isEmailInvalid ? 'is-invalid' : ''}
+                className={isEmailInvalid || hasEmailDuplicado ? 'is-invalid' : ''}
                 value={form.email}
                 onChange={(event) => onChange({ email: event.target.value })}
                 placeholder="nome@empresa.com"
                 type="email"
                 required
               />
-              {isEmailInvalid && (
-                <strong className="field-error">Insira um endereço de e-mail válido.</strong>
-              )}
+              <strong className={isEmailValid && !hasEmailDuplicado ? 'field-success' : 'field-error'}>
+                {hasEmailDuplicado ? 'E-mail já usado; insira outro ou edite o usuário.' : isEmailValid ? 'E-mail válido.' : 'Insira um e-mail válido.'}
+              </strong>
             </label>
 
-            <label className="form-row">
-              <span>Senha</span>
-              <input
-                className={password && !isPasswordValid ? 'is-invalid' : ''}
-                value={password}
-                onChange={(event) => onChange({ senha: event.target.value })}
-                minLength={PASSWORD_MIN_LENGTH}
-                placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
-                type="password"
-                autoComplete="new-password"
-                required
-              />
-              {passwordError && (
-                <strong className="field-error">{passwordError}</strong>
-              )}
-            </label>
+            {isPromotor ? (
+              <p className="field-success promoter-password-note">Senha padrão definida automaticamente.</p>
+            ) : (
+              <label className="form-row">
+                <span>Senha</span>
+                <input className={password && !isPasswordValid ? 'is-invalid' : ''} value={password}
+                  onChange={(event) => onChange({ senha: event.target.value })} minLength={PASSWORD_MIN_LENGTH}
+                  placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`} type="password" autoComplete="new-password" required />
+                <strong className={isPasswordValid ? 'field-success' : 'field-error'}>
+                  {isPasswordValid ? 'Senha válida.' : (passwordError || `Use no mínimo ${PASSWORD_MIN_LENGTH} caracteres.`)}
+                </strong>
+              </label>
+            )}
+
+            <strong className={isProfileValid ? 'field-success' : 'field-error'}>
+              {isProfileValid ? 'Perfil válido.' : 'Escolha um perfil.'}
+            </strong>
 
             {requiresState && (
               <>
@@ -687,7 +698,7 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                         key={estado}
                         className={`choice-chip ${selectedUfs.includes(estado) ? 'is-selected' : ''}`}
                         type="button"
-                        disabled={currentUserIsGerencial}
+                        disabled={isAdmin}
                         onClick={() => {
                           const nextUfs = isGerencial
                             ? (selectedUfs.includes(estado) ? selectedUfs.filter((uf) => uf !== estado) : [...selectedUfs, estado])
@@ -700,37 +711,10 @@ export function CadastroModal({ form, usuarios, currentUser, busy, error, onChan
                     ))}
                   </div>
                 </fieldset>
-
+                <strong className={isEstadoValid ? 'field-success' : 'field-error'}>
+                  {isAdmin ? 'Todas as UFs (seleção obrigatória).' : isGerencial ? (isEstadoValid ? 'Múltiplas UFs permitidas.' : 'Escolha uma ou mais UFs.') : (isEstadoValid ? 'Uma UF selecionada.' : 'Escolha uma única UF.')}
+                </strong>
               </>
-            )}
-          </div>
-
-          <div className="modal-hints" aria-hidden="true">
-            <span className={isEmailInvalid ? 'is-danger' : isEmailValid ? 'is-success' : ''}>
-              <Icon name={isEmailInvalid ? 'alert' : isEmailValid ? 'check' : 'mail'} />
-              {isEmailInvalid ? 'Preencha um e-mail válido!' : isEmailValid ? 'E-mail válido' : 'Preencha o e-mail'}
-            </span>
-            <span className={isNameValid && !hasNomeDuplicado ? 'is-success' : hasNomeDuplicado ? 'is-danger' : ''}>
-              <Icon name={isNameValid && !hasNomeDuplicado ? 'check' : hasNomeDuplicado ? 'alert' : 'users'} />
-              {hasNomeDuplicado
-                ? 'Informe o sobrenome para diferenciar este usuário.'
-                : isNameValid
-                  ? 'Nome válido'
-                  : 'Preencha o nome do usuário'}
-            </span>
-            <span className={isPasswordValid ? 'is-success' : password ? 'is-danger' : ''}>
-              <Icon name={isPasswordValid ? 'check' : password ? 'alert' : 'gear'} />
-              {isPasswordValid ? 'Senha válida' : `Senha mínima de ${PASSWORD_MIN_LENGTH} caracteres`}
-            </span>
-            <span className={isProfileValid ? 'is-success' : ''}>
-              <Icon name={isProfileValid ? 'check' : 'gear'} />
-              {isProfileValid ? 'Perfil de acesso escolhido' : 'Escolha o perfil de acesso'}
-            </span>
-            {isProfileValid && (
-              <span className={isEstadoValid ? 'is-success' : ''}>
-                <Icon name={isEstadoValid ? 'check' : 'pin'} />
-                {isAdmin ? 'UF não exigida para Admin' : isEstadoValid ? 'UF escolhida' : 'Preencha a UF'}
-              </span>
             )}
           </div>
         </div>
@@ -2726,7 +2710,7 @@ function GerencialApp({ capabilities }) {
     const payload = {
       email: form.email.trim().toLowerCase(),
       nome: form.nome.trim().toUpperCase(),
-      password: form.senha,
+      password: form.perfil === 'Promotor' ? DEFAULT_PROMOTER_PASSWORD : form.senha,
       perfil: form.perfil,
       estado: form.ufs?.[0] ?? form.estado,
       ufs: form.perfil === 'Admin' ? [] : form.ufs,
@@ -2735,8 +2719,9 @@ function GerencialApp({ capabilities }) {
     if (
       !emailPattern.test(payload.email) ||
       payload.nome.length < 4 ||
-      getPasswordValidationMessage(payload.password) ||
+      (payload.perfil !== 'Promotor' && getPasswordValidationMessage(payload.password)) ||
       isNomeDuplicado(payload.nome, usuarios) ||
+      isEmailDuplicado(payload.email, usuarios) ||
       !perfisCadastro.includes(payload.perfil) ||
       (restrictedUfs.length ? !restrictedUfs.includes(payload.estado) : payload.perfil !== 'Admin' && !payload.ufs.every((uf) => estados.includes(uf))) ||
       (isScopedGerencial(currentUser) && payload.perfil !== 'Promotor')

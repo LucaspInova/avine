@@ -174,7 +174,7 @@ describe('Cadastro de Usuários', () => {
 
     expect(screen.getByRole('group', { name: 'UF' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Gerencial responsável')).not.toBeInTheDocument()
-    expect(screen.getByText('Perfil de acesso escolhido')).toBeInTheDocument()
+    expect(screen.getByText('Perfil válido.')).toBeInTheDocument()
     expect(screen.queryByText('Habilitar fotos?')).not.toBeInTheDocument()
   })
 
@@ -195,6 +195,39 @@ describe('Cadastro de Usuários', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'PE' }))
     expect(onChange).toHaveBeenCalledWith({ ufs: ['CE', 'PE'], estado: 'CE' })
+  })
+
+  it('valida no próprio campo, converte nome para maiúsculas e não solicita senha do Promotor', () => {
+    const onChange = vi.fn()
+    render(
+      <CadastroModal
+        form={{ email: 'bruno.promotor@avine.com', nome: '', senha: '', perfil: 'Promotor', auth_role: 'promotor', estado: '', ufs: [] }}
+        usuarios={usuarios}
+        currentUser={{ perfil: 'Admin', auth_role: 'admin', ufs: [] }}
+        busy={false} error="" onChange={onChange} onClose={noop} onSubmit={noop}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: /^Nome/ }), { target: { value: 'joão silva' } })
+    expect(onChange).toHaveBeenCalledWith({ nome: 'JOÃO SILVA' })
+    expect(screen.getByText('E-mail já usado; insira outro ou edite o usuário.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Senha')).not.toBeInTheDocument()
+    expect(screen.getByText('Senha padrão definida automaticamente.')).toBeInTheDocument()
+    expect(screen.queryByText('Perfil de acesso escolhido')).not.toBeInTheDocument()
+  })
+
+  it('exibe todas as UFs selecionadas e bloqueadas para Admin', () => {
+    render(<CadastroModal form={{ email: '', nome: '', senha: '', perfil: 'Admin', auth_role: 'admin', ufs: [] }}
+      usuarios={usuarios} currentUser={{ perfil: 'Admin', auth_role: 'admin', ufs: [] }} busy={false}
+      error="" onChange={noop} onClose={noop} onSubmit={noop} />)
+
+    const ufGroup = screen.getByRole('group', { name: 'UF' })
+    expect(within(ufGroup).getAllByRole('button')).toHaveLength(11)
+    within(ufGroup).getAllByRole('button').forEach((button) => {
+      expect(button).toBeDisabled()
+      expect(button).toHaveClass('is-selected')
+    })
+    expect(screen.getByText('Todas as UFs (seleção obrigatória).')).toBeInTheDocument()
   })
 
   it('aplica os novos nomes visuais e rotas por perfil', () => {
