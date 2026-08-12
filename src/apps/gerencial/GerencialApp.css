@@ -130,16 +130,13 @@
 }
 
 .sidebar-toggle-chevron {
-  width: 7px;
-  height: 7px;
-  border-top: 1.8px solid currentColor;
-  border-right: 1.8px solid currentColor;
-  transform: rotate(45deg);
+  width: 18px;
+  height: 18px;
   transition: transform 220ms ease;
 }
 
 .sidebar.is-expanded .sidebar-toggle-chevron {
-  transform: rotate(225deg);
+  transform: rotate(180deg);
 }
 
 .sidebar-tooltip {
@@ -4088,24 +4085,34 @@ select:focus-visible {
   }
 
   .sidebar.is-mobile .sidebar-support {
-    bottom: 82px;
+    bottom: 154px;
     left: 14px;
     transform: none;
   }
 
   .sidebar.is-mobile .sidebar-user {
-    right: 14px;
-    left: 14px;
-    bottom: 14px;
+    right: 14px !important;
+    bottom: 74px !important;
+    left: 14px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 40;
   }
 
   .sidebar.is-mobile .profile-summary,
   .sidebar.is-mobile .profile-chevron {
-    display: initial;
+    display: grid;
+  }
+
+  .sidebar.is-mobile .profile-summary {
+    gap: 4px;
   }
 
   .sidebar.is-mobile .profile-trigger {
     width: 100%;
+    display: flex !important;
+    min-height: 48px;
   }
 
   .sidebar-close {
@@ -4121,19 +4128,9 @@ select:focus-visible {
     cursor: pointer;
   }
 
-  .sidebar-close span,
-  .sidebar-close span::after {
-    position: absolute;
-    width: 17px;
-    height: 2px;
-    content: '';
-    border-radius: 99px;
-    background: currentColor;
-    transform: rotate(45deg);
-  }
-
-  .sidebar-close span::after {
-    transform: rotate(90deg);
+  .sidebar-close svg {
+    width: 24px;
+    height: 24px;
   }
 
   .mobile-menu-trigger {
@@ -4151,10 +4148,21 @@ select:focus-visible {
     cursor: pointer;
   }
 
-  .mobile-menu-trigger span,
+  .mobile-menu-trigger span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 2px;
+    border-radius: 99px;
+    background: currentColor;
+    transform: translate(-50%, -50%);
+  }
+
   .mobile-menu-trigger span::before,
   .mobile-menu-trigger span::after {
     position: absolute;
+    left: 0;
     width: 18px;
     height: 2px;
     content: '';
@@ -4163,11 +4171,11 @@ select:focus-visible {
   }
 
   .mobile-menu-trigger span::before {
-    transform: translateY(-6px);
+    top: -6px;
   }
 
   .mobile-menu-trigger span::after {
-    transform: translateY(6px);
+    top: 6px;
   }
 
   .sidebar-brand {
@@ -4229,6 +4237,16 @@ select:focus-visible {
 
   .page-hero-inner > div:last-child {
     min-width: 0;
+  }
+
+  .registration-workspace .users-page-toolbar .ui-page-toolbar__search {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+    box-sizing: border-box;
   }
 
   .hero-user-icon {

@@ -507,7 +507,9 @@ export function Sidebar({ isMobile = false, expanded, canCollapse, selectedItem,
             aria-label="Fechar menu principal"
             onClick={onClose}
           >
-            <span aria-hidden="true" />
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
           </button>
         ) : canCollapse && (
           <button
@@ -516,7 +518,9 @@ export function Sidebar({ isMobile = false, expanded, canCollapse, selectedItem,
             onClick={onToggle}
             aria-label={expanded ? 'Recolher sidebar' : 'Expandir sidebar'}
           >
-            <span className="sidebar-toggle-chevron" />
+            <svg className="sidebar-toggle-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
           </button>
         )}
       </div>
@@ -1984,8 +1988,37 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const rangeStart = result.total === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1
   const rangeEnd = Math.min(safeCurrentPage * pageSize, result.total)
-  const ufs = (result.ufs ?? []).filter((uf) => restrictedUfs.length === 0 || restrictedUfs.includes(uf))
-  const cities = result.cities ?? []
+  // The invoice overview may return no option metadata when there are no rows
+  // (or while the RPC is unavailable). Stores are already loaded using the
+  // user's UF scope, so use them as a safe source for the filter options too.
+  const scopedStores = useMemo(() => {
+    const allowed = new Set((restrictedUfs ?? []).map((uf) => String(uf).trim().toUpperCase()))
+    return (lojas ?? []).filter((store) => {
+      const uf = String(store.uf ?? '').trim().toUpperCase()
+      return allowed.size === 0 || allowed.has(uf)
+    })
+  }, [lojas, restrictedUfs])
+  const storeUfs = useMemo(() => (
+    [...new Set(scopedStores
+      .map((store) => String(store.uf ?? '').trim().toUpperCase())
+      .filter(Boolean))].sort()
+  ), [scopedStores])
+  const ufs = useMemo(() => {
+    const allowed = new Set((restrictedUfs ?? []).map((uf) => String(uf).trim().toUpperCase()))
+    return [...new Set([...(result.ufs ?? []), ...storeUfs]
+      .map((uf) => String(uf).trim().toUpperCase())
+      .filter((uf) => uf && (allowed.size === 0 || allowed.has(uf))))].sort()
+  }, [result.ufs, restrictedUfs, storeUfs])
+  const cities = useMemo(() => {
+    const selectedUfValue = String(draftFilters.uf ?? '').trim().toUpperCase()
+    const storeCities = scopedStores
+      .filter((store) => !selectedUfValue || String(store.uf ?? '').trim().toUpperCase() === selectedUfValue)
+      .map((store) => String(store.cidade ?? '').trim())
+      .filter(Boolean)
+    const responseCities = (result.cities ?? []).map((city) => String(city).trim()).filter(Boolean)
+    const candidates = selectedUfValue && storeCities.length > 0 ? storeCities : [...responseCities, ...storeCities]
+    return [...new Set(candidates)].sort((left, right) => left.localeCompare(right, 'pt-BR'))
+  }, [draftFilters.uf, result.cities, scopedStores])
   // The product's default reporting period is the neutral state: only dates that
   // differ from getDefaultNoteDates contribute to the active-filter badge.
   const periodFilterCount = Number(draftFilters.startDate !== defaults.start) + Number(draftFilters.endDate !== defaults.end)
