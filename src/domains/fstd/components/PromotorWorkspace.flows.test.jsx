@@ -44,6 +44,17 @@ const storesProps = {
   profilePhoto: '', onOpenStore: noop,
 }
 
+describe('support header', () => {
+  it('opens WhatsApp in a new tab with the pre-filled message', () => {
+    render(<StoresScreen {...storesProps} />)
+
+    const supportLink = screen.getByRole('link', { name: 'Abrir suporte pelo WhatsApp' })
+    expect(supportLink).toHaveAttribute('href', 'https://wa.me/5585986532599?text=Ol%C3%A1!%20Preciso%20de%20suporte%20na%20plataforma%20Avine.')
+    expect(supportLink).toHaveAttribute('target', '_blank')
+    expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+})
+
 describe('telas proprietárias de lojas e notas do Promotor', () => {
   it('cobre carregamento, vazio, pesquisa e abertura da loja pelo contrato público', () => {
     const { rerender } = render(<StoresScreen {...storesProps} loading />)

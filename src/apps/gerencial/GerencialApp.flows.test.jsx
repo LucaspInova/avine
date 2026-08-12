@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { CadastroLojaModal, InformacoesUsuarioModal, LojasScreen, UsuariosScreen } from './GerencialApp.jsx'
+import { CadastroLojaModal, InformacoesUsuarioModal, LojasScreen, Sidebar, UsuariosScreen } from './GerencialApp.jsx'
 
 const noop = vi.fn()
 const storeProps = {
@@ -15,6 +15,26 @@ const userProps = {
   editId: '', editForm: {}, search: '', onSearch: noop, onOpenCadastro: noop, onOpenUsuario: noop,
   onEditChange: noop, onStartEdit: noop, onCancelEdit: noop, onSaveEdit: noop, onDelete: noop,
 }
+
+describe('sidebar support', () => {
+  it('directs users to WhatsApp in a new tab with a pre-filled message', () => {
+    render(<Sidebar
+      expanded
+      canCollapse={false}
+      selectedItem="dashboard"
+      currentUser={{ nome: 'Lucas Paiva', perfil: 'Admin' }}
+      profilePhoto=""
+      onLogout={noop}
+      onToggle={noop}
+      onSelect={noop}
+    />)
+
+    const supportLink = screen.getByRole('link', { name: 'Suporte' })
+    expect(supportLink).toHaveAttribute('href', 'https://wa.me/5585986532599?text=Ol%C3%A1!%20Preciso%20de%20suporte%20na%20plataforma%20Avine.')
+    expect(supportLink).toHaveAttribute('target', '_blank')
+    expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+})
 
 const filterStores = [
   { id: 'ce', codigo: '1', nome: 'Loja Ceará', cidade: 'Fortaleza', uf: 'CE' },

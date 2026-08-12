@@ -52,6 +52,9 @@ const navItems = [
   { id: 'notas', label: 'Notas', icon: 'notes' },
 ]
 
+const supportWhatsappMessage = 'Olá! Preciso de suporte na plataforma Avine.'
+const supportWhatsappUrl = `https://wa.me/5585986532599?text=${encodeURIComponent(supportWhatsappMessage)}`
+
 const gerencialScreenIds = ['dashboard', 'usuarios', 'lojas', 'notas']
 const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
 
@@ -92,6 +95,19 @@ function isAdministrativeProfile(user) {
 
 function isScopedGerencial(user) {
   return user?.perfil === 'Gerencial' && user.auth_role === 'gerencial'
+}
+
+function getUserUfLabel(user, emptyLabel = '-') {
+  if (user?.perfil === 'Admin') return 'Todas'
+
+  const ufs = Array.isArray(user?.ufs) ? user.ufs : []
+  const assignedUfs = new Set(
+    ufs.map((uf) => String(uf).trim().toUpperCase()).filter(Boolean),
+  )
+  const hasAllUfs = ['Gerencial', 'Promotor'].includes(user?.perfil) && estados.every((uf) => assignedUfs.has(uf))
+
+  if (hasAllUfs) return 'Todas'
+  return ufs.length ? ufs.join(', ') : user?.estado || emptyLabel
 }
 
 function getUserInitials(name) {
@@ -217,11 +233,19 @@ function Icon({ name, className = '' }) {
 
   if (name === 'chart') {
     return (
+      <svg {...props} strokeWidth="1.5">
+        <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+      </svg>
+    )
+  }
+
+  if (name === 'headset') {
+    return (
       <svg {...props}>
-        <path d="M4 19h16" />
-        <path d="M7 15v-3" />
-        <path d="M12 15V8" />
-        <path d="M17 15V5" />
+        <path d="M4 13a8 8 0 0 1 16 0" />
+        <path d="M4 13v3a2 2 0 0 0 2 2h1v-7H6a2 2 0 0 0-2 2Z" />
+        <path d="M20 13v3a2 2 0 0 1-2 2h-1v-7h1a2 2 0 0 1 2 2Z" />
+        <path d="M17 18a5 5 0 0 1-5 3h-1" />
       </svg>
     )
   }
@@ -409,7 +433,7 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
+export function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
   const profileMenuRef = useRef(null)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -478,6 +502,17 @@ function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhot
           </button>
         ))}
       </nav>
+
+      <a
+        className="sidebar-support"
+        href={supportWhatsappUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Suporte"
+      >
+        <Icon name="headset" />
+        <span className="sidebar-label">Suporte</span>
+      </a>
 
       <div className="sidebar-user" ref={profileMenuRef}>
         <button
@@ -809,7 +844,7 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
             </div>
             <div>
               <dt>Estado</dt>
-              <dd>{(usuario.ufs?.length ? usuario.ufs : [usuario.estado]).join(', ') || 'Escopo global'}</dd>
+              <dd>{getUserUfLabel(usuario, 'Escopo global')}</dd>
             </div>
           </dl>
         </div>
@@ -1410,7 +1445,7 @@ export function UsuariosScreen({
                     {usuario.email}
                   </div>
 
-                  <span className="uf-cell" role="cell" data-label="UF">{usuario.perfil === 'Admin' ? 'Todas' : (usuario.ufs?.length ? usuario.ufs.join(', ') : usuario.estado || '-')}</span>
+                  <span className="uf-cell" role="cell" data-label="UF">{getUserUfLabel(usuario)}</span>
 
                   <span className="stores-count-cell" role="cell" data-label="Lojas">
                     {usuario.perfil === 'Promotor' ? (storeCountByPromotor.get(usuario.id) ?? 0).toLocaleString('pt-BR') : '-'}
@@ -2216,7 +2251,9 @@ function GerencialApp({ capabilities }) {
     isAdmin: currentUser?.perfil === 'Admin' && currentUser?.auth_role === 'admin',
     isGerencial: currentUser?.perfil === 'Gerencial' && currentUser?.auth_role === 'gerencial',
     isScoped: isScopedGerencial(currentUser),
-    allowedUfs: isScopedGerencial(currentUser) ? currentUser.ufs : [],
+    allowedUfs: isScopedGerencial(currentUser)
+      ? [...new Set((currentUser.ufs ?? []).map((uf) => String(uf).trim().toUpperCase()).filter(Boolean))]
+      : [],
     canManageAllUsers: !isScopedGerencial(currentUser),
     canManageStores: currentUser?.perfil === 'Admin' && currentUser?.auth_role === 'admin',
   }
@@ -2337,8 +2374,17 @@ function GerencialApp({ capabilities }) {
     setLojasLoading(false)
   }
 
-  async function loadOperationalData() {
-    await Promise.all([loadUsuarios(), loadLojas()])
+  async function loadNotasStores() {
+    setLojasLoading(true)
+    setLojasError('')
+    try {
+      setLojas(sortStoresByCode(await listStores({ ufs: gerencialCapabilities.allowedUfs })))
+    } catch (requestError) {
+      setLojasError(requestError instanceof Error ? requestError.message : 'Não foi possível carregar as lojas.')
+      setLojas([])
+    } finally {
+      setLojasLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -2364,7 +2410,10 @@ function GerencialApp({ capabilities }) {
         setProfilePhoto('')
       }
 
-      if (isMounted) await loadOperationalData()
+      if (!isMounted) return
+      if (selectedItem === 'usuarios') await loadUsuarios()
+      if (selectedItem === 'lojas') await loadLojas()
+      if (selectedItem === 'notas') await loadNotasStores()
     }
 
     void bootstrapGerencial()
@@ -2381,6 +2430,7 @@ function GerencialApp({ capabilities }) {
     currentUser?.foto_url,
     currentUser?.perfil,
     session?.user?.id,
+    selectedItem,
   ])
 
   const vinculosPorLoja = useMemo(() => {
@@ -2433,11 +2483,13 @@ function GerencialApp({ capabilities }) {
     ? 'users'
     : isLojas
     ? 'pin'
-    : isDashboard || isNotas || isMotivos
+    : isDashboard
+      ? 'chart'
+    : isNotas || isMotivos
           ? 'notes'
           : isRecolhimento
             ? 'logs'
-        : isRelatorios || isDashboard
+        : isRelatorios
           ? 'chart'
           : 'user-plus'
 

@@ -277,6 +277,26 @@ describe('Cadastro de Usuários', () => {
     expect(document.querySelectorAll('.field-error')).toHaveLength(0)
   })
 
+  it('resume como Todas as UFs completas de Gerencial e Promotor', () => {
+    const todasUfs = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
+    const usuariosComEscopoCompleto = [
+      ...usuarios,
+      { ...usuarios[0], id: 'gerencial-todas', nome: 'GERENCIAL TODAS', ufs: todasUfs },
+      { ...usuarios[1], id: 'promotor-todas', nome: 'PROMOTOR TODAS', ufs: [...todasUfs].reverse() },
+      { ...usuarios[1], id: 'promotor-parcial', nome: 'PROMOTOR PARCIAL', ufs: ['CE', 'MA'] },
+    ]
+
+    render(
+      <UsuariosScreen currentUser={usuarios[0]} usuarios={usuariosComEscopoCompleto} loading={false} error="" busy={false}
+        editId="" editForm={{}} search="" onSearch={noop} onOpenCadastro={noop}
+        onOpenUsuario={noop} onEditChange={noop} onStartEdit={noop} onCancelEdit={noop} onSaveEdit={noop} onDelete={noop} />,
+    )
+
+    expect(screen.getByText('GERENCIAL TODAS').closest('[role="row"]')).toHaveTextContent('Todas')
+    expect(screen.getByText('PROMOTOR TODAS').closest('[role="row"]')).toHaveTextContent('Todas')
+    expect(screen.getByText('PROMOTOR PARCIAL').closest('[role="row"]')).toHaveTextContent('CE, MA')
+  })
+
   it('aplica os novos nomes visuais e rotas por perfil', () => {
     expect(getProfileLabel('Gerencial')).toBe('Gerencial')
     expect(getProfileLabel('Supervisor')).toBe('Supervisor')

@@ -44,10 +44,19 @@ export function getPreviousPeriod(filters: ManagementDashboardFilters): Manageme
   }
 }
 
-async function listAccessibleNfdNotes() {
-  return fetchAllNfdNotas(DASHBOARD_NFD_SELECT, (query) => query
-    .order('data_referencia', { ascending: false })
-    .order('chave_acesso', { ascending: true }))
+async function listAccessibleNfdNotes(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate' | 'uf' | 'city'>) {
+  return fetchAllNfdNotas(DASHBOARD_NFD_SELECT, (query) => {
+    if (filters.startDate && filters.endDate) {
+      query = query.or(`and(data_emissao.gte.${filters.startDate},data_emissao.lte.${filters.endDate}),and(data_emissao.is.null,data_referencia.gte.${filters.startDate},data_referencia.lte.${filters.endDate})`)
+    } else if (filters.startDate) {
+      query = query.or(`data_emissao.gte.${filters.startDate},and(data_emissao.is.null,data_referencia.gte.${filters.startDate})`)
+    } else if (filters.endDate) {
+      query = query.or(`data_emissao.lte.${filters.endDate},and(data_emissao.is.null,data_referencia.lte.${filters.endDate})`)
+    }
+    if (filters.uf) query = query.ilike('uf', filters.uf)
+    if (filters.city) query = query.ilike('cidade', filters.city)
+    return query.order('data_referencia', { ascending: false }).order('chave_acesso', { ascending: true })
+  })
 }
 
 function noteDate(note: Pick<DashboardNote, 'data_emissao' | 'data_referencia'>) {
@@ -139,14 +148,31 @@ async function listLegacyFstd(notes: DashboardNote[]): Promise<DashboardLegacyFs
   return rows
 }
 
-async function readOperationalSources() {
-  const [processes, products, productReasons, reasons, catalogProducts, unknown] = await Promise.all([
-    supabase.from('fstd_processos').select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa'),
-    supabase.from('fstd_produtos').select('id, processo_id, produto_id, codigo_produto, nome, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, status'),
-    supabase.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade'),
-    supabase.from('motivos_devolucao').select('id, nome'),
-    supabase.from('produtos').select('id, nome, categoria'),
-    supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null),
+function emptySource() {
+  return { data: [], error: null }
+}
+
+async function readOperationalSources(notes: DashboardNote[]) {
+  const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
+  const processes = accessKeys.length
+    ? await supabase.from('fstd_processos').select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa').in('nfd_chave_acesso', accessKeys)
+    : emptySource()
+  const unknown = await supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null)
+  if (processes.error || unknown.error) return { processes, unknown, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
+
+  const processIds = [...new Set((processes.data ?? []).map((process) => process.id))]
+  const products = processIds.length
+    ? await supabase.from('fstd_produtos').select('id, processo_id, produto_id, codigo_produto, nome, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, status').in('processo_id', processIds)
+    : emptySource()
+  if (products.error) return { processes, unknown, products, productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
+
+  const productIds = [...new Set((products.data ?? []).map((product) => product.id))]
+  const catalogIds = [...new Set((products.data ?? []).map((product) => product.produto_id).filter((value): value is string => Boolean(value)))]
+  const reasonIds = [...new Set((products.data ?? []).map((product) => product.motivo_id).filter((value): value is string => Boolean(value)))]
+  const [productReasons, reasons, catalogProducts] = await Promise.all([
+    productIds.length ? supabase.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade').in('produto_id', productIds) : emptySource(),
+    reasonIds.length ? supabase.from('motivos_devolucao').select('id, nome').in('id', reasonIds) : emptySource(),
+    catalogIds.length ? supabase.from('produtos').select('id, nome, categoria').in('id', catalogIds) : emptySource(),
   ])
 
   return { processes, products, productReasons, reasons, catalogProducts, unknown }
@@ -158,23 +184,25 @@ function sourceFailure(source: string, error: unknown): DashboardSourceError {
 
 export async function loadManagementDashboard(filters: ManagementDashboardFilters, _signal?: AbortSignal): Promise<ManagementDashboardSource> {
   const sourceErrors: DashboardSourceError[] = []
-  const [allNotes, operational] = await Promise.all([listAccessibleNfdNotes(), readOperationalSources()])
+  const previousFilters = getPreviousPeriod(filters)
+  const notesQueryFilters = { ...filters, startDate: previousFilters.startDate, endDate: filters.endDate }
+  const allNotes = await listAccessibleNfdNotes(notesQueryFilters)
+  const allNotesRows = allNotes as DashboardNote[]
+  const currentBaseNotes = filterNfdNotes(allNotesRows, filters)
+  const previousBaseNotes = filterNfdNotes(allNotesRows, previousFilters)
+  const [loadedLegacy, operational] = await Promise.all([
+    listLegacyFstd([...currentBaseNotes, ...previousBaseNotes]).catch((error) => {
+      throw toAppError(error, 'Não foi possível carregar os status legados das NFDs da dashboard.')
+    }),
+    readOperationalSources([...currentBaseNotes, ...previousBaseNotes]),
+  ])
   const processesError = operational.processes.error
   const unknownError = operational.unknown.error
   if (processesError || unknownError) {
     throw toAppError(processesError ?? unknownError, 'Não foi possível carregar os status das NFDs da dashboard.')
   }
 
-  const currentBaseNotes = filterNfdNotes(allNotes as DashboardNote[], filters)
-  const previousFilters = getPreviousPeriod(filters)
-  const previousBaseNotes = filterNfdNotes(allNotes as DashboardNote[], previousFilters)
-  let legacy: DashboardLegacyFstd[]
-  try {
-    legacy = await listLegacyFstd([...currentBaseNotes, ...previousBaseNotes])
-  } catch (error) {
-    throw toAppError(error, 'Não foi possível carregar os status legados das NFDs da dashboard.')
-  }
-
+  const legacy = loadedLegacy
   const processes = (operational.processes.data ?? []) as DashboardFstdProcess[]
   const unknown = (operational.unknown.data ?? []) as DashboardUnknownNfd[]
   const current = createNoteCollection(

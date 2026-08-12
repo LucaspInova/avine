@@ -7,7 +7,9 @@ import { can } from '../../domains/auth/model/capabilities'
 export function deriveGerencialCapabilities(profile) {
   const isAdmin = can(profile, 'admin.runRestrictedOperations')
   const isGerencial = can(profile, 'users.managePromoters') && !isAdmin
-  const allowedUfs = isGerencial ? [...new Set(profile?.ufs ?? [])] : []
+  const allowedUfs = isGerencial
+    ? [...new Set((profile?.ufs ?? []).map((uf) => String(uf).trim().toUpperCase()).filter(Boolean))]
+    : []
 
   return {
     isAdmin,

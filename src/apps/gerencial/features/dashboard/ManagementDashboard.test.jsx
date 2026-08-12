@@ -22,6 +22,7 @@ describe('tooltip do gráfico financeiro', () => {
 
     expect(screen.getByText('05 de agosto de 2026')).toBeInTheDocument()
     expect(screen.getByText(/54\.299,72/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button')[0]).toHaveAttribute('r', '24')
   })
 })
 

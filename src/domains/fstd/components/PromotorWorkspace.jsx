@@ -35,6 +35,8 @@ const initialFstdForm = {
 
 const FSTD_ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const FSTD_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+const supportWhatsappMessage = 'Olá! Preciso de suporte na plataforma Avine.'
+const supportWhatsappUrl = `https://wa.me/5585986532599?text=${encodeURIComponent(supportWhatsappMessage)}`
 
 function validateFstdPhoto(file) {
   if (!FSTD_ALLOWED_IMAGE_TYPES.has(file.type)) {
@@ -300,6 +302,17 @@ function MobileProfileMenu({ profile, profilePhoto, onLogout, onUploadPhoto, pho
   )
 }
 
+function SupportIcon() {
+  return (
+    <svg className="mobile-support-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 13a8 8 0 0 1 16 0" />
+      <path d="M4 13v3a2 2 0 0 0 2 2h1v-7H6a2 2 0 0 0-2 2Z" />
+      <path d="M20 13v3a2 2 0 0 1-2 2h-1v-7h1a2 2 0 0 1 2 2Z" />
+      <path d="M17 18a5 5 0 0 1-5 3h-1" />
+    </svg>
+  )
+}
+
 function AppHeader({
   title,
   onBack,
@@ -311,6 +324,7 @@ function AppHeader({
   profilePhoto,
   profileMenuOpen,
   onCloseProfileMenu,
+  showSupport = false,
 }) {
   const profileControlRef = useRef(null)
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -353,7 +367,7 @@ function AppHeader({
 
   return (
     <header className="mobile-header">
-      <div className={`mobile-titlebar ${onBack ? 'has-back' : 'no-back'}`}>
+      <div className={`mobile-titlebar ${onBack ? 'has-back' : 'no-back'}${showSupport ? ' has-support' : ''}`}>
         {onBack ? (
           <button className="mobile-icon-button" type="button" onClick={onBack} aria-label="Voltar">
             ‹
@@ -362,6 +376,19 @@ function AppHeader({
           <span className="mobile-spacer" />
         )}
         <strong>{title}</strong>
+        {showSupport && (
+          <a
+            className="mobile-support-link"
+            href={supportWhatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Abrir suporte pelo WhatsApp"
+            title="Suporte"
+          >
+            <SupportIcon />
+            <span>Suporte</span>
+          </a>
+        )}
         {onMenu ? (
           <div className="mobile-profile-control" ref={profileControlRef}>
             <button
@@ -716,6 +743,7 @@ export function StoresScreen({
     <main className="promotor-app">
       <AppHeader
         title="Lojas"
+        showSupport
         onMenu={onMenu}
         onCloseProfileMenu={onCloseProfileMenu}
         onLogout={onLogout}

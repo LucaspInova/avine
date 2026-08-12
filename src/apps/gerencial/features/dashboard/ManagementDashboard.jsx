@@ -10,12 +10,13 @@ const moneyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', curre
 const numberFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 const decimalFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
-function getCurrentMonthDates(now = new Date()) {
+function getCurrentWeekDates(now = new Date()) {
   const toDateInput = (date) => {
     const offset = date.getTimezoneOffset() * 60000
     return new Date(date.getTime() - offset).toISOString().slice(0, 10)
   }
-  return { startDate: toDateInput(new Date(now.getFullYear(), now.getMonth(), 1)), endDate: toDateInput(now) }
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
+  return { startDate: toDateInput(start), endDate: toDateInput(now) }
 }
 
 function formatNumber(value) {
@@ -162,7 +163,7 @@ export function FinancialChart({ data }) {
           className="management-dashboard__chart-hit-area"
           cx={x}
           cy={y}
-          r="13"
+          r="24"
           tabIndex="0"
           role="button"
           aria-label={`${formatLongDate(data[index].date)}: ${formatMoney(data[index].value)}`}
@@ -295,7 +296,7 @@ function ProductsModal({ products, errors, isOpen, onClose }) {
   />
 }
 export function ManagementDashboard({ restrictedUfs = [] }) {
-  const defaults = useMemo(() => getCurrentMonthDates(), [])
+  const defaults = useMemo(() => getCurrentWeekDates(), [])
   const today = defaults.endDate
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [filters, setFilters] = useState(() => ({ ...defaults, status: '', uf: '', city: '' }))
