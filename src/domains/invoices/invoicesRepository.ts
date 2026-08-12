@@ -24,7 +24,10 @@ export async function listInvoicesOverview(filters: InvoiceListFilters, signal?:
     const { data, error } = await (signal ? request.abortSignal(signal) : request)
     if (error) throw error
     return data as InvoiceOverviewPage
-  } catch (error) { throw toAppError(error, 'Não foi possível carregar as notas fiscais.') }
+  } catch (error) {
+    console.error('[Notas] Falha ao carregar listagem gerencial:', error)
+    throw toAppError(error, 'Não foi possível carregar as notas fiscais.')
+  }
 }
 
 export async function startInvoiceProcess(storeId: string, accessKey: string) {

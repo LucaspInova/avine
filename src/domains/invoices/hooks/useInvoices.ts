@@ -11,6 +11,9 @@ export function useInvoices(filters: InvoiceListFilters) {
   return useQuery({
     queryKey: invoiceKeys.list(filters),
     queryFn: ({ signal }) => listInvoicesOverview(filters, signal),
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 

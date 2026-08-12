@@ -1960,7 +1960,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedUf, setSelectedUf] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
-  const [draftFilters, setDraftFilters] = useState(() => ({ startDate: defaults.start, endDate: defaults.end, status: '', uf: '', city: '' }))
+  const [draftFilters, setDraftFilters] = useState(() => ({ startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [] }))
   const [selectedNote, setSelectedNote] = useState(null)
   const [selectedFstd, setSelectedFstd] = useState(null)
   const [selectedFinalized, setSelectedFinalized] = useState(null)
@@ -2010,19 +2010,19 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
       .filter((uf) => uf && (allowed.size === 0 || allowed.has(uf))))].sort()
   }, [result.ufs, restrictedUfs, storeUfs])
   const cities = useMemo(() => {
-    const selectedUfValue = String(draftFilters.uf ?? '').trim().toUpperCase()
+    const selectedUfValues = (draftFilters.uf ?? []).map((uf) => String(uf).trim().toUpperCase())
     const storeCities = scopedStores
-      .filter((store) => !selectedUfValue || String(store.uf ?? '').trim().toUpperCase() === selectedUfValue)
+      .filter((store) => selectedUfValues.length === 0 || selectedUfValues.includes(String(store.uf ?? '').trim().toUpperCase()))
       .map((store) => String(store.cidade ?? '').trim())
       .filter(Boolean)
     const responseCities = (result.cities ?? []).map((city) => String(city).trim()).filter(Boolean)
-    const candidates = selectedUfValue && storeCities.length > 0 ? storeCities : [...responseCities, ...storeCities]
+    const candidates = selectedUfValues.length > 0 && storeCities.length > 0 ? storeCities : [...responseCities, ...storeCities]
     return [...new Set(candidates)].sort((left, right) => left.localeCompare(right, 'pt-BR'))
   }, [draftFilters.uf, result.cities, scopedStores])
   // The product's default reporting period is the neutral state: only dates that
   // differ from getDefaultNoteDates contribute to the active-filter badge.
   const periodFilterCount = Number(draftFilters.startDate !== defaults.start) + Number(draftFilters.endDate !== defaults.end)
-  const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status)) + Number(Boolean(draftFilters.uf)) + Number(Boolean(draftFilters.city))
+  const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status)) + draftFilters.uf.length + draftFilters.city.length
   const totals = { Geral: result.total, Finalizada: result.counts?.Finalizada ?? 0,
     Pendente: result.counts?.Pendente ?? 0, Desconhecida: result.counts?.Desconhecida ?? 0 }
 
@@ -2124,8 +2124,8 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setStartDate(draftFilters.startDate)
     setEndDate(draftFilters.endDate)
     setSelectedStatus(draftFilters.status)
-    setSelectedUf(draftFilters.uf)
-    setSelectedCity(draftFilters.city)
+    setSelectedUf(draftFilters.uf.join(','))
+    setSelectedCity(draftFilters.city.join(','))
     setIsFilterOpen(false)
   }
 
@@ -2136,7 +2136,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedStatus('')
     setSelectedUf('')
     setSelectedCity('')
-    setDraftFilters({ startDate: defaults.start, endDate: defaults.end, status: '', uf: '', city: '' })
+    setDraftFilters({ startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [] })
   }
 
   function handleSort(key) {
@@ -2171,11 +2171,11 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
             <FilterSection title="Status" count={Number(Boolean(draftFilters.status))} id="note-filter-status">
               <AppSelect aria-label="Status" value={draftFilters.status} onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
-            <FilterSection title="UF" count={Number(Boolean(draftFilters.uf))} id="note-filter-uf">
-              <AppSelect aria-label="UF" searchable value={draftFilters.uf} onChange={(event) => setDraftFilters((current) => ({ ...current, uf: event.target.value, city: '' }))}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            <FilterSection title="UF" count={draftFilters.uf.length} id="note-filter-uf">
+              <AppSelect aria-label="UF" multiple searchable value={draftFilters.uf} onChange={(event) => setDraftFilters((current) => ({ ...current, uf: event.target.value, city: [] }))}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
-            <FilterSection title="Cidade" count={Number(Boolean(draftFilters.city))} id="note-filter-city">
-              <AppSelect aria-label="Cidade" searchable value={draftFilters.city} onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+            <FilterSection title="Cidade" count={draftFilters.city.length} id="note-filter-city">
+              <AppSelect aria-label="Cidade" multiple searchable value={draftFilters.city} onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
             </FilterSection>
           </FilterPopover>
         </PageToolbar>

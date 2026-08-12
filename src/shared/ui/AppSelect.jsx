@@ -57,7 +57,7 @@ function getNextEnabledIndex(options, startIndex, direction) {
   return -1
 }
 
-export function AppSelect({ children, options, portalOwnerId, searchable = false, onChange, ...selectProps }) {
+export function AppSelect({ children, options, portalOwnerId, searchable = false, multiple = false, onChange, ...selectProps }) {
   const selectRef = useRef(null)
   const dropdownRef = useRef(null)
   const searchRef = useRef(null)
@@ -67,9 +67,12 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
   const [activeIndex, setActiveIndex] = useState(-1)
   const [inferredPortalOwnerId, setInferredPortalOwnerId] = useState()
   const [position, setPosition] = useState(null)
-  const currentValue = String(selectProps.value ?? selectProps.defaultValue ?? '')
+  const currentValues = multiple
+    ? (Array.isArray(selectProps.value) ? selectProps.value : []).map(String)
+    : [String(selectProps.value ?? selectProps.defaultValue ?? '')]
+  const currentValue = currentValues[0] ?? ''
   const normalizedOptions = useMemo(() => normalizeOptions(options, children), [options, children])
-  const selectedIndex = normalizedOptions.findIndex((option) => option.value === currentValue)
+  const selectedIndex = normalizedOptions.findIndex((option) => currentValues.includes(option.value))
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizeSearchText(query)
     if (!normalizedQuery) return normalizedOptions
@@ -97,13 +100,13 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
       width: menuWidth,
       maxHeight: Math.max(150, window.innerHeight - rect.bottom - 16),
     })
-  }, [searchable])
+  }, [searchable, setPosition])
 
   const closeDropdown = useCallback(() => {
     setIsOpen(false)
     setQuery('')
     setPosition(null)
-  }, [])
+  }, [setIsOpen, setQuery, setPosition])
 
   const openDropdown = useCallback(() => {
     if (selectProps.disabled) return
@@ -112,7 +115,7 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
     setActiveIndex(selectedIndex >= 0 && !normalizedOptions[selectedIndex]?.disabled ? selectedIndex : firstEnabled)
     setIsOpen(true)
     updatePosition()
-  }, [normalizedOptions, selectedIndex, selectProps.disabled, updatePosition])
+  }, [normalizedOptions, selectedIndex, selectProps.disabled, updatePosition, setActiveIndex, setInferredPortalOwnerId, setIsOpen])
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -161,8 +164,11 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
 
   function selectOption(option) {
     if (option.disabled) return
-    onChange?.({ target: { name: selectProps.name, value: option.value } })
-    closeDropdown()
+    const nextValues = multiple
+      ? (option.value === '' ? [] : (currentValues.includes(option.value) ? currentValues.filter((value) => value !== option.value) : [...currentValues, option.value]))
+      : option.value
+    onChange?.({ target: { name: selectProps.name, value: nextValues } })
+    if (!multiple) closeDropdown()
     selectRef.current?.focus()
   }
 
@@ -239,7 +245,7 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
       <div className="app-select-options" role="listbox" aria-label="Opções">
         {filteredOptions.map((option) => {
           const optionIndex = normalizedOptions.findIndex((item) => item.value === option.value)
-          const isSelected = option.value === currentValue
+          const isSelected = currentValues.includes(option.value)
           const isActive = optionIndex === activeIndex
           return (
             <button
@@ -280,7 +286,7 @@ export function AppSelect({ children, options, portalOwnerId, searchable = false
           else openDropdown()
         }}
         ref={selectRef}
-        value={selectProps.value}
+        value={multiple ? currentValue : selectProps.value}
       >
         {options
           ? normalizedOptions.map((option) => <option disabled={option.disabled} key={option.key} value={option.value}>{option.label}</option>)
