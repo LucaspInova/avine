@@ -23,6 +23,7 @@ import { getPasswordValidationMessage, PASSWORD_MIN_LENGTH } from '../../shared/
 import { InvoiceIcon } from '../../shared/components/InvoiceIcon.jsx'
 import { GerencialFstdModal } from './features/fstd/GerencialFstdModal.jsx'
 import { GerencialFinalizedNfdModal } from './features/fstd/GerencialFinalizedNfdModal.jsx'
+import { ManagementDashboard } from './features/dashboard/ManagementDashboard.jsx'
 import { GerencialApplicationShell } from './features/shell/GerencialApplicationShell.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
@@ -45,23 +46,24 @@ const USERS_PAGE_SIZE = 10
 const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 
 const navItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
   { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
   { id: 'notas', label: 'Notas', icon: 'notes' },
 ]
 
-const gerencialScreenIds = ['usuarios', 'lojas', 'notas']
+const gerencialScreenIds = ['dashboard', 'usuarios', 'lojas', 'notas']
 const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
 
 function getInitialGerencialScreen() {
-  if (typeof window === 'undefined') return 'lojas'
+  if (typeof window === 'undefined') return 'dashboard'
 
   try {
     const savedScreen = window.localStorage.getItem(gerencialScreenStorageKey)
     if (savedScreen === 'configuracoes') return 'usuarios'
-    return gerencialScreenIds.includes(savedScreen) ? savedScreen : 'lojas'
+    return gerencialScreenIds.includes(savedScreen) ? savedScreen : 'dashboard'
   } catch {
-    return 'lojas'
+    return 'dashboard'
   }
 }
 
@@ -2402,7 +2404,7 @@ function GerencialApp({ capabilities }) {
     : isLojas
     ? 'Lojas'
     : isDashboard
-          ? 'Dashboard'
+          ? 'Dashboard Gerencial'
           : isNotas
             ? 'Notas Fiscais de Devolução'
             : isMotivos
@@ -2417,7 +2419,7 @@ function GerencialApp({ capabilities }) {
     : isLojas
     ? 'Roteirização dos promotores.'
     : isDashboard
-          ? 'Visão geral do painel Avine.'
+          ? 'Visão geral da operação de devoluções e retornos.'
           : isNotas
             ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
             : isMotivos
@@ -2431,7 +2433,7 @@ function GerencialApp({ capabilities }) {
     ? 'users'
     : isLojas
     ? 'pin'
-    : isNotas || isMotivos
+    : isDashboard || isNotas || isMotivos
           ? 'notes'
           : isRecolhimento
             ? 'logs'
@@ -2979,6 +2981,8 @@ function GerencialApp({ capabilities }) {
             onDelete={handleDeleteGerencial}
             restrictedUfs={gerencialCapabilities.allowedUfs}
           />
+        ) : isDashboard ? (
+          <ManagementDashboard restrictedUfs={gerencialCapabilities.allowedUfs} />
         ) : isRelatorios ? (
           <ReportScreen />
         ) : isNotas ? (
