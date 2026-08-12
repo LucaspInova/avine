@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { CadastroModal, EditarUsuarioModal, InformacoesUsuarioModal, UsuariosScreen } from './GerencialApp.jsx'
+import { CadastroModal, EditarUsuarioModal, InformacoesUsuarioModal, Sidebar, UsuariosScreen } from './GerencialApp.jsx'
 import { hasApplicationAccess, hasConsistentRole, routeForProfile } from '../../domains/auth/AuthProvider.jsx'
 import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 
@@ -308,5 +308,32 @@ describe('Cadastro de Usuários', () => {
     const inconsistentAdmin = { perfil: 'Admin', auth_role: 'gerencial', ativo: true, acesso_habilitado: true, auth_user_id: 'auth-admin' }
     expect(hasConsistentRole(inconsistentAdmin)).toBe(false)
     expect(hasApplicationAccess(inconsistentAdmin)).toBe(false)
+  })
+})
+
+describe('navegacao gerencial em celular', () => {
+  it('abre o menu como gaveta e permite fecha-lo com Esc', () => {
+    const onClose = vi.fn()
+
+    render(
+      <Sidebar
+        isMobile
+        expanded
+        canCollapse={false}
+        selectedItem="dashboard"
+        currentUser={usuarios[0]}
+        profilePhoto=""
+        onClose={onClose}
+        onLogout={noop}
+        onSelect={noop}
+        onToggle={noop}
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { name: 'Menu principal' })).toHaveAttribute('aria-modal', 'true')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalledOnce()
   })
 })

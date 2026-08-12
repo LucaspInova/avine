@@ -433,7 +433,7 @@ function Icon({ name, className = '' }) {
   return null
 }
 
-export function Sidebar({ expanded, canCollapse, selectedItem, currentUser, profilePhoto, onLogout, onToggle, onSelect }) {
+export function Sidebar({ isMobile = false, expanded, canCollapse, selectedItem, currentUser, profilePhoto, onLogout, onClose, onToggle, onSelect }) {
   const profileMenuRef = useRef(null)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [isLogoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
@@ -463,14 +463,53 @@ export function Sidebar({ expanded, canCollapse, selectedItem, currentUser, prof
     }
   }, [profileMenuOpen])
 
+  useEffect(() => {
+    if (!isMobile || !expanded) return undefined
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose?.()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [expanded, isMobile, onClose])
+
   return (
-    <aside className={`sidebar ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
+    <>
+      {isMobile && expanded && (
+        <button
+          className="sidebar-backdrop"
+          type="button"
+          aria-label="Fechar menu principal"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        id="gerencial-main-navigation"
+        className={`sidebar ${isMobile ? 'is-mobile' : ''} ${expanded ? 'is-expanded' : 'is-collapsed'}`}
+        role={isMobile ? 'dialog' : undefined}
+        aria-label={isMobile ? 'Menu principal' : undefined}
+        aria-modal={isMobile || undefined}
+        aria-hidden={isMobile && !expanded}
+      >
       <div className="sidebar-brand">
         <button className="brand-button" type="button" aria-label={`Avine ${profileRole}`}>
           <img className="brand-logo" src={avineLogo} alt="Avine" />
         </button>
 
-        {canCollapse && (
+        {isMobile ? (
+          <button
+            className="sidebar-close"
+            type="button"
+            aria-label="Fechar menu principal"
+            onClick={onClose}
+          >
+            <span aria-hidden="true" />
+          </button>
+        ) : canCollapse && (
           <button
             className="sidebar-toggle"
             type="button"
@@ -579,7 +618,8 @@ export function Sidebar({ expanded, canCollapse, selectedItem, currentUser, prof
           }
         }}
       />
-    </aside>
+      </aside>
+    </>
   )
 }
 
@@ -2258,6 +2298,7 @@ function GerencialApp({ capabilities }) {
     canManageStores: currentUser?.perfil === 'Admin' && currentUser?.auth_role === 'admin',
   }
   const [isDesktop, setIsDesktop] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 760)
   const [sidebarExpanded, setSidebarExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
   const [selectedItem, setSelectedItem] = useState(getInitialGerencialScreen)
   const [search, setSearch] = useState('')
@@ -2301,8 +2342,11 @@ function GerencialApp({ capabilities }) {
   useEffect(() => {
     function handleViewportChange() {
       const desktop = window.innerWidth > 980
+      const mobile = window.innerWidth <= 760
       setIsDesktop(desktop)
+      setIsMobile(mobile)
       if (desktop) setSidebarExpanded(true)
+      if (mobile) setSidebarExpanded(false)
     }
 
     window.addEventListener('resize', handleViewportChange)
@@ -2968,6 +3012,7 @@ function GerencialApp({ capabilities }) {
     setCadastroOpen(false)
     setGerencialError('')
     setGerencialEditId('')
+    if (isMobile) setSidebarExpanded(false)
   }
 
   function closeCadastro() {
@@ -2982,13 +3027,15 @@ function GerencialApp({ capabilities }) {
       session={session}
       profile={currentUser}
       sidebar={<Sidebar
+        isMobile={isMobile}
         expanded={sidebarExpanded}
-        canCollapse={!isDesktop}
+        canCollapse={!isDesktop && !isMobile}
         selectedItem={selectedItem}
         currentUser={currentUser}
         profilePhoto={profilePhoto}
         onLogout={handleLogout}
         onSelect={handleSelectItem}
+        onClose={() => setSidebarExpanded(false)}
         onToggle={() => setSidebarExpanded((open) => !open)}
       />}
     >
@@ -2996,6 +3043,18 @@ function GerencialApp({ capabilities }) {
       <main className={`workspace ${sidebarExpanded ? 'sidebar-open' : ''} ${isUsuarios ? 'registration-workspace' : ''}`}>
         <header className="page-hero">
           <div className="page-hero-inner">
+            {isMobile && (
+              <button
+                className="mobile-menu-trigger"
+                type="button"
+                aria-controls="gerencial-main-navigation"
+                aria-expanded={sidebarExpanded}
+                aria-label={sidebarExpanded ? 'Fechar menu principal' : 'Abrir menu principal'}
+                onClick={() => setSidebarExpanded((open) => !open)}
+              >
+                <span aria-hidden="true" />
+              </button>
+            )}
             <div className="hero-user-icon">
               <Icon name={heroIcon} />
             </div>
