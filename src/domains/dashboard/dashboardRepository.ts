@@ -148,6 +148,23 @@ async function listLegacyFstd(notes: DashboardNote[]): Promise<DashboardLegacyFs
   return rows
 }
 
+async function listFstdProcessesByAccessKeys(accessKeys: string[]) {
+  const rows: DashboardFstdProcess[] = []
+
+  for (let index = 0; index < accessKeys.length; index += LEGACY_QUERY_CHUNK_SIZE) {
+    const chunk = accessKeys.slice(index, index + LEGACY_QUERY_CHUNK_SIZE)
+    const { data, error } = await supabase
+      .from('fstd_processos')
+      .select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa')
+      .in('nfd_chave_acesso', chunk)
+
+    if (error) return { data: null, error }
+    rows.push(...(data ?? []) as DashboardFstdProcess[])
+  }
+
+  return { data: rows, error: null }
+}
+
 function emptySource() {
   return { data: [], error: null }
 }
@@ -155,7 +172,7 @@ function emptySource() {
 async function readOperationalSources(notes: DashboardNote[]) {
   const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
   const processes = accessKeys.length
-    ? await supabase.from('fstd_processos').select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa').in('nfd_chave_acesso', accessKeys)
+    ? await listFstdProcessesByAccessKeys(accessKeys)
     : emptySource()
   const unknown = await supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null)
   if (processes.error || unknown.error) return { processes, unknown, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }

@@ -1448,7 +1448,7 @@ export function UsuariosScreen({
         {loading && <p className="table-message user-loading-message">Carregando usuários...</p>}
 
         {!loading && (
-          <div className="users-table unified-users-table" role="table" aria-label="Cadastro de Usuários">
+          <div className="users-table unified-users-table" role="table" aria-label="Usuários">
             <div className="table-row table-head" role="row">
               <span role="columnheader">NOME</span>
               <span role="columnheader">PERFIL</span>
@@ -2139,6 +2139,25 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setDraftFilters({ startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [] })
   }
 
+  function toggleDraftUf(uf) {
+    setDraftFilters((current) => ({
+      ...current,
+      uf: current.uf.includes(uf) ? current.uf.filter((item) => item !== uf) : [...current.uf, uf],
+      city: [],
+    }))
+  }
+
+  function toggleDraftCity(city) {
+    setDraftFilters((current) => ({
+      ...current,
+      city: current.city.includes(city) ? current.city.filter((item) => item !== city) : [...current.city, city],
+    }))
+  }
+
+  function toggleDraftStatus(status) {
+    setDraftFilters((current) => ({ ...current, status: current.status === status ? '' : status }))
+  }
+
   function handleSort(key) {
     setCurrentPage(1)
     setSort((current) => ({
@@ -2169,13 +2188,36 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
               </div>
             </FilterSection>
             <FilterSection title="Status" count={Number(Boolean(draftFilters.status))} id="note-filter-status">
-              <AppSelect aria-label="Status" value={draftFilters.status} onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}><option value="">Todos</option>{NOTE_STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+              <div className="filter-options">
+                {NOTE_STATUS_OPTIONS.map((item) => (
+                  <label key={item} className="filter-option">
+                    <span>{item}</span>
+                    <input aria-label={item} checked={draftFilters.status === item} onChange={() => toggleDraftStatus(item)} type="checkbox" />
+                  </label>
+                ))}
+              </div>
             </FilterSection>
             <FilterSection title="UF" count={draftFilters.uf.length} id="note-filter-uf">
-              <AppSelect aria-label="UF" multiple searchable value={draftFilters.uf} onChange={(event) => setDraftFilters((current) => ({ ...current, uf: event.target.value, city: [] }))}><option value="">Todas</option>{ufs.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+              <div className="filter-options">
+                {ufs.map((item) => (
+                  <label key={item} className="filter-option">
+                    <span>{item}</span>
+                    <input aria-label={item} checked={draftFilters.uf.includes(item)} onChange={() => toggleDraftUf(item)} type="checkbox" />
+                  </label>
+                ))}
+                {ufs.length === 0 && <p className="filter-empty">Nenhuma UF disponível.</p>}
+              </div>
             </FilterSection>
             <FilterSection title="Cidade" count={draftFilters.city.length} id="note-filter-city">
-              <AppSelect aria-label="Cidade" multiple searchable value={draftFilters.city} onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}><option value="">Todas</option>{cities.map((item) => <option key={item} value={item}>{item}</option>)}</AppSelect>
+              <div className="filter-options">
+                {cities.map((item) => (
+                  <label key={item} className="filter-option">
+                    <span>{item}</span>
+                    <input aria-label={item} checked={draftFilters.city.includes(item)} onChange={() => toggleDraftCity(item)} type="checkbox" />
+                  </label>
+                ))}
+                {cities.length === 0 && <p className="filter-empty">Nenhuma cidade disponível.</p>}
+              </div>
             </FilterSection>
           </FilterPopover>
         </PageToolbar>
@@ -2333,6 +2375,7 @@ function GerencialApp({ capabilities }) {
   const [isDesktop, setIsDesktop] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 760)
   const [sidebarExpanded, setSidebarExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
+  const mobileMenuTriggerRef = useRef(null)
   const [selectedItem, setSelectedItem] = useState(getInitialGerencialScreen)
   const [search, setSearch] = useState('')
   const [usuarios, setUsuarios] = useState([])
@@ -2531,7 +2574,7 @@ function GerencialApp({ capabilities }) {
     : isLojas
     ? 'Lojas'
     : isDashboard
-          ? 'Dashboard Gerencial'
+          ? 'Dashboard Geral'
           : isNotas
             ? 'Notas Fiscais de Devolução'
             : isMotivos
@@ -2540,7 +2583,7 @@ function GerencialApp({ capabilities }) {
                 ? 'Recolhimento'
           : isRelatorios
             ? 'Relatório'
-            : 'Cadastro de Usuários'
+            : 'Usuários'
   const pageSubtitle = isPerfil
      ? `Dados da conta ${getManagedRoleLabel(currentUser)}.`
     : isLojas
@@ -3038,6 +3081,11 @@ function GerencialApp({ capabilities }) {
     await loadUsuarios()
   }
 
+  function closeMobileSidebar() {
+    if (isMobile) mobileMenuTriggerRef.current?.focus()
+    setSidebarExpanded(false)
+  }
+
   function handleSelectItem(item) {
     setSelectedItem(item)
     setSearch('')
@@ -3045,7 +3093,7 @@ function GerencialApp({ capabilities }) {
     setCadastroOpen(false)
     setGerencialError('')
     setGerencialEditId('')
-    if (isMobile) setSidebarExpanded(false)
+    if (isMobile) closeMobileSidebar()
   }
 
   function closeCadastro() {
@@ -3068,7 +3116,7 @@ function GerencialApp({ capabilities }) {
         profilePhoto={profilePhoto}
         onLogout={handleLogout}
         onSelect={handleSelectItem}
-        onClose={() => setSidebarExpanded(false)}
+        onClose={closeMobileSidebar}
         onToggle={() => setSidebarExpanded((open) => !open)}
       />}
     >
@@ -3079,6 +3127,7 @@ function GerencialApp({ capabilities }) {
             {isMobile && (
               <button
                 className="mobile-menu-trigger"
+                ref={mobileMenuTriggerRef}
                 type="button"
                 aria-controls="gerencial-main-navigation"
                 aria-expanded={sidebarExpanded}

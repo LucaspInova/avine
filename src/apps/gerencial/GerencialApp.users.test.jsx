@@ -88,7 +88,7 @@ describe('Cadastro de Usuários', () => {
     expect(filterTrigger).toHaveClass('ui-filter-trigger')
     expect(createButton).toHaveClass('user-create-button')
 
-    const table = screen.getByRole('table', { name: 'Cadastro de Usuários' })
+    const table = screen.getByRole('table', { name: 'Usuários' })
     expect(within(table).getByText('ANA GERENCIAL')).toBeInTheDocument()
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
     expect(within(table).getByText('CARLA PROMOTORA')).toBeInTheDocument()

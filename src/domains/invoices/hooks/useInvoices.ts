@@ -14,6 +14,7 @@ export function useInvoices(filters: InvoiceListFilters) {
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
   })
 }
 

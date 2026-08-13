@@ -14,12 +14,15 @@ function setup(data = page) {
   invoiceBoundary.useInvoiceMutations.mockReturnValue({ findStore: mutation(), start: mutation(), markUnknown: mutation(), recognize: mutation() })
 }
 function select(name, option) {
-  if (!screen.queryByRole('combobox', { name })) {
-    const dialog = screen.getByRole('dialog', { name: 'Filtros' })
-    fireEvent.click(within(dialog).getByRole('button', { name }))
+  const dialog = screen.queryByRole('dialog', { name: 'Filtros' }) ?? openFilters()
+  if (name === 'Linhas por página') {
+    if (!screen.queryByRole('combobox', { name })) fireEvent.click(within(dialog).getByRole('button', { name }))
+    fireEvent.mouseDown(screen.getByRole('combobox', { name }))
+    fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: option }))
+    return
   }
-  fireEvent.mouseDown(screen.getByRole('combobox', { name }))
-  fireEvent.click(within(document.querySelector('.app-select-dropdown')).getByRole('option', { name: option }))
+  if (!screen.queryByRole('checkbox', { name: option })) fireEvent.click(within(dialog).getByRole('button', { name }))
+  fireEvent.click(screen.getByRole('checkbox', { name: option }))
 }
 function openFilters() {
   fireEvent.click(screen.getByRole('button', { name: /Filtrar/ }))
@@ -131,13 +134,8 @@ describe('fluxo paginado das Notas gerenciais', () => {
     openFilters()
     select('UF', 'CE')
     select('Cidade', 'Fortaleza')
-    select('UF', 'Todas')
-    expect(screen.getByRole('combobox', { name: 'Cidade' })).toHaveValue('')
-
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'UF' }))
-    const options = within(document.querySelector('.app-select-dropdown'))
-    expect(options.getByRole('option', { name: 'CE' })).toBeVisible()
-    expect(options.queryByRole('option', { name: 'PE' })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'CE' })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'PE' })).not.toBeInTheDocument()
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ restrictedUfs: ['CE'], uf: '', city: '', page: 1 }))
   })
 

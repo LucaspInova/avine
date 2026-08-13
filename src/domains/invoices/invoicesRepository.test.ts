@@ -28,4 +28,16 @@ describe('repositório paginado de NFDs', () => {
     await expect(listInvoicesOverview({ page: 1, pageSize: 10 }, controller.signal)).resolves.toEqual(response)
     expect(abortSignal).toHaveBeenCalledWith(controller.signal)
   })
+
+  it('propaga cancelamentos sem registrar erro no console', async () => {
+    const abortSignal = vi.fn()
+    const abortError = new DOMException('The operation was aborted.', 'AbortError')
+    abortSignal.mockRejectedValue(abortError)
+    rpc.mockReturnValue({ abortSignal })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(listInvoicesOverview({ page: 1, pageSize: 10 }, new AbortController().signal)).rejects.toBe(abortError)
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
 })

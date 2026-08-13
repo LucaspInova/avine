@@ -1,5 +1,10 @@
 .management-dashboard { width: min(calc(100% - 48px), 1780px); margin: 20px auto 38px; color: var(--color-text-strong); }
-.management-dashboard__toolbar { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+.management-dashboard__toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 20px; }
+.management-dashboard__period-indicator { display: flex; min-height: 44px; align-items: center; gap: 9px; box-sizing: border-box; padding: 0 14px; border: 1px solid #b8dfcc; border-radius: 9px; background: #f1fbf5; color: #146b43; font-size: 13px; line-height: 1.2; }
+.management-dashboard__period-indicator svg { width: 17px; height: 17px; flex: 0 0 17px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.management-dashboard__period-indicator-text { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.management-dashboard__period-indicator-prefix { font-weight: 400; }
+.management-dashboard__period-indicator strong { color: #0a5734; font-weight: 700; }
 .management-dashboard__filter-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .management-dashboard__filter-dates label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .management-dashboard__filter-dates input { width: 100%; min-height: 36px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0 9px; color: var(--color-text-strong); font: inherit; }
@@ -217,7 +222,10 @@
 
 @media (max-width: 600px) {
   .management-dashboard { width: calc(100% - 24px); }
-  .management-dashboard__toolbar, .management-dashboard__toolbar > * { width: 100%; }
+  .management-dashboard__toolbar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .management-dashboard__toolbar > *, .management-dashboard__toolbar .ui-filter-popover { width: 100%; }
+  .management-dashboard__period-indicator { min-height: 40px; justify-content: center; padding: 0 10px; font-size: 12px; }
+  .management-dashboard__period-indicator-text { gap: 4px; }
   .management-dashboard__summary { grid-template-columns: 1fr 1fr; gap: 10px; }
   .management-dashboard__summary-card { min-height: 94px; padding: 15px; }
   .management-dashboard__summary-title { gap: 7px; margin-bottom: 10px; }

@@ -149,7 +149,7 @@ describe('fluxo proprietário de usuários', () => {
     expect(screen.getByText('Carregando usuários...')).toBeVisible()
     rerender(<UsuariosScreen {...userProps} error="Falha ao carregar usuários" />)
     expect(screen.getByText('Falha ao carregar usuários')).toBeVisible()
-    expect(within(screen.getByRole('table', { name: 'Cadastro de Usuários' })).getByText('Nenhum usuário encontrado.')).toBeVisible()
+    expect(within(screen.getByRole('table', { name: 'Usuários' })).getByText('Nenhum usuário encontrado.')).toBeVisible()
   })
 
   it('confirma ações sensíveis somente pelo modal e respeita canManage', () => {

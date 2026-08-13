@@ -3,6 +3,12 @@ import { paginateSupabase } from '../../shared/api/pagination'
 import { toAppError } from '../../shared/errors'
 import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand } from './types'
 
+function isAbortError(error: unknown, signal?: AbortSignal) {
+  if (signal?.aborted) return true
+  if (!error || typeof error !== 'object') return false
+  return 'name' in error && String(error.name) === 'AbortError'
+}
+
 export async function fetchAllNfdNotas(select: string, configureQuery?: (query: any) => any) {
   return paginateSupabase<any>((from, to) => {
     let query: any = supabase!.from('nfd_notas').select(select)
@@ -25,8 +31,11 @@ export async function listInvoicesOverview(filters: InvoiceListFilters, signal?:
     if (error) throw error
     return data as InvoiceOverviewPage
   } catch (error) {
+    if (isAbortError(error, signal)) throw error
+
     console.error('[Notas] Falha ao carregar listagem gerencial:', error)
-    throw toAppError(error, 'Não foi possível carregar as notas fiscais.')
+    const technicalMessage = error && typeof error === 'object' && 'message' in error ? String(error.message) : ''
+    throw toAppError(error, technicalMessage ? `Não foi possível carregar as notas fiscais: ${technicalMessage}` : 'Não foi possível carregar as notas fiscais.')
   }
 }
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateManagementDashboard, useManagementDashboard } from '../../../../domains/dashboard'
 import { AppSelect, FilterPopover, FilterSection } from '../../../../shared/ui'
 import { getGaugeTone } from './dashboardVisualUtils'
+import { formatPeriodRange } from './periodIndicatorUtils'
 import './ManagementDashboard.css'
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
@@ -34,6 +35,22 @@ function formatPercent(value) {
 function formatDate(value) {
   if (!value) return ''
   return dateFormatter.format(new Date(`${value}T00:00:00`)).replace('.', '')
+}
+
+function PeriodIndicator({ startDate, endDate, isCurrentWeek }) {
+  const periodLabel = isCurrentWeek ? 'Semana atual' : 'Período personalizado'
+  const rangeLabel = formatPeriodRange(startDate, endDate)
+  return (
+    <div className="management-dashboard__period-indicator" role="status" aria-live="polite" aria-label={`Visualizando: ${periodLabel} · ${rangeLabel}`}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17" /></svg>
+      <span className="management-dashboard__period-indicator-text">
+        <span className="management-dashboard__period-indicator-prefix">Visualizando:</span>
+        <strong>{periodLabel}</strong>
+        <span aria-hidden="true">·</span>
+        <span>{rangeLabel}</span>
+      </span>
+    </div>
+  )
 }
 
 function formatChartDate(value) {
@@ -190,7 +207,7 @@ export function FinancialChart({ data }) {
 
 function DashboardSkeleton() {
   return (
-    <div className="management-dashboard__skeleton" aria-label="Carregando Dashboard Gerencial" role="status">
+    <div className="management-dashboard__skeleton" aria-label="Carregando Dashboard Geral" role="status">
       {Array.from({ length: 10 }, (_, index) => <span className={`management-dashboard__skeleton-block is-${index + 1}`} key={index} />)}
     </div>
   )
@@ -313,6 +330,7 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
   const cities = query.data?.current.cities ?? []
   const periodFilterCount = Number(draftFilters.startDate !== defaults.startDate) + Number(draftFilters.endDate !== defaults.endDate)
   const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status)) + Number(Boolean(draftFilters.uf)) + Number(Boolean(draftFilters.city))
+  const isCurrentWeek = filters.startDate === defaults.startDate && filters.endDate === defaults.endDate
   const returnErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados') ?? []
   const productErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados' || source === 'catálogo de produtos') ?? []
   const reasonsErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados' || source === 'motivos de devolução') ?? []
@@ -356,6 +374,7 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
   return (
     <section className="management-dashboard">
       <div className="management-dashboard__toolbar">
+        <PeriodIndicator startDate={filters.startDate} endDate={filters.endDate} isCurrentWeek={isCurrentWeek} />
         <FilterPopover activeFilterCount={activeFilterCount} isOpen={isFilterOpen} onToggle={setIsFilterOpen} onApply={applyFilters} onClear={clearFilters}>
           <FilterSection title="Período" count={periodFilterCount} id="dashboard-filter-period">
             <div className="management-dashboard__filter-dates">
