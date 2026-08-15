@@ -4,6 +4,7 @@ import { supabase } from '../../shared/lib/supabaseClient'
 import type {
   DashboardCatalogProduct,
   DashboardFstdProcess,
+  DashboardInvoiceItem,
   DashboardFstdProduct,
   DashboardLegacyFstd,
   DashboardNote,
@@ -165,23 +166,39 @@ async function listFstdProcessesByAccessKeys(accessKeys: string[]) {
   return { data: rows, error: null }
 }
 
+async function listInvoiceItemsByAccessKeys(accessKeys: string[]) {
+  const rows: DashboardInvoiceItem[] = []
+  for (let index = 0; index < accessKeys.length; index += LEGACY_QUERY_CHUNK_SIZE) {
+    const { data, error } = await supabase
+      .from('nfd_itens')
+      .select('chave_acesso, codigo_produto, quantidade_galinha, valor_galinha, quantidade_codorna, valor_codorna')
+      .in('chave_acesso', accessKeys.slice(index, index + LEGACY_QUERY_CHUNK_SIZE))
+    if (error) return { data: null, error }
+    rows.push(...(data ?? []) as DashboardInvoiceItem[])
+  }
+  return { data: rows, error: null }
+}
+
 function emptySource() {
   return { data: [], error: null }
 }
 
 async function readOperationalSources(notes: DashboardNote[]) {
   const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
+  const invoiceItems = accessKeys.length
+    ? await listInvoiceItemsByAccessKeys(accessKeys)
+    : emptySource()
   const processes = accessKeys.length
     ? await listFstdProcessesByAccessKeys(accessKeys)
     : emptySource()
   const unknown = await supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null)
-  if (processes.error || unknown.error) return { processes, unknown, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
+  if (processes.error || unknown.error) return { processes, unknown, invoiceItems, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
 
   const processIds = [...new Set((processes.data ?? []).map((process) => process.id))]
   const products = processIds.length
     ? await supabase.from('fstd_produtos').select('id, processo_id, produto_id, codigo_produto, nome, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, status').in('processo_id', processIds)
     : emptySource()
-  if (products.error) return { processes, unknown, products, productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
+  if (products.error) return { processes, unknown, invoiceItems, products, productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
 
   const productIds = [...new Set((products.data ?? []).map((product) => product.id))]
   const catalogIds = [...new Set((products.data ?? []).map((product) => product.produto_id).filter((value): value is string => Boolean(value)))]
@@ -192,7 +209,7 @@ async function readOperationalSources(notes: DashboardNote[]) {
     catalogIds.length ? supabase.from('produtos').select('id, nome, categoria').in('id', catalogIds) : emptySource(),
   ])
 
-  return { processes, products, productReasons, reasons, catalogProducts, unknown }
+  return { processes, invoiceItems, products, productReasons, reasons, catalogProducts, unknown }
 }
 
 function sourceFailure(source: string, error: unknown): DashboardSourceError {
@@ -244,6 +261,7 @@ export async function loadManagementDashboard(filters: ManagementDashboardFilter
     current,
     previous,
     processes,
+    invoiceItems: operational.invoiceItems.data && !operational.invoiceItems.error ? operational.invoiceItems.data as DashboardInvoiceItem[] : [],
     products: operational.products.data && !operational.products.error ? operational.products.data as DashboardFstdProduct[] : [],
     productReasons: operational.productReasons.data && !operational.productReasons.error ? operational.productReasons.data as DashboardProductReason[] : [],
     reasons: operational.reasons.data && !operational.reasons.error ? operational.reasons.data as DashboardReason[] : [],

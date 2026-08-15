@@ -52,6 +52,15 @@ export type DashboardFstdProduct = {
   status: 'pendente' | 'concluido'
 }
 
+export type DashboardInvoiceItem = {
+  chave_acesso: string
+  codigo_produto: string
+  quantidade_galinha: number
+  valor_galinha: number
+  quantidade_codorna: number
+  valor_codorna: number
+}
+
 export type DashboardProductReason = {
   produto_id: string
   motivo_id: string
@@ -105,6 +114,7 @@ export type ManagementDashboardSource = {
   current: DashboardNoteCollection
   previous: DashboardNoteCollection
   processes: DashboardFstdProcess[]
+  invoiceItems: DashboardInvoiceItem[]
   products: DashboardFstdProduct[]
   productReasons: DashboardProductReason[]
   reasons: DashboardReason[]

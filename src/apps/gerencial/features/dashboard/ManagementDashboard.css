@@ -8,13 +8,17 @@
 .management-dashboard__filter-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .management-dashboard__filter-dates label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .management-dashboard__filter-dates input { width: 100%; min-height: 36px; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0 9px; color: var(--color-text-strong); font: inherit; }
+.management-dashboard__week-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.management-dashboard__week-actions button { min-height: 30px; padding: 0 9px; border: 1px solid #d9e5df; border-radius: 6px; background: #fff; color: #176c43; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.management-dashboard__week-actions button:hover, .management-dashboard__week-actions button:focus-visible { border-color: #8bc7a5; background: #f2faf5; outline: none; }
 
-.management-dashboard__summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.management-dashboard__summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
 .management-dashboard__summary-card, .management-dashboard__panel { border: 1px solid #e1e6e4; border-radius: 10px; background: #fff; box-shadow: 0 2px 7px rgb(28 46 40 / 6%); }
 .management-dashboard__summary-card { min-height: 106px; padding: 18px 21px; border-top: 3px solid #144c91; box-sizing: border-box; }
 .management-dashboard__summary-card.is-finalized { border-top-color: #087337; }
 .management-dashboard__summary-card.is-pending { border-top-color: #e72121; }
 .management-dashboard__summary-card.is-unknown { border-top-color: #6e7480; }
+.management-dashboard__summary-card.is-days { border-top-color: #e66c00; }
 .management-dashboard__summary-title { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; }
 .management-dashboard__summary-title svg { width: 20px; height: 20px; flex: 0 0 20px; }
 .management-dashboard__summary-title span { font-size: 16px; font-weight: 700; line-height: 1.2; }
@@ -22,6 +26,7 @@
 .management-dashboard__summary-card.is-finalized .management-dashboard__summary-title { color: #087337; }
 .management-dashboard__summary-card.is-pending .management-dashboard__summary-title { color: #e72121; }
 .management-dashboard__summary-card.is-unknown .management-dashboard__summary-title { color: #6e7480; }
+.management-dashboard__summary-card.is-days .management-dashboard__summary-title { color: #c95e00; }
 .management-dashboard__summary-card > div:not(.management-dashboard__summary-title) { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .management-dashboard__summary-card strong { font-size: clamp(26px, 2vw, 34px); line-height: 1; letter-spacing: -.035em; }
 .management-dashboard__summary-card small { font-size: 13px; font-weight: 750; }
@@ -33,19 +38,16 @@
 
 .management-dashboard__financial-summary { display: flex; min-height: 380px; flex-direction: column; }
 .management-dashboard__financial-summary h2 { font-size: 18px; font-weight: 750; }
-.management-dashboard__money-total { display: flex; align-items: center; gap: 14px; margin: 27px 0 22px; }
-.management-dashboard__money-total > span { display: grid; width: 55px; height: 55px; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #047333, #004a22); color: #fff; font-size: 29px; font-weight: 500; }
-.management-dashboard__money-total small, .management-dashboard__financial-pairs small, .management-dashboard__financial-footer small, .management-dashboard__species-topline small, .management-dashboard__days-chip small { display: block; color: #1f2940; font-size: 11px; font-weight: 650; }
-.management-dashboard__money-total strong { display: block; margin-top: 6px; font-size: clamp(23px, 1.65vw, 27px); line-height: 1; letter-spacing: -.035em; white-space: nowrap; }
-.management-dashboard__financial-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.management-dashboard__financial-pairs > div { min-height: 78px; padding: 14px 12px; border: 1px solid #e1e6e4; border-radius: 8px; box-sizing: border-box; }
-.management-dashboard__financial-pairs strong, .management-dashboard__financial-footer strong { display: block; margin-top: 9px; font-size: 18px; }
-.management-dashboard__financial-footer { display: grid; grid-template-columns: 1.18fr .82fr; gap: 14px; margin-top: 18px; padding: 15px 12px; border-radius: 7px; background: linear-gradient(110deg, #f2f6f4, #f9fbfa); }
-.management-dashboard__financial-footer > div + div { padding-left: 13px; border-left: 1px solid #d6dedb; }
-.management-dashboard__financial-footer .is-highlight { color: #e66c00; }
-.management-dashboard__financial-summary .management-dashboard__money-total small,
-.management-dashboard__financial-summary .management-dashboard__financial-pairs small,
-.management-dashboard__financial-summary .management-dashboard__financial-footer small { font-size: 13px; font-weight: 600; line-height: 1.28; }
+.management-dashboard__money-total { display: grid; gap: 8px; margin: 26px 0 20px; padding-bottom: 20px; border-bottom: 1px solid #dfe7e3; }
+.management-dashboard__money-total small, .management-dashboard__financial-species-card small, .management-dashboard__species-topline small, .management-dashboard__days-chip small { display: block; color: #1f2940; font-size: 11px; font-weight: 650; }
+.management-dashboard__money-total strong { color: #101828; font-size: clamp(24px, 1.9vw, 30px); line-height: 1; letter-spacing: -.035em; white-space: nowrap; }
+.management-dashboard__financial-species { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.management-dashboard__financial-species-card { min-width: 0; padding: 15px 13px; border: 1px solid #e1e6e4; border-radius: 8px; }
+.management-dashboard__financial-species-card h3 { margin: 0 0 15px; color: #087337; font-size: 15px; line-height: 1.2; }
+.management-dashboard__financial-species-card > div { display: grid; gap: 6px; }
+.management-dashboard__financial-species-card > div + div { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e5ebe8; }
+.management-dashboard__financial-species-card small { font-size: 11px; font-weight: 650; }
+.management-dashboard__financial-species-card strong { color: #101828; font-size: 16px; line-height: 1.1; letter-spacing: -.02em; white-space: nowrap; }
 
 .management-dashboard__species-panel { position: relative; min-height: 380px; padding-bottom: 20px; }
 .management-dashboard__species-topline { display: grid; grid-template-columns: 1fr 1fr; gap: 23px; }
@@ -100,6 +102,12 @@
 .management-dashboard__table-scroll { margin-top: 20px; overflow-x: clip; }
 .management-dashboard__table-panel table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
 .management-dashboard__table-panel th { padding: 0 6px 11px; color: #5e6977; font-size: 10px; font-weight: 750; line-height: 1.25; text-align: left; white-space: normal; }
+.management-dashboard__sort-header { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 1px 2px; border: 0; border-radius: 3px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; line-height: inherit; text-align: inherit; }
+.management-dashboard__sort-header:hover { background: #f4f8f6; color: #344054; }
+.management-dashboard__sort-header:focus-visible { outline: 2px solid #087337; outline-offset: 2px; }
+.management-dashboard__sort-header svg { width: 13px; height: 13px; flex: 0 0 13px; stroke: #98a2b3; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.4; }
+.management-dashboard__sort-header.is-active { color: #087337; }
+.management-dashboard__sort-header.is-active svg { stroke: currentColor; stroke-width: 1.8; }
 .management-dashboard__table-panel td { padding: 10px 6px; border-top: 1px solid #edf0ef; color: #131b2e; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; vertical-align: top; white-space: normal; }
 .management-dashboard__table-panel.is-products-panel th:nth-child(1) { width: 27%; }
 .management-dashboard__table-panel.is-products-panel th:nth-child(2) { width: 18%; }
@@ -114,13 +122,15 @@
 
 .management-dashboard__reasons-panel ol { display: grid; gap: 11px; margin: 21px 0 0; padding: 0; list-style: none; }
 .management-dashboard__reasons-panel > h2 { font-size: 18px; }
-.management-dashboard__reasons-panel li { display: grid; grid-template-columns: 24px minmax(118px, 1.35fr) minmax(60px, .72fr) minmax(105px, auto) auto; align-items: center; gap: 9px; min-width: 0; font-size: 13px; }
+.management-dashboard__reasons-panel li { display: grid; grid-template-columns: 24px minmax(100px, 1.15fr) minmax(52px, .62fr) minmax(145px, auto) auto; align-items: center; gap: 9px; min-width: 0; font-size: 13px; }
 .management-dashboard__reason-rank { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 4px; background: #087337; color: #fff; font-size: 12px; font-weight: 800; }
 .management-dashboard__reason-name { min-width: 0; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
 .management-dashboard__reason-bar { height: 7px; min-width: 0; overflow: hidden; border-radius: 99px; background: #e0e5e3; }
 .management-dashboard__reason-bar i { display: block; height: 100%; border-radius: inherit; background: #087337; }
-.management-dashboard__reasons-panel li > strong { font-size: 13px; white-space: nowrap; }
-.management-dashboard__reasons-panel li > strong small { color: #1d2939; font-size: 11px; }
+.management-dashboard__reason-totals { display: grid; gap: 3px; min-width: 0; white-space: nowrap; }
+.management-dashboard__reason-totals small { color: #667085; font-size: 10px; font-weight: 700; }
+.management-dashboard__reason-totals strong { color: #172033; font-size: 12px; }
+.management-dashboard__reason-totals em { color: #1d2939; font-size: 10px; font-style: normal; }
 .management-dashboard__reasons-panel .management-dashboard__evolution { font-size: 12px; }
 .management-dashboard__see-all { display: block; margin-top: auto; padding-top: 19px; color: #087337; font-size: 12px; font-weight: 800; }
 .management-dashboard__see-all.is-action { border: 0; background: transparent; cursor: pointer; font: inherit; text-align: left; }
@@ -147,6 +157,10 @@
   .management-dashboard__skeleton-block.is-10 { grid-column: span 12; }
 }
 
+@media (max-width: 900px) {
+  .management-dashboard__financial-species { grid-template-columns: 1fr; }
+}
+
 .management-dashboard__modal-root { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgb(15 23 42 / 42%); }
 .management-dashboard__products-modal { display: flex; width: min(80vw, 1220px); height: min(80vh, 820px); max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); flex-direction: column; overflow: hidden; border: 1px solid #dfe7e3; border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgb(15 23 42 / 24%); }
 .management-dashboard__products-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 26px 12px; }
@@ -161,7 +175,12 @@
 .management-dashboard__products-modal-table-scroll { overflow-x: auto; }
 .management-dashboard__products-modal-table { width: 100%; table-layout: fixed; border-collapse: collapse; color: #172033; font-size: 12px; }
 .management-dashboard__products-modal-table th { position: sticky; top: 0; z-index: 1; background: #fff; color: #344054; font-size: 11px; font-weight: 800; text-align: left; }
+.management-dashboard__products-modal-table .management-dashboard__sort-header { font-size: inherit; }
 .management-dashboard__products-modal-table th, .management-dashboard__products-modal-table td { padding: 10px 8px; border-bottom: 1px solid #e9eeec; vertical-align: top; overflow-wrap: anywhere; }
+.management-dashboard__products-modal-table tfoot td { padding-top: 12px; padding-bottom: 12px; border-top: 1px solid #cfdcd5; border-bottom: 0; background: #f7faf8; vertical-align: middle; }
+.management-dashboard__products-modal-table tfoot small, .management-dashboard__products-modal-table tfoot strong { display: block; }
+.management-dashboard__products-modal-table tfoot small { margin-bottom: 4px; color: #667085; font-size: 10px; font-weight: 700; }
+.management-dashboard__products-modal-table tfoot strong, .management-dashboard__products-total-label { color: #0b552c; font-size: 12px; font-weight: 800; }
 .management-dashboard__products-modal-table th:nth-child(1), .management-dashboard__products-modal-table td:nth-child(1) { width: 25%; }
 .management-dashboard__products-modal-table th:nth-child(2), .management-dashboard__products-modal-table td:nth-child(2) { width: 20%; }
 .management-dashboard__products-modal-table th:nth-child(3), .management-dashboard__products-modal-table td:nth-child(3) { width: 15%; }
@@ -171,11 +190,11 @@
 .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table th:nth-child(2), .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table td:nth-child(2) { width: 25%; }
 .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table th:nth-child(3), .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table td:nth-child(3), .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table th:nth-child(4), .management-dashboard__products-modal.is-stores-modal .management-dashboard__products-modal-table td:nth-child(4) { width: 15%; white-space: nowrap; }
 .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(1), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(1) { width: 5%; }
-.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(2), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(2) { width: 29%; }
-.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(3), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(3) { width: 25%; }
-.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(4), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(4) { width: 15%; white-space: nowrap; }
-.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(5), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(5) { width: 13%; white-space: nowrap; }
-.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(6), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(6) { width: 13%; white-space: nowrap; }
+.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(2), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(2) { width: 22%; }
+.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(3), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(3) { width: 16%; }
+.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(4), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(4), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(5), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(5) { width: 15%; white-space: nowrap; }
+.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(6), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(6) { width: 12%; white-space: nowrap; }
+.management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table th:nth-child(7), .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td:nth-child(7) { width: 15%; white-space: nowrap; }
 .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td.is-rank { padding-right: 2px; }
 .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td.is-rank .management-dashboard__reason-rank { display: inline-grid; }
 .management-dashboard__products-modal.is-reasons-modal .management-dashboard__products-modal-table td.is-reason-name { font-weight: 750; }
@@ -238,9 +257,8 @@
   .management-dashboard__financial-summary .management-dashboard__money-total small,
   .management-dashboard__financial-summary .management-dashboard__financial-pairs small,
   .management-dashboard__financial-summary .management-dashboard__financial-footer small { font-size: 12px; }
-  .management-dashboard__financial-pairs { grid-template-columns: 1fr; }
-  .management-dashboard__financial-footer { grid-template-columns: 1fr; }
-  .management-dashboard__financial-footer > div + div { padding: 12px 0 0; border-top: 1px solid #d6dedb; border-left: 0; }
+  .management-dashboard__financial-species { grid-template-columns: 1fr; }
+  .management-dashboard__financial-species-card { padding: 14px; }
   .management-dashboard__species-topline { gap: 12px; }
   .management-dashboard__species-topline > div + div { padding-left: 12px; }
   .management-dashboard__species-topline strong { font-size: 18px; }

@@ -21,6 +21,10 @@ function createSource(): ManagementDashboardSource {
     },
     previous: { ufs: [], cities: [], notes: [] },
     processes: [{ id: 'process-1', nfd_chave_acesso: 'modern-key', status: 'concluida', finalizada_em: '2026-08-08T10:00:00Z', created_at: '2026-08-05T10:00:00Z', is_avulsa: false }],
+    invoiceItems: [
+      { chave_acesso: 'legacy-key', codigo_produto: 'LEG', quantidade_galinha: 100, valor_galinha: 250, quantidade_codorna: 20, valor_codorna: 50 },
+      { chave_acesso: 'modern-key', codigo_produto: 'ABC', quantidade_galinha: 80, valor_galinha: 200, quantidade_codorna: 30, valor_codorna: 50 },
+    ],
     products: [{ id: 'product-1', processo_id: 'process-1', produto_id: 'catalog-1', codigo_produto: 'ABC', nome: 'Produto novo', quantidade_faturada_galinha: 80, quantidade_faturada_codorna: 0, quantidade_retorno: 16, motivo_id: 'reason-1', status: 'concluido' }],
     productReasons: [{ produto_id: 'product-1', motivo_id: 'reason-1', quantidade: 16 }],
     reasons: [{ id: 'reason-1', nome: 'Avaria na entrega' }],
@@ -37,7 +41,11 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.current.totalNfds).toBe(3)
     expect(dashboard.current.status).toEqual({ Finalizada: 2, Pendente: 1, Desconhecida: 0 })
     expect(dashboard.current.financialTotal).toBe(700)
+    expect(dashboard.current.financial).toEqual({ galinhaBilled: 600, codornaBilled: 100, galinhaReturn: 65, codornaReturn: 5 })
     expect(dashboard.current.returns).toMatchObject({ galinha: 26, codorna: 2, total: 28, count: 2 })
+    expect(dashboard.current.modernGalinhaBilled).toBe(80)
+    expect(dashboard.current.modernCodornaBilled).toBe(0)
+    expect(dashboard.current.modernReturns).toMatchObject({ galinha: 16, codorna: 0, total: 16, count: 1 })
     expect(dashboard.current.averageDays).toBe(2.5)
   })
 
@@ -45,6 +53,17 @@ describe('cálculos da Dashboard Gerencial', () => {
     const dashboard = calculateManagementDashboard(createSource())
 
     expect(dashboard.products).toEqual([expect.objectContaining({ name: 'Produto novo', category: 'Galinha', returned: 16, returnPercentage: 20, mainReason: 'Avaria na entrega' })])
+  })
+
+  it('expõe o faturado e o retorno de cada motivo sem duplicar o faturado do produto', () => {
+    const dashboard = calculateManagementDashboard(createSource())
+
+    expect(dashboard.reasons).toEqual([expect.objectContaining({
+      name: 'Avaria na entrega',
+      billed: 200,
+      returned: 28,
+      percentage: 100,
+    })])
   })
 
   it('ordena lojas pelo menor percentual de retorno e conta NFDs devolvidas', () => {

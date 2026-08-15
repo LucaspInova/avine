@@ -47,9 +47,9 @@ const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
+  { id: 'notas', label: 'Notas', icon: 'notes' },
   { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
-  { id: 'notas', label: 'Notas', icon: 'notes' },
 ]
 
 const supportWhatsappMessage = 'Olá! Preciso de suporte na plataforma Avine.'
