@@ -11,6 +11,16 @@ As duas funcoes aceitam `due_date=YYYY-MM-DD`. A funcao Sheets tambem aceita
 `start_date` e `end_date`, com limite de 31 dias por chamada. A janela movel
 permite recuperar dados que entram atrasados na planilha.
 
+Para executar uma carga manual por intervalo via Sheets, use:
+
+```powershell
+python scripts\sync_devolucoes_avine_sheets.py 2026-08-01 2026-08-18
+```
+
+O script divide automaticamente intervalos maiores que 31 dias em chamadas
+sequenciais. A URL da função é derivada de `SUPABASE_PROJECT_ID`; o mesmo
+`CRON_SECRET` das funções deve estar disponível no `.env` ou no ambiente.
+
 ## Mapeamento da aba `ITENS DA DEVOLUCAO`
 
 | Coluna Sheets | `public.nfd_itens` | Tratamento |

@@ -3,14 +3,15 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database.types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim()
+const supabaseUrl = projectId ? `https://${projectId}.supabase.co` : ''
 const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 export const supabaseConfigError =
   !supabaseUrl || !supabaseKey
-    ? 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.'
+    ? 'Configure VITE_SUPABASE_PROJECT_ID e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.'
     : null
 
 const AUTH_PERSISTENCE_KEY = 'avine-auth-persistence'
