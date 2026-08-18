@@ -11,5 +11,6 @@ export function useManagementDashboard(filters: ManagementDashboardFilters) {
   return useQuery({
     queryKey: managementDashboardKeys.detail(filters),
     queryFn: ({ signal }) => loadManagementDashboard(filters, signal),
+    staleTime: 60_000,
   })
 }

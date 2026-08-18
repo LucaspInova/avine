@@ -20,6 +20,7 @@ import type {
 } from './types'
 
 const LEGACY_QUERY_CHUNK_SIZE = 45
+const DASHBOARD_QUERY_CONCURRENCY = 4
 const DASHBOARD_NFD_SELECT = 'chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total'
 
 function parseDate(value: string) {
@@ -46,7 +47,7 @@ export function getPreviousPeriod(filters: ManagementDashboardFilters): Manageme
   }
 }
 
-async function listAccessibleNfdNotes(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate' | 'uf' | 'city'>) {
+async function listAccessibleNfdNotes(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate' | 'uf' | 'city'>, signal?: AbortSignal) {
   return fetchAllNfdNotas(DASHBOARD_NFD_SELECT, (query) => {
     if (filters.startDate && filters.endDate) {
       query = query.or(`and(data_emissao.gte.${filters.startDate},data_emissao.lte.${filters.endDate}),and(data_emissao.is.null,data_referencia.gte.${filters.startDate},data_referencia.lte.${filters.endDate})`)
@@ -58,7 +59,20 @@ async function listAccessibleNfdNotes(filters: Pick<ManagementDashboardFilters, 
     if (filters.uf) query = query.ilike('uf', filters.uf)
     if (filters.city) query = query.ilike('cidade', filters.city)
     return query.order('data_referencia', { ascending: false }).order('chave_acesso', { ascending: true })
-  })
+  }, signal)
+}
+
+async function mapWithConcurrency<T, R>(values: T[], callback: (value: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let nextIndex = 0
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex++
+      results[index] = await callback(values[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(DASHBOARD_QUERY_CONCURRENCY, values.length) }, worker))
+  return results
 }
 
 function noteDate(note: Pick<DashboardNote, 'data_emissao' | 'data_referencia'>) {
@@ -132,9 +146,9 @@ async function listLegacyFstd(notes: DashboardNote[]): Promise<DashboardLegacyFs
   })
 
   const pairs = [...uniquePairs.values()]
-  const rows: DashboardLegacyFstd[] = []
-  for (let index = 0; index < pairs.length; index += LEGACY_QUERY_CHUNK_SIZE) {
-    const chunk = pairs.slice(index, index + LEGACY_QUERY_CHUNK_SIZE)
+  const chunks = Array.from({ length: Math.ceil(pairs.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
+    pairs.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
+  const pages = await mapWithConcurrency(chunks, async (chunk) => {
     const expression = chunk.map(({ storeCode, noteNumber }) => (
       `and(codigo_loja.eq.${escapePostgrestValue(storeCode)},numero_nfd.eq.${escapePostgrestValue(noteNumber)})`
     )).join(',')
@@ -144,40 +158,40 @@ async function listLegacyFstd(notes: DashboardNote[]): Promise<DashboardLegacyFs
       .or(expression)
       .order('legado_id', { ascending: true })
     if (error) throw error
-    rows.push(...(data ?? []) as DashboardLegacyFstd[])
-  }
-
-  return rows
+    return (data ?? []) as DashboardLegacyFstd[]
+  })
+  return pages.flat()
 }
 
 async function listFstdProcessesByAccessKeys(accessKeys: string[]) {
-  const rows: DashboardFstdProcess[] = []
-
-  for (let index = 0; index < accessKeys.length; index += LEGACY_QUERY_CHUNK_SIZE) {
-    const chunk = accessKeys.slice(index, index + LEGACY_QUERY_CHUNK_SIZE)
+  const chunks = Array.from({ length: Math.ceil(accessKeys.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
+    accessKeys.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
+  const pages = await mapWithConcurrency(chunks, async (chunk) => {
     const { data, error } = await supabase
       .from('fstd_processos')
       .select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa')
       .in('nfd_chave_acesso', chunk)
 
-    if (error) return { data: null, error }
-    rows.push(...(data ?? []) as DashboardFstdProcess[])
-  }
-
-  return { data: rows, error: null }
+    if (error) throw error
+    return (data ?? []) as DashboardFstdProcess[]
+  }).catch((error) => ({ error }))
+  if (!Array.isArray(pages)) return { data: null, error: pages.error }
+  return { data: pages.flat(), error: null }
 }
 
 async function listInvoiceItemsByAccessKeys(accessKeys: string[]) {
-  const rows: DashboardInvoiceItem[] = []
-  for (let index = 0; index < accessKeys.length; index += LEGACY_QUERY_CHUNK_SIZE) {
+  const chunks = Array.from({ length: Math.ceil(accessKeys.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
+    accessKeys.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
+  const pages = await mapWithConcurrency(chunks, async (chunk) => {
     const { data, error } = await supabase
       .from('nfd_itens')
       .select('chave_acesso, codigo_produto, quantidade_galinha, valor_galinha, quantidade_codorna, valor_codorna')
-      .in('chave_acesso', accessKeys.slice(index, index + LEGACY_QUERY_CHUNK_SIZE))
-    if (error) return { data: null, error }
-    rows.push(...(data ?? []) as DashboardInvoiceItem[])
-  }
-  return { data: rows, error: null }
+      .in('chave_acesso', chunk)
+    if (error) throw error
+    return (data ?? []) as DashboardInvoiceItem[]
+  }).catch((error) => ({ error }))
+  if (!Array.isArray(pages)) return { data: null, error: pages.error }
+  return { data: pages.flat(), error: null }
 }
 
 async function listFstdReports(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate'>) {
@@ -195,14 +209,12 @@ function emptySource() {
 
 async function readOperationalSources(notes: DashboardNote[], reportFilters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate'>) {
   const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
-  const invoiceItems = accessKeys.length
-    ? await listInvoiceItemsByAccessKeys(accessKeys)
-    : emptySource()
-  const processes = accessKeys.length
-    ? await listFstdProcessesByAccessKeys(accessKeys)
-    : emptySource()
-  const unknown = await supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null)
-  const reports = await listFstdReports(reportFilters)
+  const [invoiceItems, processes, unknown, reports] = await Promise.all([
+    accessKeys.length ? listInvoiceItemsByAccessKeys(accessKeys) : emptySource(),
+    accessKeys.length ? listFstdProcessesByAccessKeys(accessKeys) : emptySource(),
+    supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null),
+    listFstdReports(reportFilters),
+  ])
   if (processes.error || unknown.error) return { processes, unknown, invoiceItems, reports, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
 
   const processIds = [...new Set((processes.data ?? []).map((process) => process.id))]
@@ -227,11 +239,11 @@ function sourceFailure(source: string, error: unknown): DashboardSourceError {
   return { source, message: toAppError(error).message }
 }
 
-export async function loadManagementDashboard(filters: ManagementDashboardFilters, _signal?: AbortSignal): Promise<ManagementDashboardSource> {
+export async function loadManagementDashboard(filters: ManagementDashboardFilters, signal?: AbortSignal): Promise<ManagementDashboardSource> {
   const sourceErrors: DashboardSourceError[] = []
   const previousFilters = getPreviousPeriod(filters)
   const notesQueryFilters = { ...filters, startDate: previousFilters.startDate, endDate: filters.endDate }
-  const allNotes = await listAccessibleNfdNotes(notesQueryFilters)
+  const allNotes = await listAccessibleNfdNotes(notesQueryFilters, signal)
   const allNotesRows = allNotes as DashboardNote[]
   const currentBaseNotes = filterNfdNotes(allNotesRows, filters)
   const previousBaseNotes = filterNfdNotes(allNotesRows, previousFilters)
