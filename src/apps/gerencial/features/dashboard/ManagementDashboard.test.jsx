@@ -38,7 +38,7 @@ describe('modal completo de lojas', () => {
 
     render(
       <ManagementListModal
-        title="Lojas com menor índice de retorno"
+        title="Lojas e índice de retorno"
         modalId="stores-modal-title"
         itemLabel="lojas"
         searchPlaceholder="Buscar loja..."
@@ -66,7 +66,7 @@ describe('modal completo de lojas', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar loja' }), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
     expect(screen.getByText('21–21 de 21 lojas')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar lojas com menor índice de retorno' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar lojas e índice de retorno' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
@@ -75,7 +75,7 @@ describe('ordenação das tabelas do dashboard', () => {
   it('alterna entre ordem crescente e decrescente sem tratar a coluna como filtro', () => {
     render(
       <ManagementListModal
-        title="Lojas com menor índice de retorno"
+        title="Lojas e índice de retorno"
         modalId="stores-sort-modal-title"
         itemLabel="lojas"
         searchPlaceholder="Buscar loja..."

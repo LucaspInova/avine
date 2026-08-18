@@ -15,6 +15,13 @@ const DAY = 86400000
 
 type ReturnTotals = { galinha: number; codorna: number; total: number; unresolved: number; count: number }
 type FinancialSpeciesTotals = { galinhaBilled: number; codornaBilled: number; galinhaReturn: number; codornaReturn: number }
+type FinalizedDashboardMetrics = {
+  financialTotal: number
+  financial: FinancialSpeciesTotals
+  galinhaBilled: number
+  codornaBilled: number
+  returns: ReturnTotals
+}
 
 function numberValue(value: number | null | undefined) {
   return Number(value ?? 0)
@@ -83,6 +90,7 @@ function createDataIndex(source: ManagementDashboardSource) {
     legacyByNote,
     reasonNameById: new Map(source.reasons.map((reason) => [reason.id, reason.nome])),
     catalogById: new Map(source.catalogProducts.map((product) => [product.id, product])),
+    sourceReports: source.reports ?? [],
   }
 }
 
@@ -145,6 +153,13 @@ function buildPeriodSummary(notes: DashboardNote[], index: ReturnType<typeof cre
   let codornaBilled = 0
   let modernGalinhaBilled = 0
   let modernCodornaBilled = 0
+  const finalized: FinalizedDashboardMetrics = {
+    financialTotal: 0,
+    financial: { galinhaBilled: 0, codornaBilled: 0, galinhaReturn: 0, codornaReturn: 0 },
+    galinhaBilled: 0,
+    codornaBilled: 0,
+    returns: { galinha: 0, codorna: 0, total: 0, unresolved: 0, count: 0 },
+  }
 
   notes.forEach((note) => {
     status[note.status] += 1
@@ -177,6 +192,20 @@ function buildPeriodSummary(notes: DashboardNote[], index: ReturnType<typeof cre
     if (galinhaQuantity > 0) financial.galinhaReturn += noteFinancial.galinha * (noteReturn.galinha / galinhaQuantity)
     if (codornaQuantity > 0) financial.codornaReturn += noteFinancial.codorna * (noteReturn.codorna / codornaQuantity)
     if (noteReturn.duration !== null) durations.push(noteReturn.duration)
+    if (note.status === 'Finalizada') {
+      finalized.financialTotal += numberValue(note.valor_total)
+      finalized.financial.galinhaBilled += noteFinancial.galinha
+      finalized.financial.codornaBilled += noteFinancial.codorna
+      finalized.galinhaBilled += galinhaQuantity
+      finalized.codornaBilled += codornaQuantity
+      finalized.returns.galinha += noteReturn.galinha
+      finalized.returns.codorna += noteReturn.codorna
+      finalized.returns.total += noteReturn.total
+      finalized.returns.unresolved += noteReturn.unresolved
+      finalized.returns.count += noteReturn.count
+      if (galinhaQuantity > 0) finalized.financial.galinhaReturn += noteFinancial.galinha * (noteReturn.galinha / galinhaQuantity)
+      if (codornaQuantity > 0) finalized.financial.codornaReturn += noteFinancial.codorna * (noteReturn.codorna / codornaQuantity)
+    }
   })
 
   return {
@@ -191,6 +220,7 @@ function buildPeriodSummary(notes: DashboardNote[], index: ReturnType<typeof cre
     modernCodornaBilled,
     returns,
     modernReturns,
+    finalized,
     averageDays: safeAverage(durations),
   }
 }
@@ -282,8 +312,27 @@ function buildReasons(notes: DashboardNote[], index: ReturnType<typeof createDat
 }
 
 function buildStores(notes: DashboardNote[], index: ReturnType<typeof createDataIndex>): DashboardStore[] {
+  const reports = index.sourceReports
+  if (reports.length > 0) {
+    const allowedNames = new Set(notes.filter((note) => note.status === 'Finalizada').map((note) => note.nome_abreviado?.trim() || note.estabelecimento?.trim()).filter(Boolean))
+    const stores = new Map<string, Omit<DashboardStore, 'returnPercentage'>>()
+    reports.forEach((report) => {
+      const name = report.nome_abreviado?.trim()
+      if (!name || !allowedNames.has(name)) return
+      const row = stores.get(name) ?? { name, billed: 0, returned: 0, returns: 0 }
+      row.billed += numberValue(report.galinha_nfd) + numberValue(report.codorna_nfd)
+      const returned = numberValue(report.galinha_retorno) + numberValue(report.codorna_retorno)
+      row.returned += returned
+      row.returns += returned > 0 ? 1 : 0
+      stores.set(name, row)
+    })
+    return [...stores.values()]
+      .filter((store) => store.billed > 0)
+      .map((store) => ({ ...store, returnPercentage: (store.returned / store.billed) * 100 }))
+      .sort((left, right) => right.returnPercentage - left.returnPercentage || right.billed - left.billed)
+  }
   const stores = new Map<string, Omit<DashboardStore, 'returnPercentage'>>()
-  notes.forEach((note) => {
+  notes.filter((note) => note.status === 'Finalizada').forEach((note) => {
     const key = String(note.codigo_cliente ?? note.nome_abreviado ?? note.estabelecimento ?? 'sem-loja')
     const row = stores.get(key) ?? {
       name: note.nome_abreviado?.trim() || note.estabelecimento?.trim() || `Loja ${key}`,
@@ -301,7 +350,7 @@ function buildStores(notes: DashboardNote[], index: ReturnType<typeof createData
   return [...stores.values()]
     .filter((store) => store.billed > 0)
     .map((store) => ({ ...store, returnPercentage: (store.returned / store.billed) * 100 }))
-    .sort((left, right) => left.returnPercentage - right.returnPercentage || right.billed - left.billed)
+    .sort((left, right) => right.returnPercentage - left.returnPercentage || right.billed - left.billed)
 }
 
 function buildFinancialSeries(notes: DashboardNote[]) {
@@ -348,12 +397,12 @@ export function calculateManagementDashboard(source: ManagementDashboardSource) 
     allReasons,
     stores: allStores.slice(0, 6),
     allStores,
-    financialSeries: buildFinancialSeries(source.current.notes),
+    financialSeries: buildFinancialSeries(source.current.notes.filter((note) => note.status === 'Finalizada')),
     evolutions: {
-      galinhaBilled: percentageChange(current.galinhaBilled, previous.galinhaBilled),
-      codornaBilled: percentageChange(current.codornaBilled, previous.codornaBilled),
-      galinhaReturn: percentageChange(current.returns.galinha, previous.returns.galinha),
-      codornaReturn: percentageChange(current.returns.codorna, previous.returns.codorna),
+      galinhaBilled: percentageChange(current.finalized.galinhaBilled, previous.finalized.galinhaBilled),
+      codornaBilled: percentageChange(current.finalized.codornaBilled, previous.finalized.codornaBilled),
+      galinhaReturn: percentageChange(current.finalized.returns.galinha, previous.finalized.returns.galinha),
+      codornaReturn: percentageChange(current.finalized.returns.codorna, previous.finalized.returns.codorna),
     },
     returnsAvailable,
     productsAvailable,

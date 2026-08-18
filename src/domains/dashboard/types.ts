@@ -78,6 +78,14 @@ export type DashboardCatalogProduct = {
   categoria: string | null
 }
 
+export type DashboardFstdReport = {
+  nome_abreviado: string | null
+  galinha_nfd: number | null
+  codorna_nfd: number | null
+  galinha_retorno: number | null
+  codorna_retorno: number | null
+}
+
 export type DashboardStore = {
   name: string
   billed: number
@@ -119,6 +127,7 @@ export type ManagementDashboardSource = {
   productReasons: DashboardProductReason[]
   reasons: DashboardReason[]
   catalogProducts: DashboardCatalogProduct[]
+  reports?: DashboardFstdReport[]
   legacy: DashboardLegacyFstd[]
   sourceErrors: DashboardSourceError[]
 }
