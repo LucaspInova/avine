@@ -21,10 +21,15 @@ function createSource(): ManagementDashboardSource {
     },
     previous: { ufs: [], cities: [], notes: [] },
     processes: [{ id: 'process-1', nfd_chave_acesso: 'modern-key', status: 'concluida', finalizada_em: '2026-08-08T10:00:00Z', created_at: '2026-08-05T10:00:00Z', is_avulsa: false }],
+    invoiceItems: [
+      { chave_acesso: 'legacy-key', codigo_produto: 'LEG', quantidade_galinha: 100, valor_galinha: 250, quantidade_codorna: 20, valor_codorna: 50 },
+      { chave_acesso: 'modern-key', codigo_produto: 'ABC', quantidade_galinha: 80, valor_galinha: 200, quantidade_codorna: 30, valor_codorna: 50 },
+    ],
     products: [{ id: 'product-1', processo_id: 'process-1', produto_id: 'catalog-1', codigo_produto: 'ABC', nome: 'Produto novo', quantidade_faturada_galinha: 80, quantidade_faturada_codorna: 0, quantidade_retorno: 16, motivo_id: 'reason-1', status: 'concluido' }],
     productReasons: [{ produto_id: 'product-1', motivo_id: 'reason-1', quantidade: 16 }],
     reasons: [{ id: 'reason-1', nome: 'Avaria na entrega' }],
     catalogProducts: [{ id: 'catalog-1', nome: 'Produto novo', categoria: 'Galinha' }],
+    reports: [],
     legacy: [{ legado_id: 1, codigo_loja: '1', numero_nfd: '10', data_preenchimento: '2026-08-06T10:00:00Z', motivo: 'Avaria na entrega', qtd_total_galinha: 100, qtd_retorno_galinha: 10, qtd_total_codorna: 20, qtd_retorno_codorna: 2 }],
     sourceErrors: [],
   }
@@ -37,7 +42,14 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.current.totalNfds).toBe(3)
     expect(dashboard.current.status).toEqual({ Finalizada: 2, Pendente: 1, Desconhecida: 0 })
     expect(dashboard.current.financialTotal).toBe(700)
+    expect(dashboard.current.financial).toEqual({ galinhaBilled: 600, codornaBilled: 100, galinhaReturn: 65, codornaReturn: 5 })
     expect(dashboard.current.returns).toMatchObject({ galinha: 26, codorna: 2, total: 28, count: 2 })
+    expect(dashboard.current.modernGalinhaBilled).toBe(80)
+    expect(dashboard.current.modernCodornaBilled).toBe(0)
+    expect(dashboard.current.finalized.galinhaBilled).toBe(180)
+    expect(dashboard.current.finalized.codornaBilled).toBe(50)
+    expect(dashboard.current.finalized.returns).toMatchObject({ galinha: 26, codorna: 2, total: 28, count: 2 })
+    expect(dashboard.current.modernReturns).toMatchObject({ galinha: 16, codorna: 0, total: 16, count: 1 })
     expect(dashboard.current.averageDays).toBe(2.5)
   })
 
@@ -47,13 +59,23 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.products).toEqual([expect.objectContaining({ name: 'Produto novo', category: 'Galinha', returned: 16, returnPercentage: 20, mainReason: 'Avaria na entrega' })])
   })
 
-  it('ordena lojas pelo menor percentual de retorno e conta NFDs devolvidas', () => {
+  it('expõe o faturado e o retorno de cada motivo sem duplicar o faturado do produto', () => {
+    const dashboard = calculateManagementDashboard(createSource())
+
+    expect(dashboard.reasons).toEqual([expect.objectContaining({
+      name: 'Avaria na entrega',
+      billed: 200,
+      returned: 28,
+      percentage: 100,
+    })])
+  })
+
+  it('ordena lojas pelo maior percentual de retorno e conta NFDs devolvidas', () => {
     const dashboard = calculateManagementDashboard(createSource())
 
     expect(dashboard.stores.map((store) => ({ name: store.name, returns: store.returns }))).toEqual([
-      { name: 'Loja Pendente', returns: 0 },
-      { name: 'Loja Legado', returns: 1 },
       { name: 'Loja Nova', returns: 1 },
+      { name: 'Loja Legado', returns: 1 },
     ])
   })
 
@@ -69,7 +91,32 @@ describe('cálculos da Dashboard Gerencial', () => {
 
     const dashboard = calculateManagementDashboard(source)
 
-    expect(dashboard.stores).toHaveLength(6)
-    expect(dashboard.allStores).toHaveLength(8)
+    expect(dashboard.stores).toHaveLength(2)
+    expect(dashboard.allStores).toHaveLength(2)
+  })
+
+  it('não cria lojas quando não há NFD finalizada', () => {
+    const source = createSource()
+    source.current.notes = source.current.notes.map((note) => ({ ...note, status: 'Pendente' as const }))
+
+    const dashboard = calculateManagementDashboard(source)
+
+    expect(dashboard.stores).toEqual([])
+    expect(dashboard.allStores).toEqual([])
+  })
+
+  it('usa o retorno consolidado do relatório FSTD para as lojas', () => {
+    const source = createSource()
+    source.reports = [{
+      nome_abreviado: 'Loja Nova',
+      galinha_nfd: 80,
+      codorna_nfd: 30,
+      galinha_retorno: 16,
+      codorna_retorno: 0,
+    }]
+
+    const dashboard = calculateManagementDashboard(source)
+
+    expect(dashboard.allStores).toEqual([expect.objectContaining({ name: 'Loja Nova', billed: 110, returned: 16, returns: 1 })])
   })
 })

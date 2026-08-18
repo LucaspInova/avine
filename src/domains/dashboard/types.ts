@@ -52,6 +52,15 @@ export type DashboardFstdProduct = {
   status: 'pendente' | 'concluido'
 }
 
+export type DashboardInvoiceItem = {
+  chave_acesso: string
+  codigo_produto: string
+  quantidade_galinha: number
+  valor_galinha: number
+  quantidade_codorna: number
+  valor_codorna: number
+}
+
 export type DashboardProductReason = {
   produto_id: string
   motivo_id: string
@@ -67,6 +76,14 @@ export type DashboardCatalogProduct = {
   id: string
   nome: string | null
   categoria: string | null
+}
+
+export type DashboardFstdReport = {
+  nome_abreviado: string | null
+  galinha_nfd: number | null
+  codorna_nfd: number | null
+  galinha_retorno: number | null
+  codorna_retorno: number | null
 }
 
 export type DashboardStore = {
@@ -105,10 +122,12 @@ export type ManagementDashboardSource = {
   current: DashboardNoteCollection
   previous: DashboardNoteCollection
   processes: DashboardFstdProcess[]
+  invoiceItems: DashboardInvoiceItem[]
   products: DashboardFstdProduct[]
   productReasons: DashboardProductReason[]
   reasons: DashboardReason[]
   catalogProducts: DashboardCatalogProduct[]
+  reports?: DashboardFstdReport[]
   legacy: DashboardLegacyFstd[]
   sourceErrors: DashboardSourceError[]
 }

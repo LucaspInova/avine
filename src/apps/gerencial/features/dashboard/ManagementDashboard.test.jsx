@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { FinancialChart, ManagementListModal } from './ManagementDashboard'
+import { FinancialChart, ManagementListModal, ProductsModal } from './ManagementDashboard'
 import { getGaugeTone } from './dashboardVisualUtils'
 
 describe('cores do percentual do velocímetro', () => {
@@ -38,7 +38,7 @@ describe('modal completo de lojas', () => {
 
     render(
       <ManagementListModal
-        title="Lojas com menor índice de retorno"
+        title="Lojas e índice de retorno"
         modalId="stores-modal-title"
         itemLabel="lojas"
         searchPlaceholder="Buscar loja..."
@@ -66,8 +66,74 @@ describe('modal completo de lojas', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar loja' }), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
     expect(screen.getByText('21–21 de 21 lojas')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar lojas com menor índice de retorno' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar lojas e índice de retorno' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ordenação das tabelas do dashboard', () => {
+  it('alterna entre ordem crescente e decrescente sem tratar a coluna como filtro', () => {
+    render(
+      <ManagementListModal
+        title="Lojas e índice de retorno"
+        modalId="stores-sort-modal-title"
+        itemLabel="lojas"
+        searchPlaceholder="Buscar loja..."
+        searchLabel="Buscar loja"
+        emptyMessage="Nenhuma loja encontrada."
+        searchEmptyMessage="Não encontramos lojas para esta busca."
+        items={[
+          { name: 'Loja maior', billed: 1200 },
+          { name: 'Loja menor', billed: 120 },
+        ]}
+        getSearchText={(store) => store.name}
+        getItemKey={(store) => store.name}
+        columns={[
+          { key: 'name', label: 'Loja', sortValue: (store) => store.name, render: (store) => store.name },
+          { key: 'billed', label: 'Qtd. faturada', sortValue: (store) => store.billed, render: (store) => store.billed },
+        ]}
+        isOpen
+        onClose={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar por Qtd. faturada em ordem crescente' }))
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Loja menor')
+    expect(screen.getByRole('columnheader', { name: /Qtd\. faturada/ })).toHaveAttribute('aria-sort', 'ascending')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar por Qtd. faturada em ordem decrescente' }))
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Loja maior')
+    expect(screen.getByRole('columnheader', { name: /Qtd\. faturada/ })).toHaveAttribute('aria-sort', 'descending')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar por Qtd. faturada em ordem original' }))
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Loja maior')
+    expect(screen.getByRole('columnheader', { name: /Qtd\. faturada/ })).toHaveAttribute('aria-sort', 'none')
+  })
+})
+
+describe('linha de total dos produtos', () => {
+  it('consolida faturado, retorno, percentual e motivo principal da busca ativa', () => {
+    render(<ProductsModal
+      products={[
+        { name: 'Produto A', category: 'Galinha', billed: 100, returned: 10, returnPercentage: 10, mainReason: 'Avaria no PDV' },
+        { name: 'Produto B', category: 'Codorna', billed: 200, returned: 50, returnPercentage: 25, mainReason: 'Avaria na entrega' },
+      ]}
+      errors={[]}
+      isOpen
+      onClose={vi.fn()}
+    />)
+
+    expect(screen.getByText('Total faturado')).toBeInTheDocument()
+    expect(screen.getByText('300 ovos')).toBeInTheDocument()
+    expect(screen.getByText('60 ovos')).toBeInTheDocument()
+    expect(screen.getByText('20,0%')).toBeInTheDocument()
+    expect(screen.getAllByText('Avaria na entrega')).toHaveLength(2)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar produto' }), { target: { value: 'Produto A' } })
+    expect(screen.getAllByText('100 ovos')).toHaveLength(2)
+    expect(screen.getAllByText('10 ovos')).toHaveLength(2)
+    expect(screen.getAllByText('10,0%')).toHaveLength(2)
+    expect(screen.getAllByText('Avaria no PDV')).toHaveLength(2)
   })
 })
 
