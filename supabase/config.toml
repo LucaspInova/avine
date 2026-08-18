@@ -79,7 +79,12 @@ enabled = true
 verify_jwt = true
 entrypoint = "./functions/manage-users/index.ts"
 
-[functions.sync-devolucoes-avine]
+[functions.sync-devolucoes-avine-api]
 enabled = true
 verify_jwt = false
-entrypoint = "./functions/sync-devolucoes-avine/index.ts"
+entrypoint = "./functions/sync-devolucoes-avine-api/index.ts"
+
+[functions.sync-devolucoes-avine-sheets]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sync-devolucoes-avine-sheets/index.ts"

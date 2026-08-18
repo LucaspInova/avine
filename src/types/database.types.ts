@@ -239,6 +239,7 @@ export type Database = {
       nfd_logs: {
         Row: {
           id: number
+          fonte: string
           data_referencia: string
           iniciado_em: string
           finalizado_em: string | null
@@ -253,6 +254,7 @@ export type Database = {
         }
         Insert: {
           id: number
+          fonte?: string
           data_referencia: string
           iniciado_em?: string
           finalizado_em?: string | null
@@ -267,6 +269,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          fonte?: string
           data_referencia?: string
           iniciado_em?: string
           finalizado_em?: string | null

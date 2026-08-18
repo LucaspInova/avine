@@ -61,6 +61,7 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 
 - [Contexto](docs/CONTEXTO.md)
 - [Supabase](docs/SUPABASE.md)
+- [Sincronizacao de NFDs](docs/NFD_SYNC.md)
 
 ## Modelo Operacional
 
@@ -68,11 +69,13 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 capacidade nunca concede autorização de banco: RLS, grants, RPCs e validações no
 servidor continuam sendo obrigatórios para toda operação.
 
-1. `sync-devolucoes-avine` importa NFDs e atualiza lojas no servidor.
-2. Gerencial administra perfis, contas de acesso, lojas e vinculos.
-3. Promotor acessa somente lojas e NFDs liberadas pela RLS.
-4. `iniciar_fstd_produtos_v2` cria o processo usando exclusivamente dados de `nfd_itens`.
-5. As RPCs de conclusao, edicao e finalizacao validam propriedade, somas e fotos.
+1. `sync-devolucoes-avine-api` importa NFDs da API Avine no horario legado.
+2. `sync-devolucoes-avine-sheets` revisa diariamente a janela movel da planilha
+   e insere somente itens ainda ausentes.
+3. Gerencial administra perfis, contas de acesso, lojas e vinculos.
+4. Promotor acessa somente lojas e NFDs liberadas pela RLS.
+5. `iniciar_fstd_produtos_v2` cria o processo usando exclusivamente dados de `nfd_itens`.
+6. As RPCs de conclusao, edicao e finalizacao validam propriedade, somas e fotos.
 
 ## Referencias Supabase
 

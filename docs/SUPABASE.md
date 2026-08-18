@@ -15,7 +15,7 @@ feitas por migrations, testadas localmente e nunca por reset do banco remoto.
   e caminho do PDF persistido por FSTD.
 - `nfd_desconhecimentos`: declaracoes de NFD nao reconhecida.
 - `motivos_devolucao`: catalogo administravel de motivos.
-- `nfd_logs`: log interno da sincronizacao.
+- `nfd_logs`: log interno da sincronizacao, com `fonte = api | sheets`.
 
 `fstds` pertencia ao dominio anterior e foi removida depois da verificacao de
 que nao havia chamadas no aplicativo. `solicitar_fstd` e seus overloads antigos
@@ -78,6 +78,12 @@ frontend nao consegue forjar produtos ou quantidades.
 `nfd_logs` tem RLS habilitado sem policy de cliente por decisao intencional. A
 tabela e acessada somente pela sincronizacao com service role; o aviso
 `rls_enabled_no_policy` do advisor e esperado.
+
+As Edge Functions `sync-devolucoes-avine-api` e
+`sync-devolucoes-avine-sheets` usam o mesmo `CRON_SECRET`, mantido como secret
+da Edge Function. Os jobs leem a copia correspondente do Vault
+(`avine_cron_secret`), sem incluir o valor no SQL versionado. A API roda as
+10:00 UTC (horario legado) e o fallback Sheets as 14:00 UTC/11:00 de Sao Paulo.
 
 Os defaults de objetos criados por `postgres` no schema `public` revogam
 privilegios de `PUBLIC`, `anon` e `authenticated`. Os defaults pertencentes ao

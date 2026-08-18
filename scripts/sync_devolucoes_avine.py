@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 
 DEFAULT_FUNCTION_URL = (
     "https://<PROJECT_REF>.supabase.co/functions/v1/"
-    "sync-devolucoes-avine"
+    "sync-devolucoes-avine-api"
 )
 REQUEST_TIMEOUT_SECONDS = 300
 ENV_FILE = ".env"
