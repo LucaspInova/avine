@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { getDefaultPeriodDates } from './periodDateUtils'
 import { formatPeriodRange } from './periodIndicatorUtils'
+
+describe('período padrão do dashboard', () => {
+  it('começa no primeiro dia do mês atual e termina ontem', () => {
+    expect(getDefaultPeriodDates(new Date(2026, 7, 18, 12))).toEqual({
+      startDate: '2026-08-01',
+      endDate: '2026-08-17',
+    })
+  })
+})
 
 describe('indicador de período', () => {
   it('formata um intervalo no mesmo mês', () => {
