@@ -12,12 +12,21 @@ export function getUserInitials(name: unknown) {
   return String(name ?? '').trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join('').toUpperCase() || 'US'
 }
 
-const ACTIVE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+const ACTIVE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
+
+export type UserActivityStatus = 'active' | 'offline' | 'inactive'
+
+export function getUserActivityStatus(user: { last_access_at?: string | null }, now = Date.now()): UserActivityStatus {
+  if (!user.last_access_at) return 'inactive'
+
+  const lastAccess = new Date(user.last_access_at).getTime()
+  if (!Number.isFinite(lastAccess)) return 'inactive'
+
+  return lastAccess >= now - ACTIVE_WINDOW_MS ? 'active' : 'offline'
+}
 
 export function isUserActive(user: { last_access_at?: string | null }, now = Date.now()) {
-  if (!user.last_access_at) return false
-  const lastAccess = new Date(user.last_access_at).getTime()
-  return Number.isFinite(lastAccess) && lastAccess >= now - ACTIVE_WINDOW_MS
+  return getUserActivityStatus(user, now) === 'active'
 }
 
 export function getGerencialName(user: any) {

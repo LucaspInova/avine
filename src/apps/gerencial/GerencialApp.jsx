@@ -8,7 +8,7 @@ import {
   createGerencialUser,
   createOperationalUser,
   deleteManagedUser,
-  isUserActive,
+  getUserActivityStatus,
   listManagedUsers,
   updateManagedUser,
 } from '../../domains/users'
@@ -1314,6 +1314,10 @@ export function UsuariosScreen({
     Gerencial: usuarios.filter((usuario) => getManagedRoleKey(usuario) === 'Gerencial').length,
     Promotor: usuarios.filter((usuario) => usuario.perfil === 'Promotor').length,
   }), [usuarios])
+  const statusCounts = useMemo(() => usuarios.reduce((summary, usuario) => {
+    summary[getUserActivityStatus(usuario)] += 1
+    return summary
+  }, { active: 0, offline: 0, inactive: 0 }), [usuarios])
   const availableUfs = useMemo(
     () => [...new Set(usuarios.map((usuario) => usuario.estado).filter((uf) =>
       uf && (restrictedUfs.length === 0 || restrictedUfs.includes(uf))))]
@@ -1332,8 +1336,7 @@ export function UsuariosScreen({
       const matchesProfile = profileFilter === 'all' || getManagedRoleKey(usuario) === profileFilter
       const matchesScope = restrictedUfs.length === 0 || restrictedUfs.includes(usuario.estado)
       const matchesUf = matchesScope && (restrictedUfs.length === 1 || ufFilter === 'all' || usuario.estado === ufFilter)
-      const matchesStatus = statusFilter === 'all'
-        || (statusFilter === 'active' ? isUserActive(usuario) : !isUserActive(usuario))
+      const matchesStatus = statusFilter === 'all' || getUserActivityStatus(usuario) === statusFilter
 
       return matchesSearch && matchesProfile && matchesUf && matchesStatus
     })
@@ -1408,6 +1411,7 @@ export function UsuariosScreen({
             >
               <option value="all">Todos</option>
               <option value="active">Ativo</option>
+              <option value="offline">Off-Line</option>
               <option value="inactive">Inativo</option>
             </AppSelect>
           </FilterSection>
@@ -1420,6 +1424,31 @@ export function UsuariosScreen({
           </button>
         </div>
       </PageToolbar>
+
+      <section className="user-status-summary" aria-label="Resumo de usuários">
+        {[
+          { key: 'total', label: 'Total', total: usuarios.length, helper: 'Todos os usuários cadastrados no sistema.' },
+          { key: 'active', label: 'Ativo', total: statusCounts.active, helper: 'Usuários cujo último acesso aconteceu entre agora e 3 dias atrás.' },
+          { key: 'offline', label: 'Off-Line', total: statusCounts.offline, helper: 'Usuários que acessaram o sistema pela última vez há mais de 3 dias.' },
+          { key: 'inactive', label: 'Inativo', total: statusCounts.inactive, helper: 'Usuários que nunca acessaram o sistema.' },
+        ].map((item) => {
+          const percentage = usuarios.length ? (item.total / usuarios.length) * 100 : 0
+          return (
+            <article className={`user-status-summary-card is-${item.key}`} key={item.key}>
+              <div className="user-status-summary-title">
+                <span>{item.label}</span>
+                <span className="user-status-helper" tabIndex={0} aria-label={`${item.label}: ${item.helper}`}>
+                  ?<span role="tooltip">{item.helper}</span>
+                </span>
+              </div>
+              <div className="user-status-summary-value">
+                <strong>{item.total.toLocaleString('pt-BR')}</strong>
+                <small>{percentage.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</small>
+              </div>
+            </article>
+          )
+        })}
+      </section>
 
       <nav className="user-quick-filters" aria-label="Filtros rápidos por perfil">
         {[
@@ -1461,6 +1490,8 @@ export function UsuariosScreen({
 
             {pageUsers.map((usuario) => {
               const profileClass = getManagedRoleKey(usuario).toLowerCase()
+              const activityStatus = getUserActivityStatus(usuario)
+              const activityLabel = activityStatus === 'active' ? 'Ativo' : activityStatus === 'offline' ? 'Off-Line' : 'Inativo'
 
               return (
                 <div
@@ -1496,9 +1527,9 @@ export function UsuariosScreen({
                   </span>
 
                   <span className="status-cell" role="cell" data-label="Status">
-                    <span className={`status-pill ${isUserActive(usuario) ? 'is-active' : 'is-inactive'}`}>
+                    <span className={`status-pill is-${activityStatus}`}>
                       <span className="status-dot" aria-hidden="true" />
-                      {isUserActive(usuario) ? 'Ativo' : 'Inativo'}
+                      {activityLabel}
                     </span>
                   </span>
 
