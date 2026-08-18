@@ -51,6 +51,11 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.current.finalized.returns).toMatchObject({ galinha: 26, codorna: 2, total: 28, count: 2 })
     expect(dashboard.current.modernReturns).toMatchObject({ galinha: 16, codorna: 0, total: 16, count: 1 })
     expect(dashboard.current.averageDays).toBe(2.5)
+    expect(dashboard.financialSeries).toEqual([
+      { date: '2026-08-04', value: 300 },
+      { date: '2026-08-05', value: 250 },
+      { date: '2026-08-06', value: 150 },
+    ])
   })
 
   it('mantém o ranking de produtos restrito aos FSTDs modernos detalhados', () => {
@@ -76,10 +81,11 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.stores.map((store) => ({ name: store.name, returns: store.returns }))).toEqual([
       { name: 'Loja Nova', returns: 1 },
       { name: 'Loja Legado', returns: 1 },
+      { name: 'Loja Pendente', returns: 0 },
     ])
   })
 
-  it('mantém o card limitado e disponibiliza todas as lojas para o modal', () => {
+  it('inclui o faturamento das lojas filtradas mesmo quando não finalizadas', () => {
     const source = createSource()
     source.current.notes.push(...Array.from({ length: 5 }, (_, index) => ({
       ...source.current.notes[0],
@@ -91,18 +97,36 @@ describe('cálculos da Dashboard Gerencial', () => {
 
     const dashboard = calculateManagementDashboard(source)
 
-    expect(dashboard.stores).toHaveLength(2)
-    expect(dashboard.allStores).toHaveLength(2)
+    expect(dashboard.stores).toHaveLength(6)
+    expect(dashboard.allStores).toHaveLength(8)
+    expect(dashboard.allStores.find((store) => store.name === 'Loja Pendente')).toEqual(expect.objectContaining({ billed: 40, returned: 0 }))
   })
 
-  it('não cria lojas quando não há NFD finalizada', () => {
+  it('mantém o faturamento das lojas quando não há NFD finalizada', () => {
     const source = createSource()
     source.current.notes = source.current.notes.map((note) => ({ ...note, status: 'Pendente' as const }))
 
     const dashboard = calculateManagementDashboard(source)
 
-    expect(dashboard.stores).toEqual([])
-    expect(dashboard.allStores).toEqual([])
+    expect(dashboard.stores).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Loja Legado', billed: 120, returned: 0 }),
+      expect.objectContaining({ name: 'Loja Pendente', billed: 40, returned: 0 }),
+    ]))
+    expect(dashboard.allStores).toHaveLength(3)
+  })
+
+  it('trata NFD desconhecida como faturada, mas sem retorno apurado', () => {
+    const source = createSource()
+    source.current.notes = source.current.notes.map((note) => note.nota_fiscal === 12
+      ? { ...note, status: 'Desconhecida' as const }
+      : note)
+
+    const dashboard = calculateManagementDashboard(source)
+
+    expect(dashboard.current.financialTotal).toBe(700)
+    expect(dashboard.current.galinhaBilled).toBe(220)
+    expect(dashboard.current.returns).toMatchObject({ total: 28 })
+    expect(dashboard.allStores.find((store) => store.name === 'Loja Pendente')).toEqual(expect.objectContaining({ billed: 40, returned: 0 }))
   })
 
   it('usa o retorno consolidado do relatório FSTD para as lojas', () => {
@@ -117,6 +141,6 @@ describe('cálculos da Dashboard Gerencial', () => {
 
     const dashboard = calculateManagementDashboard(source)
 
-    expect(dashboard.allStores).toEqual([expect.objectContaining({ name: 'Loja Nova', billed: 110, returned: 16, returns: 1 })])
+    expect(dashboard.allStores.find((store) => store.name === 'Loja Nova')).toEqual(expect.objectContaining({ billed: 110, returned: 16, returns: 1 }))
   })
 })
