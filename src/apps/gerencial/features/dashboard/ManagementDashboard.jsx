@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { calculateManagementDashboard, useManagementDashboard } from '../../../../domains/dashboard'
 import { AppSelect, FilterPopover, FilterSection } from '../../../../shared/ui'
 import { getGaugeTone } from './dashboardVisualUtils'
+import { getDefaultPeriodDates } from './periodDateUtils'
 import { formatPeriodRange } from './periodIndicatorUtils'
 import './ManagementDashboard.css'
 
@@ -11,11 +12,12 @@ const moneyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', curre
 const numberFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 })
 const decimalFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
+function toDateInput(date) {
+  const offset = date.getTimezoneOffset() * 60000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+}
+
 function getCurrentWeekDates(now = new Date()) {
-  const toDateInput = (date) => {
-    const offset = date.getTimezoneOffset() * 60000
-    return new Date(date.getTime() - offset).toISOString().slice(0, 10)
-  }
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
   return { startDate: toDateInput(start), endDate: toDateInput(now) }
 }
@@ -41,8 +43,8 @@ function formatDate(value) {
   return dateFormatter.format(new Date(`${value}T00:00:00`)).replace('.', '')
 }
 
-function PeriodIndicator({ startDate, endDate, isCurrentWeek }) {
-  const periodLabel = isCurrentWeek ? 'Semana atual' : 'Período personalizado'
+function PeriodIndicator({ startDate, endDate, isDefaultPeriod }) {
+  const periodLabel = isDefaultPeriod ? 'Período padrão' : 'Período personalizado'
   const rangeLabel = formatPeriodRange(startDate, endDate)
   return (
     <div className="management-dashboard__period-indicator" role="status" aria-live="polite" aria-label={`Visualizando: ${periodLabel} · ${rangeLabel}`}>
@@ -371,8 +373,9 @@ export function ProductsModal({ products, errors, isOpen, onClose }) {
   />
 }
 export function ManagementDashboard({ restrictedUfs = [] }) {
-  const defaults = useMemo(() => getCurrentWeekDates(), [])
-  const today = defaults.endDate
+  const defaults = useMemo(() => getDefaultPeriodDates(), [])
+  const currentWeek = useMemo(() => getCurrentWeekDates(), [])
+  const today = currentWeek.endDate
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [filters, setFilters] = useState(() => ({ ...defaults, status: '', uf: '', city: '' }))
   const [draftFilters, setDraftFilters] = useState(() => ({ ...defaults, status: '', uf: '', city: '' }))
@@ -404,7 +407,7 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
   const periodFilterCount = Number(draftFilters.startDate !== defaults.startDate || draftFilters.endDate !== defaults.endDate)
   const activePeriodFilterCount = Number(filters.startDate !== defaults.startDate || filters.endDate !== defaults.endDate)
   const activeFilterCount = activePeriodFilterCount + Number(Boolean(filters.status)) + Number(Boolean(filters.uf)) + Number(Boolean(filters.city))
-  const isCurrentWeek = filters.startDate === defaults.startDate && filters.endDate === defaults.endDate
+  const isDefaultPeriod = filters.startDate === defaults.startDate && filters.endDate === defaults.endDate
   const returnErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados') ?? []
   const productErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados' || source === 'catálogo de produtos') ?? []
   const reasonsErrors = dashboard?.sourceErrors.filter(({ source }) => source === 'retornos modernos' || source === 'retornos legados' || source === 'motivos de devolução') ?? []
@@ -430,7 +433,7 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
     setDraftFilters((current) => ({ ...current, endDate: nextEndDate, startDate: current.startDate > nextEndDate ? nextEndDate : current.startDate }))
   }
 
-  function moveDraftWeek(weeks) {
+  function selectRelativeWeek(weeks) {
     const shiftDate = (value) => {
       const date = new Date(`${value}T00:00:00`)
       date.setDate(date.getDate() + weeks * 7)
@@ -438,8 +441,8 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
       return new Date(date.getTime() - offset).toISOString().slice(0, 10)
     }
     setDraftFilters((current) => {
-      const startDate = shiftDate(current.startDate)
-      const endDate = shiftDate(current.endDate)
+      const startDate = shiftDate(currentWeek.startDate)
+      const endDate = shiftDate(currentWeek.endDate)
       return { ...current, startDate, endDate: endDate > today ? today : endDate }
     })
   }
@@ -462,10 +465,10 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
   return (
     <section className="management-dashboard">
       <div className="management-dashboard__toolbar">
-        <PeriodIndicator startDate={filters.startDate} endDate={filters.endDate} isCurrentWeek={isCurrentWeek} />
+        <PeriodIndicator startDate={filters.startDate} endDate={filters.endDate} isDefaultPeriod={isDefaultPeriod} />
         <FilterPopover activeFilterCount={activeFilterCount} isOpen={isFilterOpen} onToggle={setIsFilterOpen} onApply={applyFilters} onClear={clearFilters}>
           <FilterSection title="Período" count={periodFilterCount} id="dashboard-filter-period">
-            <div className="management-dashboard__week-actions"><button type="button" onClick={() => moveDraftWeek(-1)}>Semana anterior</button><button type="button" onClick={() => setDraftFilters((current) => ({ ...current, ...defaults }))}>Semana atual</button></div>
+            <div className="management-dashboard__week-actions"><button type="button" onClick={() => selectRelativeWeek(-1)}>Semana anterior</button><button type="button" onClick={() => setDraftFilters((current) => ({ ...current, ...currentWeek }))}>Semana atual</button></div>
             <div className="management-dashboard__filter-dates">
               <label>Data inicial<input aria-label="Data inicial" type="date" value={draftFilters.startDate} max={draftFilters.endDate && draftFilters.endDate < today ? draftFilters.endDate : today} onChange={(event) => changeStartDate(event.target.value)} /></label>
               <label>Data final<input aria-label="Data final" type="date" value={draftFilters.endDate} min={draftFilters.startDate} max={today} onChange={(event) => changeEndDate(event.target.value)} /></label>
@@ -503,15 +506,15 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
         <section className="management-dashboard__main-grid">
           <article className="management-dashboard__panel management-dashboard__financial-summary">
             <h2>Resumo Financeiro</h2>
-            <div className="management-dashboard__money-total"><small>Valor total das notas</small><strong>{formatMoney(dashboard.current.finalized.financialTotal)}</strong></div>
+            <div className="management-dashboard__money-total"><small>Valor total das notas</small><strong>{formatMoney(dashboard.current.financialTotal)}</strong></div>
             <div className="management-dashboard__financial-species">
-              <section className="management-dashboard__financial-species-card"><h3>Galinha</h3><div><small>Valor de Faturado</small><strong>{formatMoney(dashboard.current.finalized.financial.galinhaBilled)}</strong></div><div><small>Valor de Retorno</small><strong>{returnErrors.length > 0 ? '—' : formatMoney(dashboard.current.finalized.financial.galinhaReturn)}</strong></div></section>
-              <section className="management-dashboard__financial-species-card"><h3>Codorna</h3><div><small>Valor de Faturado</small><strong>{formatMoney(dashboard.current.finalized.financial.codornaBilled)}</strong></div><div><small>Valor de Retorno</small><strong>{returnErrors.length > 0 ? '—' : formatMoney(dashboard.current.finalized.financial.codornaReturn)}</strong></div></section>
+              <section className="management-dashboard__financial-species-card"><h3>Galinha</h3><div><small>Valor de Faturado</small><strong>{formatMoney(dashboard.current.financial.galinhaBilled)}</strong></div></section>
+              <section className="management-dashboard__financial-species-card"><h3>Codorna</h3><div><small>Valor de Faturado</small><strong>{formatMoney(dashboard.current.financial.codornaBilled)}</strong></div></section>
             </div>
           </article>
 
           <article className="management-dashboard__panel management-dashboard__species-panel">
-            <div className="management-dashboard__species-topline"><div><small>Faturado GAL</small><strong>{formatEggs(dashboard.current.finalized.galinhaBilled)}</strong><Evolution value={dashboard.evolutions.galinhaBilled} /></div><div><small>Faturado COD</small><strong>{formatEggs(dashboard.current.finalized.codornaBilled)}</strong><Evolution value={dashboard.evolutions.codornaBilled} /></div></div>
+            <div className="management-dashboard__species-topline"><div><small>Faturado GAL</small><strong>{formatEggs(dashboard.current.galinhaBilled)}</strong><Evolution value={dashboard.evolutions.galinhaBilled} /></div><div><small>Faturado COD</small><strong>{formatEggs(dashboard.current.codornaBilled)}</strong><Evolution value={dashboard.evolutions.codornaBilled} /></div></div>
             <div className="management-dashboard__species-topline is-return"><div><small>Retorno GAL</small><strong>{dashboard.returnsAvailable ? formatEggs(dashboard.current.finalized.returns.galinha) : '—'}</strong><Evolution value={dashboard.evolutions.galinhaReturn} /></div><div><small>Retorno COD</small><strong>{dashboard.returnsAvailable ? formatEggs(dashboard.current.finalized.returns.codorna) : '—'}</strong><Evolution value={dashboard.evolutions.codornaReturn} /></div></div>
             {returnErrors.length > 0 ? <SourceError title="Indicadores de retorno indisponíveis" sourceErrors={returnErrors} /> : <>
               <div className="management-dashboard__gauges"><DashboardGauge label="Galinha" value={dashboard.current.finalized.galinhaBilled ? (dashboard.current.finalized.returns.galinha / dashboard.current.finalized.galinhaBilled) * 100 : 0} unavailable={dashboard.current.finalized.returns.unresolved > 0} /><DashboardGauge label="Codorna" value={dashboard.current.finalized.codornaBilled ? (dashboard.current.finalized.returns.codorna / dashboard.current.finalized.codornaBilled) * 100 : 0} unavailable={dashboard.current.finalized.returns.unresolved > 0} /></div>

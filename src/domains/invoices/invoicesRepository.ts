@@ -9,11 +9,12 @@ function isAbortError(error: unknown, signal?: AbortSignal) {
   return 'name' in error && String(error.name) === 'AbortError'
 }
 
-export async function fetchAllNfdNotas(select: string, configureQuery?: (query: any) => any) {
+export async function fetchAllNfdNotas(select: string, configureQuery?: (query: any) => any, signal?: AbortSignal) {
   return paginateSupabase<any>((from, to) => {
     let query: any = supabase!.from('nfd_notas').select(select)
     if (configureQuery) query = configureQuery(query)
-    return query.range(from, to)
+    query = query.range(from, to)
+    return signal ? query.abortSignal(signal) : query
   })
 }
 

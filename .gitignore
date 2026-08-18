@@ -17,6 +17,9 @@ test-results/
 
 # Local legacy-data workbench and generated import artifacts
 .tmp-sheet/
+.tmp_fstd_import/
+fstd_legado_copia_v1_upload.csv
+scripts/prepare_fstd_import_chunks.ps1
 base-legado/
 ~$*
 
