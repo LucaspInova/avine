@@ -1,4 +1,4 @@
-import { getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../invoices'
+import { getFstdTargetProducts, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../invoices'
 import { buildSaveFstdProductCommand } from '../model/commands'
 import { keepNumericNfdCode } from '../model/validation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -3035,7 +3035,9 @@ export function PromotorWorkspace({
     })
   }, [embeddedFinalized, embeddedFstd, fstdTarget, nfdSearch, profile.id, saveNavigation, selectedNfd, selectedStore, statusFilter, storeSearch])
 
-  const workspaceQueries = usePromotorWorkspace(profile)
+  const workspaceQueries = usePromotorWorkspace(profile, {
+    fstdAccessKey: embeddedFstd || embeddedFinalized ? initialFstdTarget?.chave_acesso : null,
+  })
   const storesQuery = workspaceQueries.stores
   const nfdsQuery = workspaceQueries.invoices
   const produtosCatalogQuery = workspaceQueries.catalog
@@ -3161,8 +3163,24 @@ export function PromotorWorkspace({
     [allUnknownNfdComments, fstdProcessosByNfd, fstdProcessosQuery.data, nfdsQuery.data, produtosCatalogQuery.data, stores],
   )
   const selectedStoreNfds = selectedStore ? nfds.filter((nfd) => nfd.loja_id === selectedStore.id) : []
+  const fallbackFstdProcess = fstdTarget
+    ? fstdProcessosByNfd.get(String(fstdTarget.chave_acesso))
+      ?? fstdTarget.fstd_process
+      ?? null
+    : null
   const currentFstdTarget = fstdTarget
-    ? nfds.find((nfd) => String(nfd.chave_acesso) === String(fstdTarget.chave_acesso)) ?? fstdTarget
+    ? nfds.find((nfd) => String(nfd.chave_acesso) === String(fstdTarget.chave_acesso))
+      ?? {
+        ...fstdTarget,
+        produtos: getFstdTargetProducts(
+          fstdTarget,
+          produtosCatalogQuery.data ?? [],
+          fallbackFstdProcess?.produtos ?? fstdTarget.produtos ?? [],
+        ),
+        fstd_process_id: fallbackFstdProcess?.id ?? fstdTarget.fstd_process_id ?? null,
+        fstd_process_status: fallbackFstdProcess?.status ?? fstdTarget.fstd_process_status ?? null,
+        fstd_process: fallbackFstdProcess,
+      }
     : undefined
 
   const conferenceAlertNfd = conferenceAlertDismissed

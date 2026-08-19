@@ -81,7 +81,22 @@ describe('fluxo paginado das Notas gerenciais', () => {
     rerender(<NotasScreen search="mercado" onSearch={onSearch} lojas={[]} currentUser={{ id: 'a1' }} />)
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ search: '' }))
     act(() => vi.advanceTimersByTime(300))
-    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'mercado' }))
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'mercado', startDate: '', endDate: '' }))
+  })
+
+  it('preserva um período escolhido explicitamente durante a pesquisa', () => {
+    render(<NotasScreen search="mercado" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+    openFilters()
+    openPeriod()
+    fireEvent.change(screen.getByLabelText('Data inicial'), { target: { value: '2026-07-20' } })
+    fireEvent.change(screen.getByLabelText('Data final'), { target: { value: '2026-08-06' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
+
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({
+      search: 'mercado',
+      startDate: '2026-07-20',
+      endDate: '2026-08-06',
+    }))
   })
 
   it('mantém datas no intervalo local e expõe estado vazio', () => {

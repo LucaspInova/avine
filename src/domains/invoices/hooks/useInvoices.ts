@@ -21,8 +21,12 @@ export function useInvoices(filters: InvoiceListFilters) {
 export function useInvoiceMutations() {
   const client = useQueryClient()
   const invalidate = () => client.invalidateQueries({ queryKey: invoiceKeys.all })
+  const invalidateStartedProcess = () => Promise.all([
+    invalidate(),
+    client.invalidateQueries({ queryKey: ['fstd-process'] }),
+  ])
   return {
-    start: useMutation({ mutationFn: ({ storeId, accessKey }: StartInvoiceProcessCommand) => startInvoiceProcess(storeId, accessKey), onSuccess: invalidate }),
+    start: useMutation({ mutationFn: ({ storeId, accessKey }: StartInvoiceProcessCommand) => startInvoiceProcess(storeId, accessKey), onSuccess: invalidateStartedProcess }),
     findStore: useMutation({ mutationFn: ({ code, restrictedUfs }: FindInvoiceStoreCommand) => findInvoiceStore(code, restrictedUfs) }),
     markUnknown: useMutation({ mutationFn: ({ store, note, comment }: MarkInvoiceUnknownCommand) => markInvoiceUnknown(store, note, comment), onSuccess: invalidate }),
     recognize: useMutation({ mutationFn: (note: RecognizeInvoiceCommand) => recognizeInvoice(note), onSuccess: invalidate }),

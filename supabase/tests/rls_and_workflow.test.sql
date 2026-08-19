@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(49);
+select plan(51);
 
 insert into auth.users (id, email)
 values
@@ -305,6 +305,65 @@ select results_eq(
   array[2::bigint],
   'all NFD products are derived server-side'
 );
+savepoint late_product_reconciliation;
+
+reset role;
+
+insert into public.nfd_itens (
+  id,
+  estabelecimento,
+  nota_fiscal,
+  chave_acesso,
+  data_emissao,
+  codigo_cliente,
+  codigo_produto,
+  descricao_produto,
+  quantidade_galinha,
+  quantidade_codorna,
+  data_referencia
+)
+values (
+  90004,
+  'AVINE',
+  1234,
+  'NFD-OWNER',
+  current_date,
+  9001,
+  'P3',
+  'Produto importado posteriormente',
+  7,
+  0,
+  current_date
+);
+
+set local role authenticated;
+set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
+
+select lives_ok(
+  $$
+    select public.iniciar_fstd_produtos_v2(
+      '20000000-0000-0000-0000-000000000021',
+      'NFD-OWNER'
+    )
+  $$,
+  'reopening an FSTD reconciles products imported after process creation'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_produtos
+    where processo_id = (
+      select id from public.fstd_processos
+      where nfd_chave_acesso = 'NFD-OWNER'
+    )
+  $$,
+  array[3::bigint],
+  'reconciliation inserts only the missing source product'
+);
+
+rollback to savepoint late_product_reconciliation;
+
 select results_eq(
   $$
     select quantidade_faturada_galinha, quantidade_faturada_codorna

@@ -145,6 +145,24 @@ function getNoteReturn(note: DashboardNote, index: ReturnType<typeof createDataI
   return { ...result, count: result.total > 0 ? 1 : 0, duration, source: 'modern' as const }
 }
 
+function getLegacyStoreValues(note: DashboardNote, index: ReturnType<typeof createDataIndex>) {
+  const legacy = index.legacyByNote.get(noteKey(note))
+  if (!legacy) return null
+
+  const billed = numberValue(legacy.qtd_total_galinha) + numberValue(legacy.qtd_total_codorna)
+  const rawReturned = numberValue(legacy.qtd_retorno_galinha) + numberValue(legacy.qtd_retorno_codorna)
+  const returned = Math.min(Math.max(0, rawReturned), Math.max(0, billed))
+
+  // O card usa faturado e retorno do mesmo FSTD legado e protege a regra retorno <= faturado.
+  return { billed, returned, returns: returned > 0 ? 1 : 0 }
+}
+
+function finalizeStore(row: Omit<DashboardStore, 'returnPercentage'>): DashboardStore {
+  const billed = Math.max(0, row.billed)
+  const returned = Math.min(Math.max(0, row.returned), billed)
+  return { ...row, billed, returned, returnPercentage: billed > 0 ? (returned / billed) * 100 : 0 }
+}
+
 function buildPeriodSummary(notes: DashboardNote[], index: ReturnType<typeof createDataIndex>) {
   const status = { Finalizada: 0, Pendente: 0, Desconhecida: 0 }
   const returns: ReturnTotals = { galinha: 0, codorna: 0, total: 0, unresolved: 0, count: 0 }
@@ -344,7 +362,14 @@ function buildStores(notes: DashboardNote[], index: ReturnType<typeof createData
       if (!name || !allowedNames.has(name)) return
       const key = String(note.codigo_cliente ?? name)
       const row = stores.get(key) ?? { name, billed: 0, returned: 0, returns: 0 }
-      row.billed += numberValue(note.quantidade_galinha) + numberValue(note.quantidade_codorna)
+      const legacyValues = getLegacyStoreValues(note, index)
+      if (legacyValues) {
+        row.billed += legacyValues.billed
+        row.returned += legacyValues.returned
+        row.returns += legacyValues.returns
+      } else {
+        row.billed += numberValue(note.quantidade_galinha) + numberValue(note.quantidade_codorna)
+      }
       stores.set(key, row)
     })
     reports.forEach((report) => {
@@ -358,7 +383,7 @@ function buildStores(notes: DashboardNote[], index: ReturnType<typeof createData
     })
     return [...stores.values()]
       .filter((store) => store.billed > 0)
-      .map((store) => ({ ...store, returnPercentage: (store.returned / store.billed) * 100 }))
+      .map(finalizeStore)
       .sort((left, right) => right.returnPercentage - left.returnPercentage || right.billed - left.billed)
   }
   const stores = new Map<string, Omit<DashboardStore, 'returnPercentage'>>()
@@ -370,16 +395,23 @@ function buildStores(notes: DashboardNote[], index: ReturnType<typeof createData
       returned: 0,
       returns: 0,
     }
-    row.billed += numberValue(note.quantidade_galinha) + numberValue(note.quantidade_codorna)
-    const noteReturn = getNoteReturn(note, index)
-    row.returned += noteReturn.total
-    row.returns += noteReturn.count
+    const legacyValues = getLegacyStoreValues(note, index)
+    if (legacyValues) {
+      row.billed += legacyValues.billed
+      row.returned += legacyValues.returned
+      row.returns += legacyValues.returns
+    } else {
+      row.billed += numberValue(note.quantidade_galinha) + numberValue(note.quantidade_codorna)
+      const noteReturn = getNoteReturn(note, index)
+      row.returned += noteReturn.total
+      row.returns += noteReturn.count
+    }
     stores.set(key, row)
   })
 
   return [...stores.values()]
     .filter((store) => store.billed > 0)
-    .map((store) => ({ ...store, returnPercentage: (store.returned / store.billed) * 100 }))
+    .map(finalizeStore)
     .sort((left, right) => right.returnPercentage - left.returnPercentage || right.billed - left.billed)
 }
 

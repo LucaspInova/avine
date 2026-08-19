@@ -85,6 +85,18 @@ describe('cálculos da Dashboard Gerencial', () => {
     ])
   })
 
+  it('usa faturado e retorno do mesmo FSTD legado apenas no card de lojas', () => {
+    const dashboard = calculateManagementDashboard(createSource())
+
+    expect(dashboard.allStores.find((store) => store.name === 'Loja Legado')).toEqual(expect.objectContaining({
+      billed: 120,
+      returned: 12,
+      returnPercentage: 10,
+    }))
+    expect(dashboard.current.galinhaBilled).toBe(220)
+    expect(dashboard.reasons.find((reason) => reason.name === 'Avaria na entrega')).toEqual(expect.objectContaining({ billed: 200 }))
+  })
+
   it('inclui o faturamento das lojas filtradas mesmo quando não finalizadas', () => {
     const source = createSource()
     source.current.notes.push(...Array.from({ length: 5 }, (_, index) => ({
@@ -109,7 +121,7 @@ describe('cálculos da Dashboard Gerencial', () => {
     const dashboard = calculateManagementDashboard(source)
 
     expect(dashboard.stores).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: 'Loja Legado', billed: 120, returned: 0 }),
+      expect.objectContaining({ name: 'Loja Legado', billed: 120, returned: 12 }),
       expect.objectContaining({ name: 'Loja Pendente', billed: 40, returned: 0 }),
     ]))
     expect(dashboard.allStores).toHaveLength(3)
@@ -142,5 +154,17 @@ describe('cálculos da Dashboard Gerencial', () => {
     const dashboard = calculateManagementDashboard(source)
 
     expect(dashboard.allStores.find((store) => store.name === 'Loja Nova')).toEqual(expect.objectContaining({ billed: 110, returned: 16, returns: 1 }))
+    expect(dashboard.allStores.find((store) => store.name === 'Loja Legado')).toEqual(expect.objectContaining({ billed: 120, returned: 12, returns: 1 }))
+  })
+
+  it('nunca permite retorno maior que faturado no card quando o legado contém dado inválido', () => {
+    const source = createSource()
+    source.legacy[0] = { ...source.legacy[0], qtd_total_galinha: 20, qtd_total_codorna: 0, qtd_retorno_galinha: 50, qtd_retorno_codorna: 0 }
+
+    const dashboard = calculateManagementDashboard(source)
+    const legacyStore = dashboard.allStores.find((store) => store.name === 'Loja Legado')
+
+    expect(legacyStore).toEqual(expect.objectContaining({ billed: 20, returned: 20, returnPercentage: 100 }))
+    expect(dashboard.allStores.every((store) => store.returned <= store.billed)).toBe(true)
   })
 })

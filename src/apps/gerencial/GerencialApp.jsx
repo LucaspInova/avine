@@ -2005,10 +2005,23 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     const timer = window.setTimeout(() => { setCurrentPage(1); setDebouncedSearch(search) }, 300)
     return () => window.clearTimeout(timer)
   }, [search])
-  const invoiceFilters = useMemo(() => ({ restrictedUfs, startDate, endDate,
-    status: selectedStatus, uf: selectedUf, city: selectedCity, search: debouncedSearch,
-    sortBy: sort.key, direction: sort.direction === 'ascending' ? 'asc' : 'desc', page: currentPage, pageSize,
-  }), [restrictedUfs, startDate, endDate, selectedStatus, selectedUf, selectedCity, debouncedSearch, sort, currentPage, pageSize])
+  const invoiceFilters = useMemo(() => {
+    const normalizedSearch = debouncedSearch.trim()
+    const isDefaultPeriod = startDate === defaults.start && endDate === defaults.end
+    return {
+      restrictedUfs,
+      startDate: normalizedSearch && isDefaultPeriod ? '' : startDate,
+      endDate: normalizedSearch && isDefaultPeriod ? '' : endDate,
+      status: selectedStatus,
+      uf: selectedUf,
+      city: selectedCity,
+      search: normalizedSearch,
+      sortBy: sort.key,
+      direction: sort.direction === 'ascending' ? 'asc' : 'desc',
+      page: currentPage,
+      pageSize,
+    }
+  }, [restrictedUfs, startDate, endDate, defaults, selectedStatus, selectedUf, selectedCity, debouncedSearch, sort, currentPage, pageSize])
   const invoicesQuery = useInvoices(invoiceFilters)
   const invoiceMutations = useInvoiceMutations()
   const result = invoicesQuery.data ?? { rows: [], total: 0, counts: {}, ufs: [], cities: [] }
@@ -2084,12 +2097,13 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     }
     if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
 
-    await invoiceMutations.start.mutateAsync({ storeId: store.id, accessKey: String(note.chave_acesso) })
+    const startedProcess = await invoiceMutations.start.mutateAsync({ storeId: store.id, accessKey: String(note.chave_acesso) })
+    const hydratedNote = startedProcess?.note ? { ...note, ...startedProcess.note } : note
 
     const selectedNfd = {
-      ...note,
-      id: note.chave_acesso,
-      numero: String(note.nota_fiscal),
+      ...hydratedNote,
+      id: hydratedNote.chave_acesso,
+      numero: String(hydratedNote.nota_fiscal),
       loja_id: store.id,
       loja_codigo: store.codigo,
       loja_nome: store.nome,

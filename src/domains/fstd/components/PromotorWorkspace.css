@@ -2650,7 +2650,8 @@
 }
 
 .gerencial-fstd-modal {
-  width: min(560px, calc(100vw - 32px));
+  /* O preenchimento de NFD usa campos e nomes de produto extensos no desktop. */
+  width: min(980px, calc(100vw - 32px));
   height: min(780px, calc(100vh - 40px));
   overflow: hidden;
   border-radius: 12px;

@@ -26,6 +26,7 @@ export type InvoiceOverviewPage = {
 }
 
 export type StartInvoiceProcessCommand = { storeId: string; accessKey: string }
+export type StartInvoiceProcessResult = { processId: string; note: InvoiceRecord }
 export type FindInvoiceStoreCommand = { code: string | number; restrictedUfs: string[] }
 export type MarkInvoiceUnknownCommand = {
   store: StoreReferenceViewModel

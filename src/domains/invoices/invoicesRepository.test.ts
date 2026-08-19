@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const boundary = vi.hoisted(() => ({ rpc: vi.fn() }))
+const boundary = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }))
 const rpc = boundary.rpc
-vi.mock('../../shared/lib/supabaseClient', () => ({ supabase: { rpc: boundary.rpc } }))
-import { listInvoicesOverview } from './invoicesRepository'
+const from = boundary.from
+vi.mock('../../shared/lib/supabaseClient', () => ({ supabase: { rpc: boundary.rpc, from: boundary.from } }))
+import { listInvoicesOverview, startInvoiceProcess } from './invoicesRepository'
 
 describe('repositório paginado de NFDs', () => {
-  beforeEach(() => rpc.mockReset())
+  beforeEach(() => {
+    rpc.mockReset()
+    from.mockReset()
+  })
 
   it('envia filtros, ordenação, limite e deslocamento ao RPC uma única vez', async () => {
     const response = { rows: [{ chave_acesso: '1' }], total: 21, counts: { Finalizada: 1, Pendente: 20, Desconhecida: 0 }, ufs: ['CE'], cities: ['Fortaleza'] }
@@ -39,5 +43,19 @@ describe('repositório paginado de NFDs', () => {
     await expect(listInvoicesOverview({ page: 1, pageSize: 10 }, new AbortController().signal)).rejects.toBe(abortError)
     expect(consoleError).not.toHaveBeenCalled()
     consoleError.mockRestore()
+  })
+
+  it('inicia o processo e hidrata os detalhes da NFD pela chave de acesso', async () => {
+    const note = { chave_acesso: 'chave-869', nota_fiscal: 869, detalhes: [{ codigo_produto: 'P1' }] }
+    const single = vi.fn().mockResolvedValue({ data: note, error: null })
+    const eq = vi.fn().mockReturnValue({ single })
+    const select = vi.fn().mockReturnValue({ eq })
+    from.mockReturnValue({ select })
+    rpc.mockResolvedValue({ data: 'processo-1', error: null })
+
+    await expect(startInvoiceProcess('loja-1', 'chave-869')).resolves.toEqual({ processId: 'processo-1', note })
+    expect(rpc).toHaveBeenCalledWith('iniciar_fstd_produtos_v2', { p_loja_id: 'loja-1', p_nfd_chave_acesso: 'chave-869' })
+    expect(from).toHaveBeenCalledWith('nfd_notas')
+    expect(eq).toHaveBeenCalledWith('chave_acesso', 'chave-869')
   })
 })

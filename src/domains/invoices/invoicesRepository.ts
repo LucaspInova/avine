@@ -1,7 +1,9 @@
 import { supabase } from '../../shared/lib/supabaseClient'
 import { paginateSupabase } from '../../shared/api/pagination'
 import { toAppError } from '../../shared/errors'
-import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand } from './types'
+import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand, StartInvoiceProcessResult } from './types'
+
+const hydratedInvoiceSelect = 'chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, valor_galinha, quantidade_codorna, valor_codorna, valor_total, quantidade_itens, quantidade_produtos_distintos, detalhes'
 
 function isAbortError(error: unknown, signal?: AbortSignal) {
   if (signal?.aborted) return true
@@ -40,9 +42,18 @@ export async function listInvoicesOverview(filters: InvoiceListFilters, signal?:
   }
 }
 
-export async function startInvoiceProcess(storeId: string, accessKey: string) {
-  const { error } = await supabase!.rpc('iniciar_fstd_produtos_v2', { p_loja_id: storeId, p_nfd_chave_acesso: accessKey })
-  if (error) throw toAppError(error)
+export async function startInvoiceProcess(storeId: string, accessKey: string): Promise<StartInvoiceProcessResult> {
+  const { data: processId, error: processError } = await supabase!.rpc('iniciar_fstd_produtos_v2', { p_loja_id: storeId, p_nfd_chave_acesso: accessKey })
+  if (processError) throw toAppError(processError)
+
+  const { data: note, error: noteError } = await supabase!
+    .from('nfd_notas')
+    .select(hydratedInvoiceSelect)
+    .eq('chave_acesso', accessKey)
+    .single()
+  if (noteError) throw toAppError(noteError)
+
+  return { processId: String(processId), note }
 }
 
 export async function findInvoiceStore(code: string | number, restrictedUfs: string[] = []) {

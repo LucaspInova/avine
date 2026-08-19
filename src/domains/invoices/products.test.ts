@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getNfdProducts, getNfdReturnRates, mergeNfdProducts } from './products'
+import { getFstdTargetProducts, getNfdProducts, getNfdReturnRates, mergeNfdProducts } from './products'
 
 describe('produtos e quantidades de NFD', () => {
   it('agrupa códigos vinculados ao mesmo produto e soma faturados', () => {
@@ -11,6 +11,18 @@ describe('produtos e quantidades de NFD', () => {
   it('mescla produto persistido sem duplicar o importado', () => {
     expect(mergeNfdProducts([{ produto_id: 'p1', codigo_produto: 'A', codigos_produto: ['A'], imagem_url: '' }], [{ produto_id: 'p1', codigo_produto: 'B', imagem_url: 'foto' }]))
       .toEqual([expect.objectContaining({ codigos_produto: ['A', 'B'], imagem_url: 'foto' })])
+  })
+  it('preserva os itens detalhados quando o FSTD abre antes da consulta ampla da NFD', () => {
+    const products = getFstdTargetProducts(
+      { detalhes: [{ codigo_produto: 'A', descricao_produto: 'Produto A', quantidade_galinha: 10 }] },
+      [],
+      [{ codigo_produto: 'B', nome: 'Produto B', quantidade_faturada_galinha: 2 }],
+    )
+
+    expect(products).toEqual([
+      expect.objectContaining({ codigo_produto: 'A', quantidade_faturada_galinha: 10 }),
+      expect.objectContaining({ codigo_produto: 'B', quantidade_faturada_galinha: 2 }),
+    ])
   })
   it('rateia devolução mista e limita percentuais entre zero e cem', () => {
     const rates = getNfdReturnRates({ quantidade_galinha: 8, quantidade_codorna: 2, produtos: [{ produto_id: 'p1', quantidade_faturada_galinha: 8, quantidade_faturada_codorna: 2 }], fstd_process: { produtos: [{ produto_id: 'p1', quantidade_retorno: 5 }] } })

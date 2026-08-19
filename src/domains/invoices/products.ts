@@ -25,6 +25,10 @@ export function getNfdProducts(nfd: any, productsCatalog: any[] = []) {
   return [...grouped.values()]
 }
 
+export function getFstdTargetProducts(nfd: any, productsCatalog: any[] = [], processProducts: any[] = []) {
+  return mergeNfdProducts(getNfdProducts(nfd, productsCatalog), processProducts)
+}
+
 export function mergeNfdProducts(importedProducts: any[], processProducts: any[] = []) {
   const grouped = new Map(importedProducts.map((p) => [getProductGroupKey(p), p]))
   for (const product of processProducts) {
