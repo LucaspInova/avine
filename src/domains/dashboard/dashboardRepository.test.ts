@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyNfdStatuses } from './dashboardRepository'
+import { applyNfdStatuses, collectDashboardReasonIds } from './dashboardRepository'
 import type { DashboardFstdProcess, DashboardLegacyFstd, DashboardNote, DashboardUnknownNfd } from './types'
 
 function note(chaveAcesso: string, numero: number): DashboardNote {
@@ -28,7 +28,10 @@ describe('status das NFDs da dashboard', () => {
       { id: 'done', nfd_chave_acesso: 'moderna', status: 'concluida', finalizada_em: '2026-08-10', created_at: '2026-08-10T08:00:00Z', is_avulsa: false },
     ]
     const legacy: DashboardLegacyFstd[] = [{ legado_id: 1, codigo_loja: '1', numero_nfd: '1', data_preenchimento: null, motivo: null, qtd_total_galinha: 0, qtd_retorno_galinha: 0, qtd_total_codorna: 0, qtd_retorno_codorna: 0 }]
-    const unknown: DashboardUnknownNfd[] = [{ nfd_chave_acesso: 'moderna', nfd_referencia: '1:2', loja_codigo: '1', nfd_numero: '2' }]
+    const unknown: DashboardUnknownNfd[] = [
+      { nfd_chave_acesso: 'legado', nfd_referencia: '1:1', loja_codigo: '1', nfd_numero: '1' },
+      { nfd_chave_acesso: 'moderna', nfd_referencia: '1:2', loja_codigo: '1', nfd_numero: '2' },
+    ]
 
     const result = applyNfdStatuses(
       [note('legado', 1), note('moderna', 2), note('cancelada', 3), note('pendente', 4)],
@@ -38,6 +41,15 @@ describe('status das NFDs da dashboard', () => {
       unknown,
     )
 
-    expect(result.map((item) => item.status)).toEqual(['Finalizada', 'Desconhecida', 'Pendente', 'Pendente'])
+    expect(result.map((item) => item.status)).toEqual(['Finalizada', 'Finalizada', 'Pendente', 'Pendente'])
+  })
+})
+
+describe('motivos carregados pela dashboard', () => {
+  it('inclui motivos das divisões quando o produto não possui motivo direto', () => {
+    expect(collectDashboardReasonIds(
+      [{ motivo_id: 'motivo-direto' }, { motivo_id: null }],
+      [{ motivo_id: 'motivo-divisao' }, { motivo_id: 'motivo-direto' }],
+    )).toEqual(['motivo-direto', 'motivo-divisao'])
   })
 })

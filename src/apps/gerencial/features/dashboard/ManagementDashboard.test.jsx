@@ -23,6 +23,19 @@ describe('tooltip do gráfico financeiro', () => {
     expect(screen.getByText('05 de agosto de 2026')).toBeInTheDocument()
     expect(screen.getByText(/54\.299,72/)).toBeInTheDocument()
     expect(screen.getAllByRole('button')[0]).toHaveAttribute('r', '24')
+    expect(screen.getByRole('img', { name: 'Evolução diária do valor financeiro' })).toHaveAttribute('viewBox', '0 0 760 310')
+  })
+
+  it('usa uma área vertical maior no mobile', () => {
+    const originalWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+    try {
+      render(<FinancialChart data={[{ date: '2026-08-05', value: 54299.72 }]} />)
+
+      expect(screen.getByRole('img', { name: 'Evolução diária do valor financeiro' })).toHaveAttribute('viewBox', '0 0 420 360')
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
+    }
   })
 })
 
@@ -124,6 +137,7 @@ describe('linha de total dos produtos', () => {
     />)
 
     expect(screen.getByText('Total faturado')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /Motivo de devolução principal/ })).toBeInTheDocument()
     expect(screen.getByText('300 ovos')).toBeInTheDocument()
     expect(screen.getByText('60 ovos')).toBeInTheDocument()
     expect(screen.getByText('20,0%')).toBeInTheDocument()

@@ -9,7 +9,7 @@ const LIGHT_GREEN = [235, 241, 232]
 const GREY = [100, 105, 100]
 const PAGE_WIDTH = 210
 const PAGE_HEIGHT = 297
-export const FSTD_PDF_TEMPLATE_VERSION = 7
+export const FSTD_PDF_TEMPLATE_VERSION = 8
 
 function asText(value, fallback = '-') {
   const text = String(value ?? '').trim()
@@ -229,6 +229,45 @@ async function getImageDataUrl(url) {
   }
 }
 
+async function getPdfPhotoDataUrl(url) {
+  if (!url || typeof Image === 'undefined' || typeof document === 'undefined') return getImageDataUrl(url)
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+
+    try {
+      return await new Promise((resolve) => {
+        const image = new Image()
+        image.onload = () => {
+          const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
+          const scale = longestSide > 480 ? 480 / longestSide : 1
+          const width = Math.max(1, Math.round(image.naturalWidth * scale))
+          const height = Math.max(1, Math.round(image.naturalHeight * scale))
+          const canvas = document.createElement('canvas')
+          canvas.width = width
+          canvas.height = height
+          const context = canvas.getContext('2d')
+          if (!context) {
+            resolve(null)
+            return
+          }
+          context.drawImage(image, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.68))
+        }
+        image.onerror = () => resolve(null)
+        image.src = objectUrl
+      })
+    } finally {
+      URL.revokeObjectURL(objectUrl)
+    }
+  } catch {
+    return null
+  }
+}
+
 function addImageContain(pdf, dataUrl, x, y, width, height) {
   if (!dataUrl) return
 
@@ -253,7 +292,7 @@ function addImageContain(pdf, dataUrl, x, y, width, height) {
   }
 }
 
-function productRows(process, motivosById) {
+export function productRows(process, motivosById) {
   return (process?.produtos ?? []).map((product) => {
     const divisions = Array.isArray(product.divisoes) ? product.divisoes : []
     const reasons = divisions.length > 0
@@ -262,7 +301,10 @@ function productRows(process, motivosById) {
 
     return {
       name: asText(product.nome || product.descricao || product.codigo_produto),
-      billed: asNumber(product.quantidade_faturada_galinha) + asNumber(product.quantidade_faturada_codorna),
+      billedChicken: asNumber(product.quantidade_faturada_galinha ?? product.qtd_total_galinha),
+      billedQuail: asNumber(product.quantidade_faturada_codorna ?? product.qtd_total_codorna),
+      returnedChicken: asNumber(product.quantidade_retorno_galinha ?? product.qtd_retorno_galinha),
+      returnedQuail: asNumber(product.quantidade_retorno_codorna ?? product.qtd_retorno_codorna),
       returned: asNumber(product.quantidade_retorno),
       reasons,
       observation: cleanObservation(product.observacao),
@@ -288,12 +330,12 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   const photoPaths = [...new Set(rows.flatMap((row) => row.photos))]
   await Promise.all(photoPaths.map(async (path) => {
     const url = photoUrlByPath.get(path) ?? path
-    const dataUrl = /^(?:https?:\/\/|data:image\/)/i.test(url) ? await getImageDataUrl(url) : null
+    const dataUrl = /^(?:https?:\/\/|data:image\/)/i.test(url) ? await getPdfPhotoDataUrl(url) : null
     if (dataUrl) photoDataByPath.set(path, dataUrl)
   }))
 
   pdf.setProperties({
-    title: `FSTD ${document.numero_controle}`,
+    title: `FSTD ${document?.numero_controle ?? process?.nfd_numero ?? nfd?.nota_fiscal ?? '-'}`,
     subject: 'Formulário de Solicitação de Trocas e Devoluções',
     creator: 'Avine FSTD Digital',
   })
@@ -347,7 +389,7 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   pdf.roundedRect(145, 16, 58, 16, 2, 2, 'S')
   pdf.setFontSize(19)
   pdf.setTextColor(210, 26, 70)
-  pdf.text(String(document.numero_controle), 174, 27, { align: 'center' })
+  pdf.text(String(document?.numero_controle ?? '-'), 174, 27, { align: 'center' })
 
   pdf.setDrawColor(205, 215, 205)
   pdf.line(7, 42, 203, 42)
@@ -362,8 +404,8 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
 
   addInfoField(pdf, {
     icon: 'calendar',
-    label: 'Data da entrega',
-    value: formatDate(process?.data_entrega ?? nfd?.data_entrega ?? nfd?.data_emissao),
+    label: 'Data da FSTD',
+    value: formatDate(process?.data_entrega ?? process?.finalizada_em ?? nfd?.data_entrega ?? nfd?.data_emissao),
     x: 13,
     y: 56,
     width: 53,
@@ -387,7 +429,7 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   addInfoField(pdf, {
     icon: 'barcode',
     label: 'Nº da NFD',
-    value: process?.nfd_numero ?? nfd?.nota_fiscal,
+    value: process?.nfd_numero ?? nfd?.nota_fiscal ?? nfd?.numero,
     x: 13,
     y: 78,
     width: 53,
@@ -407,11 +449,12 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   const tableY = 117
   const tableX = 7
   const columns = [
-    { label: 'PRODUTO', x: tableX, width: 48 },
-    { label: 'FATURADO (OVOS)', x: tableX + 48, width: 32 },
-    { label: 'RETORNO (OVOS)', x: tableX + 80, width: 32 },
-    { label: 'MOTIVO', x: tableX + 112, width: 43 },
-    { label: 'OBSERVAÇÃO', x: tableX + 155, width: contentWidth - 155 },
+    { label: 'PRODUTO', x: tableX, width: 42 },
+    { label: 'FATURADO\nGALINHA', x: tableX + 42, width: 25 },
+    { label: 'FATURADO\nCODORNA', x: tableX + 67, width: 25 },
+    { label: 'RETORNO\nTOTAL', x: tableX + 92, width: 24 },
+    { label: 'MOTIVO', x: tableX + 116, width: 40 },
+    { label: 'OBSERVAÇÃO', x: tableX + 156, width: contentWidth - 156 },
   ]
   const rowHeight = 8.7
   const maxRows = Math.max(10, rows.length)
@@ -422,7 +465,10 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   pdf.setFont('helvetica', 'bold')
   pdf.setFontSize(6.5)
   pdf.setTextColor(255, 255, 255)
-  columns.forEach((column) => pdf.text(column.label, column.x + column.width / 2, tableY + 5.2, { align: 'center' }))
+  columns.forEach((column) => {
+    const labels = String(column.label).split('\n')
+    pdf.text(labels, column.x + column.width / 2, labels.length > 1 ? tableY + 3.2 : tableY + 5.2, { align: 'center' })
+  })
 
   pdf.setDrawColor(220, 225, 220)
   pdf.setLineWidth(0.25)
@@ -450,10 +496,12 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
     pdf.setFontSize(7.5)
     pdf.setTextColor(30, 34, 30)
     pdf.text(pdf.splitTextToSize(row.name, columns[0].width - 15)[0], columns[0].x + 12, y + 5.5)
-    pdf.text(String(row.billed), columns[1].x + columns[1].width / 2, y + 5.7, { align: 'center' })
-    pdf.text(String(row.returned), columns[2].x + columns[2].width / 2, y + 5.7, { align: 'center' })
-    pdf.text(pdf.splitTextToSize(row.reasons, columns[3].width - 5)[0], columns[3].x + 3, y + 5.7)
-    pdf.text(pdf.splitTextToSize(row.observation, columns[4].width - 5)[0], columns[4].x + 3, y + 5.7)
+    pdf.text(String(row.billedChicken), columns[1].x + columns[1].width / 2, y + 5.7, { align: 'center' })
+    pdf.text(String(row.billedQuail), columns[2].x + columns[2].width / 2, y + 5.7, { align: 'center' })
+    const returned = row.returnedChicken + row.returnedQuail || row.returned
+    pdf.text(String(returned), columns[3].x + columns[3].width / 2, y + 5.7, { align: 'center' })
+    pdf.text(pdf.splitTextToSize(row.reasons, columns[4].width - 5)[0], columns[4].x + 3, y + 5.7)
+    pdf.text(pdf.splitTextToSize(row.observation, columns[5].width - 5)[0], columns[5].x + 3, y + 5.7)
   }
 
   const photosY = 219

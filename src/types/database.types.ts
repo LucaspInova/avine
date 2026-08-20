@@ -596,10 +596,97 @@ export type Database = {
           qtd_total_codorna: number | null
           qtd_retorno_codorna: number | null
           origem: string
+          source_hash: string | null
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['fstd_legado']['Row'], 'legado_id' | 'created_at'> & { legado_id?: number; created_at?: string }
-        Update: Partial<Database['public']['Tables']['fstd_legado']['Insert']>
+        Insert: {
+          legado_id?: number
+          codigo_loja: string
+          numero_nfd: string
+          id: string
+          numero_controle?: string | null
+          data_preenchimento?: string | null
+          responsavel_fstd?: string | null
+          motivo?: string | null
+          qtd_total_galinha?: number | null
+          qtd_retorno_galinha?: number | null
+          qtd_total_codorna?: number | null
+          qtd_retorno_codorna?: number | null
+          origem: string
+          source_hash?: string | null
+          created_at?: string
+        }
+        Update: {
+          legado_id?: number
+          codigo_loja?: string
+          numero_nfd?: string
+          id?: string
+          numero_controle?: string | null
+          data_preenchimento?: string | null
+          responsavel_fstd?: string | null
+          motivo?: string | null
+          qtd_total_galinha?: number | null
+          qtd_retorno_galinha?: number | null
+          qtd_total_codorna?: number | null
+          qtd_retorno_codorna?: number | null
+          origem?: string
+          source_hash?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      fstd_legado_import_staging: {
+        Row: {
+          import_id: number
+          codigo_loja: string
+          numero_nfd: string
+          id: string
+          numero_controle: string | null
+          data_preenchimento: string | null
+          responsavel_fstd: string | null
+          motivo: string | null
+          qtd_total_galinha: number | null
+          qtd_retorno_galinha: number | null
+          qtd_total_codorna: number | null
+          qtd_retorno_codorna: number | null
+          origem: string
+          source_hash: string
+          uploaded_at: string
+        }
+        Insert: {
+          import_id?: never
+          codigo_loja: string
+          numero_nfd: string
+          id: string
+          numero_controle?: string | null
+          data_preenchimento?: string | null
+          responsavel_fstd?: string | null
+          motivo?: string | null
+          qtd_total_galinha?: number | null
+          qtd_retorno_galinha?: number | null
+          qtd_total_codorna?: number | null
+          qtd_retorno_codorna?: number | null
+          origem: string
+          source_hash: string
+          uploaded_at?: string
+        }
+        Update: {
+          import_id?: never
+          codigo_loja?: string
+          numero_nfd?: string
+          id?: string
+          numero_controle?: string | null
+          data_preenchimento?: string | null
+          responsavel_fstd?: string | null
+          motivo?: string | null
+          qtd_total_galinha?: number | null
+          qtd_retorno_galinha?: number | null
+          qtd_total_codorna?: number | null
+          qtd_retorno_codorna?: number | null
+          origem?: string
+          source_hash?: string
+          uploaded_at?: string
+        }
         Relationships: []
       }
     }

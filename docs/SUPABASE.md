@@ -79,6 +79,20 @@ frontend nao consegue forjar produtos ou quantidades.
 tabela e acessada somente pela sincronizacao com service role; o aviso
 `rls_enabled_no_policy` do advisor e esperado.
 
+### Pesquisa numerica de NFD
+
+A RPC `listar_nfd_notas_gerencial` permanece `SECURITY INVOKER`. Pesquisas
+numericas parciais resolvem primeiro as chaves autorizadas pelo helper privado
+`app_private.search_nfd_chaves_numeric(text)` e depois carregam as notas pela
+view com RLS. Isso evita que o predicado `LIKE` fique atras da barreira de
+seguranca e force uma varredura completa de `nfd_itens`.
+
+O helper valida perfil ativo e aplica o escopo de UFs antes de retornar apenas
+chaves de acesso; `anon` nao possui `EXECUTE`. Em um rollback forward-only, uma
+nova migration deve restaurar a versao anterior da RPC antes de remover o
+helper. Os indices trigrama podem permanecer porque nao alteram dados nem o
+contrato da consulta.
+
 As Edge Functions `sync-devolucoes-avine-api` e
 `sync-devolucoes-avine-sheets` usam o mesmo `CRON_SECRET`, mantido como secret
 da Edge Function. Os jobs leem a copia correspondente do Vault

@@ -1,38 +1,70 @@
-import legacyTemplate from '../../../../base-legado/template-pdf.html?raw'
+import { generateFstdPdf } from './fstdPdf'
 
-export const FSTD_LEGADO_TEMPLATE_VERSION = 1
+export const FSTD_LEGADO_TEMPLATE_VERSION = 2
 
-function escapeHtml(value) {
-  return String(value ?? '-').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]))
-}
+export function legacyFstdLookupParams(target, store) {
+  const legacy = target?.fstd_legado
+  const codigoLoja = legacy?.codigo_loja ?? target?.loja_codigo ?? target?.codigo_cliente ?? store?.codigo
+  const numeroNfd = legacy?.numero_nfd ?? target?.nota_fiscal ?? target?.numero
 
-function formatDate(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date)
-}
-
-export function generateLegacyFstdHtml({ record, store }) {
-  const values = {
-    id: record.id,
-    data_preenchimento: formatDate(record.data_preenchimento),
-    codigo_loja: store?.nome ? `${store.nome} (${record.codigo_loja})` : record.codigo_loja,
-    responsavel_fstd: record.responsavel_fstd,
-    motivo: record.motivo,
-    numero_nfd: record.numero_nfd,
-    qtd_total_galinha: record.qtd_total_galinha,
-    qtd_retorno_galinha: record.qtd_retorno_galinha,
-    qtd_total_codorna: record.qtd_total_codorna,
-    qtd_retorno_codorna: record.qtd_retorno_codorna,
-    'calcular-perdido-gal': Number(record.qtd_total_galinha ?? 0) - Number(record.qtd_retorno_galinha ?? 0),
-    'calcular-perdido-cod': Number(record.qtd_total_codorna ?? 0) - Number(record.qtd_retorno_codorna ?? 0),
+  if (codigoLoja === null || codigoLoja === undefined || numeroNfd === null || numeroNfd === undefined) {
+    throw new Error('Não foi possível identificar a loja e a NFD da FSTD legada.')
   }
-  let html = legacyTemplate.replace('src\\shared\\assets\\foto_logoavine.png', '/src/shared/assets/foto_logoavine.png')
-  for (const [key, value] of Object.entries(values)) html = html.replaceAll(`$${key}`, escapeHtml(value))
-  return html.replace('<title>FSTD DIGITAL</title>', `<title>FSTD ${escapeHtml(record.id)}</title>`)
+
+  return {
+    p_codigo_loja: String(codigoLoja).trim(),
+    p_numero_nfd: String(numeroNfd).trim(),
+  }
 }
 
-export function createLegacyFstdDocument(record, store) {
-  const blob = new Blob([generateLegacyFstdHtml({ record, store })], { type: 'text/html;charset=utf-8' })
-  return { controlNumber: record.id, url: URL.createObjectURL(blob), templateVersion: FSTD_LEGADO_TEMPLATE_VERSION }
+export function legacyFstdPdfInput(record, store) {
+  const controlNumber = record.numero_controle ?? record.id
+  const process = {
+    nfd_numero: record.numero_nfd,
+    finalizada_em: record.data_preenchimento,
+    produtos: [{
+      codigo_produto: 'LEGADO-CAIPIRA',
+      nome: 'Caipira',
+      quantidade_faturada_galinha: Number(record.qtd_total_galinha ?? 0),
+      quantidade_faturada_codorna: 0,
+      quantidade_retorno_galinha: Number(record.qtd_retorno_galinha ?? 0),
+      quantidade_retorno_codorna: 0,
+      motivo_id: null,
+      observacao: `Perda no cliente: ${Number(record.qtd_total_galinha ?? 0) - Number(record.qtd_retorno_galinha ?? 0)}.`,
+      fotos: [],
+    }, {
+      codigo_produto: 'LEGADO-CODORNA',
+      nome: 'Codorna',
+      quantidade_faturada_galinha: 0,
+      quantidade_faturada_codorna: Number(record.qtd_total_codorna ?? 0),
+      quantidade_retorno_galinha: 0,
+      quantidade_retorno_codorna: Number(record.qtd_retorno_codorna ?? 0),
+      motivo_id: null,
+      observacao: `Perda no cliente: ${Number(record.qtd_total_codorna ?? 0) - Number(record.qtd_retorno_codorna ?? 0)}.`,
+      fotos: [],
+    }],
+  }
+
+  return {
+    document: { numero_controle: controlNumber },
+    process,
+    nfd: {
+      nota_fiscal: record.numero_nfd,
+      codigo_cliente: record.codigo_loja ?? store?.codigo,
+      nome_abreviado: store?.nome,
+    },
+    store: store ?? { codigo: record.codigo_loja },
+    responsible: record.responsavel_fstd,
+    motivos: record.motivo ? [{ id: '__legacy__', nome: record.motivo }] : [],
+    photoUrls: [],
+  }
+}
+
+export async function createLegacyFstdDocument(record, store) {
+  const input = legacyFstdPdfInput(record, store)
+  input.process.produtos.forEach((product) => {
+    product.motivo_id = input.motivos[0]?.id ?? null
+  })
+  const blob = await generateFstdPdf(input)
+  return { controlNumber: input.document.numero_controle, url: URL.createObjectURL(blob), templateVersion: FSTD_LEGADO_TEMPLATE_VERSION }
 }

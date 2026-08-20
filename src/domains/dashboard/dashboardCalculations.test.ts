@@ -26,7 +26,7 @@ function createSource(): ManagementDashboardSource {
       { chave_acesso: 'modern-key', codigo_produto: 'ABC', quantidade_galinha: 80, valor_galinha: 200, quantidade_codorna: 30, valor_codorna: 50 },
     ],
     products: [{ id: 'product-1', processo_id: 'process-1', produto_id: 'catalog-1', codigo_produto: 'ABC', nome: 'Produto novo', quantidade_faturada_galinha: 80, quantidade_faturada_codorna: 0, quantidade_retorno: 16, motivo_id: 'reason-1', status: 'concluido' }],
-    productReasons: [{ produto_id: 'product-1', motivo_id: 'reason-1', quantidade: 16 }],
+    productReasons: [{ produto_id: 'product-1', motivo_id: 'reason-1', quantidade_faturada: 80, quantidade: 16 }],
     reasons: [{ id: 'reason-1', nome: 'Avaria na entrega' }],
     catalogProducts: [{ id: 'catalog-1', nome: 'Produto novo', categoria: 'Galinha' }],
     reports: [],
@@ -59,9 +59,46 @@ describe('cálculos da Dashboard Gerencial', () => {
   })
 
   it('mantém o ranking de produtos restrito aos FSTDs modernos detalhados', () => {
-    const dashboard = calculateManagementDashboard(createSource())
+    const source = createSource()
+    source.invoiceItems.push(
+      { chave_acesso: 'pending-key', codigo_produto: 'ABC', quantidade_galinha: 40, valor_galinha: 80, quantidade_codorna: 0, valor_codorna: 0 },
+      { chave_acesso: 'pending-key', codigo_produto: 'PENDING', quantidade_galinha: 30, valor_galinha: 60, quantidade_codorna: 0, valor_codorna: 0 },
+    )
 
-    expect(dashboard.products).toEqual([expect.objectContaining({ name: 'Produto novo', category: 'Galinha', returned: 16, returnPercentage: 20, mainReason: 'Avaria na entrega' })])
+    const dashboard = calculateManagementDashboard(source)
+
+    expect(dashboard.products).toEqual([expect.objectContaining({ name: 'Produto novo', category: 'Galinha', billed: 80, returned: 16, returnPercentage: 20, mainReason: 'Avaria na entrega' })])
+    expect(dashboard.allProducts.some((product) => product.name === 'PENDING')).toBe(false)
+  })
+
+  it('mantém o motivo registrado com retorno zero e sinaliza retorno sem motivo', () => {
+    const source = createSource()
+    source.invoiceItems.push(
+      { chave_acesso: 'modern-key', codigo_produto: 'ZERO', quantidade_galinha: 40, valor_galinha: 80, quantidade_codorna: 0, valor_codorna: 0 },
+      { chave_acesso: 'modern-key', codigo_produto: 'GAP', quantidade_galinha: 50, valor_galinha: 100, quantidade_codorna: 0, valor_codorna: 0 },
+    )
+    source.products.push(
+      { id: 'product-zero', processo_id: 'process-1', produto_id: 'catalog-zero', codigo_produto: 'ZERO', nome: 'Produto sem retorno', quantidade_faturada_galinha: 40, quantidade_faturada_codorna: 0, quantidade_retorno: 0, motivo_id: 'reason-1', status: 'concluido' },
+      { id: 'product-gap', processo_id: 'process-1', produto_id: 'catalog-gap', codigo_produto: 'GAP', nome: 'Produto com motivo ausente', quantidade_faturada_galinha: 50, quantidade_faturada_codorna: 0, quantidade_retorno: 5, motivo_id: null, status: 'concluido' },
+    )
+    source.productReasons.push({ produto_id: 'product-zero', motivo_id: 'reason-1', quantidade_faturada: 40, quantidade: 0 })
+    source.catalogProducts.push(
+      { id: 'catalog-zero', nome: 'Produto sem retorno', categoria: 'Galinha' },
+      { id: 'catalog-gap', nome: 'Produto com motivo ausente', categoria: 'Galinha' },
+    )
+
+    const dashboard = calculateManagementDashboard(source)
+
+    expect(dashboard.allProducts.find((product) => product.name === 'Produto sem retorno')).toEqual(expect.objectContaining({
+      billed: 40,
+      returned: 0,
+      mainReason: 'Avaria na entrega',
+    }))
+    expect(dashboard.allProducts.find((product) => product.name === 'Produto com motivo ausente')).toEqual(expect.objectContaining({
+      billed: 50,
+      returned: 5,
+      mainReason: 'Motivo não informado',
+    }))
   })
 
   it('expõe o faturado e o retorno de cada motivo sem duplicar o faturado do produto', () => {

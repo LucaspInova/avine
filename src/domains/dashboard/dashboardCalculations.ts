@@ -49,12 +49,17 @@ function percentageChange(value: number, previous: number) {
 }
 
 function createDataIndex(source: ManagementDashboardSource) {
-  const allProcessByAccessKey = new Map<string, DashboardFstdProcess>()
-  const processByAccessKey = new Map<string, DashboardFstdProcess>()
+  const latestProcessByAccessKey = new Map<string, DashboardFstdProcess>()
   source.processes.forEach((process) => {
-    if (!process.is_avulsa) allProcessByAccessKey.set(process.nfd_chave_acesso, process)
-    if (!process.is_avulsa && process.status === 'concluida') processByAccessKey.set(process.nfd_chave_acesso, process)
+    if (process.is_avulsa) return
+    const current = latestProcessByAccessKey.get(process.nfd_chave_acesso)
+    if (!current || process.created_at > current.created_at || (process.created_at === current.created_at && process.id > current.id)) {
+      latestProcessByAccessKey.set(process.nfd_chave_acesso, process)
+    }
   })
+  const processByAccessKey = new Map(
+    [...latestProcessByAccessKey.entries()].filter(([, process]) => process.status === 'concluida'),
+  )
 
   const productsByProcess = new Map<string, DashboardFstdProduct[]>()
   source.products.forEach((product) => {
@@ -85,7 +90,6 @@ function createDataIndex(source: ManagementDashboardSource) {
   })
 
   return {
-    allProcessByAccessKey,
     processByAccessKey,
     productsByProcess,
     invoiceItemsByAccessKey,
@@ -247,10 +251,16 @@ function buildPeriodSummary(notes: DashboardNote[], index: ReturnType<typeof cre
 }
 
 function buildProducts(notes: DashboardNote[], index: ReturnType<typeof createDataIndex>) {
-  const rows = new Map<string, { name: string; category: string; returned: number; billed: number; reasons: Map<string, number> }>()
+  const rows = new Map<string, {
+    name: string
+    category: string
+    returned: number
+    billed: number
+    reasons: Map<string, { returned: number; billed: number }>
+  }>()
   const invoiceTotalsByCode = new Map<string, { galinha: number; codorna: number }>()
   notes.forEach((note) => {
-    if (index.legacyByNote.has(noteKey(note)) || !note.chave_acesso) return
+    if (index.legacyByNote.has(noteKey(note)) || !note.chave_acesso || !index.processByAccessKey.has(note.chave_acesso)) return
     ;(index.invoiceItemsByAccessKey.get(note.chave_acesso) ?? []).forEach((item) => {
       const current = invoiceTotalsByCode.get(item.codigo_produto) ?? { galinha: 0, codorna: 0 }
       current.galinha += numberValue(item.quantidade_galinha)
@@ -260,7 +270,7 @@ function buildProducts(notes: DashboardNote[], index: ReturnType<typeof createDa
   })
   notes.forEach((note) => {
     if (!note.chave_acesso || index.legacyByNote.has(noteKey(note))) return
-    const process = index.allProcessByAccessKey.get(note.chave_acesso)
+    const process = index.processByAccessKey.get(note.chave_acesso)
     if (!process) return
     ;(index.productsByProcess.get(process.id) ?? []).forEach((product) => {
       const catalog = product.produto_id ? index.catalogById.get(product.produto_id) : undefined
@@ -274,19 +284,25 @@ function buildProducts(notes: DashboardNote[], index: ReturnType<typeof createDa
           if (!invoiceTotals) return 0
           return catalog?.categoria?.toLowerCase().includes('codorna') ? invoiceTotals.codorna : invoiceTotals.galinha
         })(),
-        reasons: new Map<string, number>(),
+        reasons: new Map<string, { returned: number; billed: number }>(),
       }
       row.returned += numberValue(product.quantidade_retorno)
       if (!invoiceTotalsByCode.has(product.codigo_produto)) row.billed += numberValue(product.quantidade_faturada_galinha) + numberValue(product.quantidade_faturada_codorna)
       const divisions = index.reasonsByProduct.get(product.id) ?? []
       if (divisions.length > 0) {
-        divisions.forEach((division) => row.reasons.set(
-          index.reasonNameById.get(division.motivo_id) ?? 'Motivo não informado',
-          (row.reasons.get(index.reasonNameById.get(division.motivo_id) ?? 'Motivo não informado') ?? 0) + numberValue(division.quantidade),
-        ))
+        divisions.forEach((division) => {
+          const reason = index.reasonNameById.get(division.motivo_id) ?? 'Motivo não informado'
+          const totals = row.reasons.get(reason) ?? { returned: 0, billed: 0 }
+          totals.returned += numberValue(division.quantidade)
+          totals.billed += numberValue(division.quantidade_faturada)
+          row.reasons.set(reason, totals)
+        })
       } else if (product.motivo_id) {
         const reason = index.reasonNameById.get(product.motivo_id) ?? 'Motivo não informado'
-        row.reasons.set(reason, (row.reasons.get(reason) ?? 0) + numberValue(product.quantidade_retorno))
+        const totals = row.reasons.get(reason) ?? { returned: 0, billed: 0 }
+        totals.returned += numberValue(product.quantidade_retorno)
+        totals.billed += numberValue(product.quantidade_faturada_galinha) + numberValue(product.quantidade_faturada_codorna)
+        row.reasons.set(reason, totals)
       }
       rows.set(key, row)
     })
@@ -300,11 +316,18 @@ function buildProducts(notes: DashboardNote[], index: ReturnType<typeof createDa
 
   return [...rows.values()]
     .filter((row) => row.billed > 0 || row.returned > 0)
-    .map((row) => ({
-      ...row,
-      returnPercentage: row.billed > 0 ? (row.returned / row.billed) * 100 : 0,
-      mainReason: [...row.reasons.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? 'Não informado',
-    }))
+    .map((row) => {
+      const mainReturnReason = [...row.reasons.entries()]
+        .sort((left, right) => (
+          right[1].returned - left[1].returned || right[1].billed - left[1].billed
+        ))[0]?.[0]
+
+      return {
+        ...row,
+        returnPercentage: row.billed > 0 ? (row.returned / row.billed) * 100 : 0,
+        mainReason: mainReturnReason ?? 'Motivo não informado',
+      }
+    })
     .sort((left, right) => right.returned - left.returned || right.returnPercentage - left.returnPercentage)
 }
 

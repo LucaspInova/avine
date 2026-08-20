@@ -115,10 +115,10 @@ export function applyNfdStatuses(
   return notes.map((note) => {
     const reference = `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`
     const process = note.chave_acesso ? latestProcess.get(note.chave_acesso) : undefined
-    const status: DashboardStatus = (note.chave_acesso && unknownAccessKeys.has(note.chave_acesso)) || unknownReferences.has(reference)
-      ? 'Desconhecida'
-      : legacyNoteKeys.has(reference) || process?.status === 'concluida'
-        ? 'Finalizada'
+    const status: DashboardStatus = legacyNoteKeys.has(reference) || process?.status === 'concluida'
+      ? 'Finalizada'
+      : (note.chave_acesso && unknownAccessKeys.has(note.chave_acesso)) || unknownReferences.has(reference)
+        ? 'Desconhecida'
         : 'Pendente'
     return { ...note, status }
   }).filter((note) => !filters.status || note.status === filters.status)
@@ -207,6 +207,16 @@ function emptySource() {
   return { data: [], error: null }
 }
 
+export function collectDashboardReasonIds(
+  products: Pick<DashboardFstdProduct, 'motivo_id'>[],
+  productReasons: Pick<DashboardProductReason, 'motivo_id'>[],
+) {
+  return [...new Set([
+    ...products.map((product) => product.motivo_id),
+    ...productReasons.map((reason) => reason.motivo_id),
+  ].filter((value): value is string => Boolean(value)))]
+}
+
 async function readOperationalSources(notes: DashboardNote[], reportFilters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate'>) {
   const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
   const [invoiceItems, processes, unknown, reports] = await Promise.all([
@@ -225,12 +235,17 @@ async function readOperationalSources(notes: DashboardNote[], reportFilters: Pic
 
   const productIds = [...new Set((products.data ?? []).map((product) => product.id))]
   const catalogIds = [...new Set((products.data ?? []).map((product) => product.produto_id).filter((value): value is string => Boolean(value)))]
-  const reasonIds = [...new Set((products.data ?? []).map((product) => product.motivo_id).filter((value): value is string => Boolean(value)))]
-  const [productReasons, reasons, catalogProducts] = await Promise.all([
-    productIds.length ? supabase.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade').in('produto_id', productIds) : emptySource(),
-    reasonIds.length ? supabase.from('motivos_devolucao').select('id, nome').in('id', reasonIds) : emptySource(),
+  const [productReasons, catalogProducts] = await Promise.all([
+    productIds.length ? supabase.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade_faturada, quantidade').in('produto_id', productIds) : emptySource(),
     catalogIds.length ? supabase.from('produtos').select('id, nome, categoria').in('id', catalogIds) : emptySource(),
   ])
+  const reasonIds = collectDashboardReasonIds(
+    (products.data ?? []) as DashboardFstdProduct[],
+    (productReasons.data ?? []) as DashboardProductReason[],
+  )
+  const reasons = reasonIds.length
+    ? await supabase.from('motivos_devolucao').select('id, nome').in('id', reasonIds)
+    : emptySource()
 
   return { processes, invoiceItems, products, productReasons, reasons, catalogProducts, unknown, reports }
 }

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../shared/lib/supabaseClient'
 import { usePromotorWorkspace } from '../../promotor/hooks/usePromotorWorkspace'
 import { FSTD_PDF_TEMPLATE_VERSION, generateFstdPdf } from '../../../shared/lib/fstdPdf'
-import { createLegacyFstdDocument } from '../services/fstdLegadoPdf'
+import { createLegacyFstdDocument, legacyFstdLookupParams } from '../services/fstdLegadoPdf'
 import { getProfilePhotoSignedUrl, uploadProfilePhoto } from '../../../shared/lib/profilePhoto'
 import { getProfileLabel } from '../../../shared/lib/profileLabels.js'
 import LogoutConfirmDialog from '../../../shared/components/LogoutConfirmDialog.jsx'
@@ -3369,7 +3369,17 @@ export function PromotorWorkspace({
   const fstdDocumentMutation = useMutation({
     mutationFn: async (targetOverride) => {
       const documentTarget = targetOverride ?? currentFstdTarget
-      if (documentTarget?.fstd_legado) return createLegacyFstdDocument(documentTarget.fstd_legado, selectedStore)
+      if (documentTarget?.fstd_legado) {
+        const { data: legacyData, error: legacyError } = await supabase.rpc(
+          'obter_fstd_legado',
+          legacyFstdLookupParams(documentTarget, selectedStore),
+        )
+        if (legacyError) throw legacyError
+
+        const legacyRecord = Array.isArray(legacyData) ? legacyData[0] : legacyData
+        if (!legacyRecord) throw new Error('FSTD legada não encontrada para esta NFD.')
+        return createLegacyFstdDocument(legacyRecord, selectedStore)
+      }
       const processoId = documentTarget?.fstd_process_id
       if (!processoId || documentTarget?.fstd_process?.status !== 'concluida') {
         throw new Error('Finalize a FSTD antes de gerar o documento.')

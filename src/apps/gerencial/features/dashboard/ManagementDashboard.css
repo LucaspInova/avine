@@ -268,7 +268,7 @@
   .management-dashboard__gauge span { font-size: 13px; }
   .management-dashboard__days-chip { width: 126px; }
   .management-dashboard__days-chip small { font-size: 11px; }
-  .management-dashboard__financial-chart { min-height: 260px; }
+  .management-dashboard__financial-chart { min-height: 320px; }
   .management-dashboard__panel-heading { align-items: flex-start; flex-direction: column; gap: 6px; }
   .management-dashboard__table-scroll { overflow-x: auto; padding-bottom: 4px; }
   .management-dashboard__table-panel table { min-width: 490px; table-layout: auto; }

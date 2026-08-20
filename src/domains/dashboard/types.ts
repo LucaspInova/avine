@@ -64,6 +64,7 @@ export type DashboardInvoiceItem = {
 export type DashboardProductReason = {
   produto_id: string
   motivo_id: string
+  quantidade_faturada: number
   quantidade: number
 }
 

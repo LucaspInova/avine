@@ -185,10 +185,25 @@ function DashboardGauge({ label, value, unavailable = false }) {
 
 export function FinancialChart({ data }) {
   const [activeIndex, setActiveIndex] = useState(null)
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 600)
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const mediaQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 600px)') : null
+    const updateViewport = () => setIsMobile(mediaQuery ? mediaQuery.matches : window.innerWidth <= 600)
+    updateViewport()
+    if (mediaQuery?.addEventListener) {
+      mediaQuery.addEventListener('change', updateViewport)
+      return () => mediaQuery.removeEventListener('change', updateViewport)
+    }
+    window.addEventListener('resize', updateViewport)
+    return () => window.removeEventListener('resize', updateViewport)
+  }, [])
   if (data.length === 0) return <div className="management-dashboard__chart-empty">Sem valores no período.</div>
-  const width = 760
-  const height = 310
-  const padding = { top: 20, right: 28, bottom: 52, left: 84 }
+  const width = isMobile ? 420 : 760
+  const height = isMobile ? 360 : 310
+  const padding = isMobile
+    ? { top: 20, right: 18, bottom: 58, left: 62 }
+    : { top: 20, right: 28, bottom: 52, left: 84 }
   const max = Math.max(...data.map((point) => point.value), 1)
   const innerWidth = width - padding.left - padding.right
   const innerHeight = height - padding.top - padding.bottom
@@ -354,19 +369,24 @@ export function ProductsModal({ products, errors, isOpen, onClose }) {
       const totals = filteredProducts.reduce((result, product) => {
         result.billed += Number(product.billed ?? 0)
         result.returned += Number(product.returned ?? 0)
-        result.reasons.set(product.mainReason, (result.reasons.get(product.mainReason) ?? 0) + Number(product.returned ?? 0))
+        const reason = result.reasons.get(product.mainReason) ?? { returned: 0, billed: 0 }
+        reason.returned += Number(product.returned ?? 0)
+        reason.billed += Number(product.billed ?? 0)
+        result.reasons.set(product.mainReason, reason)
         return result
       }, { billed: 0, returned: 0, reasons: new Map() })
-      const mainReason = [...totals.reasons.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? '—'
+      const mainReason = [...totals.reasons.entries()].sort((left, right) => (
+        right[1].returned - left[1].returned || right[1].billed - left[1].billed
+      ))[0]?.[0] ?? '—'
       const returnPercentage = totals.billed > 0 ? (totals.returned / totals.billed) * 100 : 0
-      return <><td className="management-dashboard__products-total-label">Total</td><td><small>Total faturado</small><strong>{formatEggs(totals.billed)}</strong></td><td><small>Total retorno</small><strong>{formatEggs(totals.returned)}</strong></td><td><small>% média de retorno</small><strong>{formatPercent(returnPercentage)}</strong></td><td><small>Motivo principal</small><strong>{mainReason}</strong></td></>
+      return <><td className="management-dashboard__products-total-label">Total</td><td><small>Total faturado</small><strong>{formatEggs(totals.billed)}</strong></td><td><small>Total retorno</small><strong>{formatEggs(totals.returned)}</strong></td><td><small>% média de retorno</small><strong>{formatPercent(returnPercentage)}</strong></td><td><small>Motivo de devolução principal</small><strong>{mainReason}</strong></td></>
     }}
     columns={[
       { key: 'name', label: 'Produto', sortValue: (product) => product.name, render: (product) => product.name },
       { key: 'billed', label: 'Faturado', sortValue: (product) => product.billed, render: (product) => formatEggs(product.billed) },
       { key: 'returned', label: 'Retornado', sortValue: (product) => product.returned, render: (product) => formatEggs(product.returned) },
       { key: 'percentage', label: '% retorno', sortValue: (product) => product.returnPercentage, className: (product) => 'is-' + getGaugeTone(product.returnPercentage), render: (product) => formatPercent(product.returnPercentage) },
-      { key: 'reason', label: 'Motivo principal', sortValue: (product) => product.mainReason, render: (product) => product.mainReason },
+      { key: 'reason', label: 'Motivo de devolução principal', sortValue: (product) => product.mainReason, render: (product) => product.mainReason },
     ]}
     isOpen={isOpen}
     onClose={onClose}
@@ -392,7 +412,7 @@ export function ManagementDashboard({ restrictedUfs = [] }) {
     { key: 'billed', label: 'Faturado', sortValue: (product) => product.billed },
     { key: 'returned', label: 'Retornado', sortValue: (product) => product.returned },
     { key: 'percentage', label: '% retorno', sortValue: (product) => product.returnPercentage },
-    { key: 'reason', label: 'Motivo principal', sortValue: (product) => product.mainReason },
+    { key: 'reason', label: 'Motivo de devolução principal', sortValue: (product) => product.mainReason },
   ], [])
   const storeColumns = useMemo(() => [
     { key: 'name', label: 'Loja', sortValue: (store) => store.name },
