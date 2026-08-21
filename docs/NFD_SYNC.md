@@ -5,7 +5,7 @@
 | Fonte | Edge Function | Janela padrao | Cron UTC | Horario de negocio |
 | --- | --- | --- | --- | --- |
 | API Avine | `sync-devolucoes-avine-api` | dia anterior | `0 10 * * *` | horario legado |
-| Google Sheets | `sync-devolucoes-avine-sheets` | ultimos 21 dias ate ontem | `0 14 * * *` | 11:00 Sao Paulo |
+| Google Sheets | `sync-devolucoes-avine-sheets` | ultimos 21 dias ate ontem | `0 17 * * *` | 14:00 Brasilia |
 
 As duas funcoes aceitam `due_date=YYYY-MM-DD`. A funcao Sheets tambem aceita
 `start_date` e `end_date`, com limite de 31 dias por chamada. A janela movel
