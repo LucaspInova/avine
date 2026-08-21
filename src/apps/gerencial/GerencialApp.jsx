@@ -2217,7 +2217,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
         <PageToolbar
           className="notes-page-toolbar"
           title="Notas Fiscais de Devolução"
-          search={{ value: search, onChange: (value) => { setCurrentPage(1); onSearch(value) }, placeholder: 'Procurar', label: 'Procurar notas' }}
+          search={{ value: search, onChange: (value) => { setCurrentPage(1); onSearch(value) }, placeholder: 'Procurar por NFD ou nome', label: 'Procurar notas por NFD ou nome' }}
         >
           <FilterPopover
             activeFilterCount={activeFilterCount}
