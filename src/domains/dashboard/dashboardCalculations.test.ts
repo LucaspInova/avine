@@ -29,7 +29,6 @@ function createSource(): ManagementDashboardSource {
     productReasons: [{ produto_id: 'product-1', motivo_id: 'reason-1', quantidade_faturada: 80, quantidade: 16 }],
     reasons: [{ id: 'reason-1', nome: 'Avaria na entrega' }],
     catalogProducts: [{ id: 'catalog-1', nome: 'Produto novo', categoria: 'Galinha' }],
-    reports: [],
     legacy: [{ legado_id: 1, codigo_loja: '1', numero_nfd: '10', data_preenchimento: '2026-08-06T10:00:00Z', motivo: 'Avaria na entrega', qtd_total_galinha: 100, qtd_retorno_galinha: 10, qtd_total_codorna: 20, qtd_retorno_codorna: 2 }],
     sourceErrors: [],
   }
@@ -178,15 +177,8 @@ describe('cálculos da Dashboard Gerencial', () => {
     expect(dashboard.allStores.find((store) => store.name === 'Loja Pendente')).toEqual(expect.objectContaining({ billed: 40, returned: 0 }))
   })
 
-  it('usa o retorno consolidado do relatório FSTD para as lojas', () => {
+  it('calcula os retornos das lojas a partir dos produtos FSTD já carregados', () => {
     const source = createSource()
-    source.reports = [{
-      nome_abreviado: 'Loja Nova',
-      galinha_nfd: 80,
-      codorna_nfd: 30,
-      galinha_retorno: 16,
-      codorna_retorno: 0,
-    }]
 
     const dashboard = calculateManagementDashboard(source)
 

@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { applyNfdStatuses, collectDashboardReasonIds } from './dashboardRepository'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const dashboardApi = vi.hoisted(() => ({ rpc: vi.fn() }))
+
+vi.mock('../../shared/lib/supabaseClient', () => ({ supabase: { rpc: dashboardApi.rpc } }))
+
+import { applyNfdStatuses, collectDashboardReasonIds, loadManagementDashboard } from './dashboardRepository'
 import type { DashboardFstdProcess, DashboardLegacyFstd, DashboardNote, DashboardUnknownNfd } from './types'
 
 function note(chaveAcesso: string, numero: number): DashboardNote {
@@ -42,6 +47,33 @@ describe('status das NFDs da dashboard', () => {
     )
 
     expect(result.map((item) => item.status)).toEqual(['Finalizada', 'Finalizada', 'Pendente', 'Pendente'])
+  })
+})
+
+describe('fontes da dashboard', () => {
+  beforeEach(() => {
+    dashboardApi.rpc.mockReset()
+  })
+
+  it('carrega NFDs e dados operacionais em uma única RPC autenticada', async () => {
+    dashboardApi.rpc.mockResolvedValue({
+      data: {
+        notes: [note('chave-unica', 1)], invoiceItems: [], processes: [], legacy: [], unknown: [], products: [],
+        productReasons: [], catalogProducts: [], reasons: [],
+      },
+      error: null,
+    })
+
+    const result = await loadManagementDashboard({ startDate: '2026-08-01', endDate: '2026-08-31' })
+
+    expect(dashboardApi.rpc).toHaveBeenCalledTimes(1)
+    expect(dashboardApi.rpc).toHaveBeenCalledWith('carregar_dashboard_gerencial', {
+      p_data_inicial: '2026-08-01',
+      p_data_final: '2026-08-31',
+      p_uf: null,
+      p_cidade: null,
+    })
+    expect(result.current.notes).toHaveLength(1)
   })
 })
 

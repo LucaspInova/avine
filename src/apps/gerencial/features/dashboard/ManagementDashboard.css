@@ -122,7 +122,7 @@
 
 .management-dashboard__reasons-panel ol { display: grid; gap: 11px; margin: 21px 0 0; padding: 0; list-style: none; }
 .management-dashboard__reasons-panel > h2 { font-size: 18px; }
-.management-dashboard__reasons-panel li { display: grid; grid-template-columns: 24px minmax(100px, 1.15fr) minmax(52px, .62fr) minmax(145px, auto) auto; align-items: center; gap: 9px; min-width: 0; font-size: 13px; }
+.management-dashboard__reasons-panel li { display: grid; grid-template-columns: 24px 115px 76px minmax(128px, 1fr) 43px; align-items: center; gap: 9px; min-width: 0; font-size: 13px; }
 .management-dashboard__reason-rank { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 4px; background: #087337; color: #fff; font-size: 12px; font-weight: 800; }
 .management-dashboard__reason-name { min-width: 0; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
 .management-dashboard__reason-bar { height: 7px; min-width: 0; overflow: hidden; border-radius: 99px; background: #e0e5e3; }
@@ -272,7 +272,7 @@
   .management-dashboard__panel-heading { align-items: flex-start; flex-direction: column; gap: 6px; }
   .management-dashboard__table-scroll { overflow-x: auto; padding-bottom: 4px; }
   .management-dashboard__table-panel table { min-width: 490px; table-layout: auto; }
-  .management-dashboard__reasons-panel li { grid-template-columns: 24px minmax(90px, 1fr) minmax(52px, .65fr) auto; }
+  .management-dashboard__reasons-panel li { grid-template-columns: 24px minmax(90px, 1fr) 76px minmax(125px, 1fr); }
   .management-dashboard__reasons-panel li > .management-dashboard__evolution { display: none; }
   .management-dashboard__skeleton-block.is-1, .management-dashboard__skeleton-block.is-2, .management-dashboard__skeleton-block.is-3, .management-dashboard__skeleton-block.is-4 { grid-column: span 12; }
 }

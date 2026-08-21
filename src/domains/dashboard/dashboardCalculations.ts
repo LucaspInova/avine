@@ -97,7 +97,6 @@ function createDataIndex(source: ManagementDashboardSource) {
     legacyByNote,
     reasonNameById: new Map(source.reasons.map((reason) => [reason.id, reason.nome])),
     catalogById: new Map(source.catalogProducts.map((product) => [product.id, product])),
-    sourceReports: source.reports ?? [],
   }
 }
 
@@ -376,39 +375,6 @@ function buildReasons(notes: DashboardNote[], index: ReturnType<typeof createDat
 }
 
 function buildStores(notes: DashboardNote[], index: ReturnType<typeof createDataIndex>): DashboardStore[] {
-  const reports = index.sourceReports
-  if (reports.length > 0) {
-    const allowedNames = new Set(notes.map((note) => note.nome_abreviado?.trim() || note.estabelecimento?.trim()).filter(Boolean))
-    const stores = new Map<string, Omit<DashboardStore, 'returnPercentage'>>()
-    notes.forEach((note) => {
-      const name = note.nome_abreviado?.trim() || note.estabelecimento?.trim()
-      if (!name || !allowedNames.has(name)) return
-      const key = String(note.codigo_cliente ?? name)
-      const row = stores.get(key) ?? { name, billed: 0, returned: 0, returns: 0 }
-      const legacyValues = getLegacyStoreValues(note, index)
-      if (legacyValues) {
-        row.billed += legacyValues.billed
-        row.returned += legacyValues.returned
-        row.returns += legacyValues.returns
-      } else {
-        row.billed += numberValue(note.quantidade_galinha) + numberValue(note.quantidade_codorna)
-      }
-      stores.set(key, row)
-    })
-    reports.forEach((report) => {
-      const name = report.nome_abreviado?.trim()
-      if (!name || !allowedNames.has(name)) return
-      const row = [...stores.values()].find((store) => store.name === name) ?? { name, billed: 0, returned: 0, returns: 0 }
-      const returned = numberValue(report.galinha_retorno) + numberValue(report.codorna_retorno)
-      row.returned += returned
-      row.returns += returned > 0 ? 1 : 0
-      stores.set([...stores.entries()].find(([, store]) => store === row)?.[0] ?? name, row)
-    })
-    return [...stores.values()]
-      .filter((store) => store.billed > 0)
-      .map(finalizeStore)
-      .sort((left, right) => right.returnPercentage - left.returnPercentage || right.billed - left.billed)
-  }
   const stores = new Map<string, Omit<DashboardStore, 'returnPercentage'>>()
   notes.forEach((note) => {
     const key = String(note.codigo_cliente ?? note.nome_abreviado ?? note.estabelecimento ?? 'sem-loja')

@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(30);
 
 select has_function('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer']);
 select function_returns('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer'], 'jsonb');
@@ -10,9 +10,19 @@ select has_index('public', 'nfd_desconhecimentos', 'nfd_desconhecimentos_referen
 select has_index('public', 'fstd_legado', 'fstd_legado_loja_nfd_idx', 'legado indexado sem cast da coluna legada');
 select has_index('public', 'nfd_itens', 'nfd_itens_nota_fiscal_trgm_idx', 'NFD textual parcial indexada');
 select has_index('public', 'nfd_itens', 'nfd_itens_codigo_cliente_trgm_idx', 'cliente textual parcial indexado');
+select has_index('public', 'nfd_itens', 'nfd_itens_nome_abreviado_trgm_idx', 'nome abreviado textual parcial indexado');
+select has_index('public', 'nfd_itens', 'nfd_itens_estabelecimento_trgm_idx', 'estabelecimento textual parcial indexado');
 select function_privs_are('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer'], 'authenticated', array['EXECUTE'], 'somente usuário autenticado executa');
+select has_function('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'RPC da dashboard consolidada existe');
+select function_returns('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'jsonb', 'RPC da dashboard consolidada retorna JSON');
+select function_privs_are('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'authenticated', array['EXECUTE'], 'somente autenticado carrega fontes da dashboard');
+select has_function('public', 'carregar_dashboard_gerencial', array['date', 'date', 'text', 'text'], 'RPC unica da dashboard existe');
+select function_returns('public', 'carregar_dashboard_gerencial', array['date', 'date', 'text', 'text'], 'jsonb', 'RPC unica da dashboard retorna JSON');
+select function_privs_are('public', 'carregar_dashboard_gerencial', array['date', 'date', 'text', 'text'], 'authenticated', array['EXECUTE'], 'somente autenticado carrega a dashboard completa');
 select has_function('app_private', 'search_nfd_chaves_numeric', array['text'], 'helper numerico privado existe');
 select function_privs_are('app_private', 'search_nfd_chaves_numeric', array['text'], 'authenticated', array['EXECUTE'], 'usuário autenticado pode usar o helper pelo RPC');
+select has_function('app_private', 'search_nfd_chaves_by_name', array['text'], 'helper textual privado existe');
+select function_privs_are('app_private', 'search_nfd_chaves_by_name', array['text'], 'authenticated', array['EXECUTE'], 'usuário autenticado pode usar a busca por nome pelo RPC');
 
 select matches(
   pg_get_functiondef('app_private.search_nfd_chaves_numeric(text)'::regprocedure),
@@ -30,6 +40,12 @@ select matches(
   pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
   E'app_private\\.search_nfd_chaves_numeric\\(\\$6\\)',
   'RPC resolve chaves numericas antes de consultar a view protegida por RLS'
+);
+
+select matches(
+  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
+  E'app_private\\.search_nfd_chaves_by_name\\(\\$6\\)',
+  'RPC resolve chaves por nome antes de consultar os itens protegidos por RLS'
 );
 
 select matches(

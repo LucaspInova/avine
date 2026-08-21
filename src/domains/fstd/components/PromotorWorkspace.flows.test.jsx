@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { FstdAvulsaFlow, FstdTableEditor, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { FstdAvulsaFlow, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
 import { keepNumericNfdCode } from '../model/validation'
 
 const noop = vi.fn()
@@ -56,6 +56,12 @@ describe('support header', () => {
 })
 
 describe('telas proprietárias de lojas e notas do Promotor', () => {
+  it('normaliza finalizada para o ícone visual verde de concluída', () => {
+    render(<InvoiceIcon status="finalizada" />)
+
+    expect(document.querySelector('svg')).toHaveClass('document-glyph', 'is-sent')
+  })
+
   it('cobre carregamento, vazio, pesquisa e abertura da loja pelo contrato público', () => {
     const { rerender } = render(<StoresScreen {...storesProps} loading />)
     expect(screen.getByText('Carregando lojas...')).toBeVisible()

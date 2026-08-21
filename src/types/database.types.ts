@@ -907,6 +907,14 @@ export type Database = {
         Args: { p_codigo_loja: string; p_numero_nfd: string }
         Returns: Database['public']['Tables']['fstd_legado']['Row'][]
       }
+      carregar_fontes_dashboard_gerencial: {
+        Args: { p_chaves_acesso?: string[]; p_referencias_legadas?: Json }
+        Returns: Json
+      }
+      carregar_dashboard_gerencial: {
+        Args: { p_data_inicial: string; p_data_final: string; p_uf?: string | null; p_cidade?: string | null }
+        Returns: Json
+      }
       listar_nfd_notas_gerencial: {
         Args: { p_data_inicial?: string | null; p_data_final?: string | null; p_status?: string | null; p_uf?: string | null; p_cidade?: string | null; p_pesquisa?: string | null; p_ordenar_por?: string; p_direcao?: string; p_limite?: number; p_deslocamento?: number }
         Returns: Json

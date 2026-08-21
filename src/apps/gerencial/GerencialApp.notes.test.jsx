@@ -84,6 +84,12 @@ describe('fluxo paginado das Notas gerenciais', () => {
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'mercado', startDate: '', endDate: '' }))
   })
 
+  it('informa que a busca aceita o número da NFD e o nome da loja', () => {
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
+
+    expect(screen.getByRole('searchbox', { name: 'Procurar notas por NFD ou nome' })).toHaveAttribute('placeholder', 'Procurar por NFD ou nome')
+  })
+
   it('preserva um período escolhido explicitamente durante a pesquisa', () => {
     render(<NotasScreen search="mercado" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     openFilters()

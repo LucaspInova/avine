@@ -1,4 +1,3 @@
-import { fetchAllNfdNotas } from '../invoices'
 import { toAppError } from '../../shared/errors'
 import { supabase } from '../../shared/lib/supabaseClient'
 import type {
@@ -6,7 +5,6 @@ import type {
   DashboardFstdProcess,
   DashboardInvoiceItem,
   DashboardFstdProduct,
-  DashboardFstdReport,
   DashboardLegacyFstd,
   DashboardNote,
   DashboardNoteCollection,
@@ -18,10 +16,6 @@ import type {
   ManagementDashboardFilters,
   ManagementDashboardSource,
 } from './types'
-
-const LEGACY_QUERY_CHUNK_SIZE = 45
-const DASHBOARD_QUERY_CONCURRENCY = 4
-const DASHBOARD_NFD_SELECT = 'chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, quantidade_codorna, valor_total'
 
 function parseDate(value: string) {
   return new Date(`${value}T00:00:00Z`)
@@ -45,34 +39,6 @@ export function getPreviousPeriod(filters: ManagementDashboardFilters): Manageme
     startDate: formatDate(previousStart),
     endDate: formatDate(previousEnd),
   }
-}
-
-async function listAccessibleNfdNotes(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate' | 'uf' | 'city'>, signal?: AbortSignal) {
-  return fetchAllNfdNotas(DASHBOARD_NFD_SELECT, (query) => {
-    if (filters.startDate && filters.endDate) {
-      query = query.or(`and(data_emissao.gte.${filters.startDate},data_emissao.lte.${filters.endDate}),and(data_emissao.is.null,data_referencia.gte.${filters.startDate},data_referencia.lte.${filters.endDate})`)
-    } else if (filters.startDate) {
-      query = query.or(`data_emissao.gte.${filters.startDate},and(data_emissao.is.null,data_referencia.gte.${filters.startDate})`)
-    } else if (filters.endDate) {
-      query = query.or(`data_emissao.lte.${filters.endDate},and(data_emissao.is.null,data_referencia.lte.${filters.endDate})`)
-    }
-    if (filters.uf) query = query.ilike('uf', filters.uf)
-    if (filters.city) query = query.ilike('cidade', filters.city)
-    return query.order('data_referencia', { ascending: false }).order('chave_acesso', { ascending: true })
-  }, signal)
-}
-
-async function mapWithConcurrency<T, R>(values: T[], callback: (value: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(values.length)
-  let nextIndex = 0
-  async function worker() {
-    while (nextIndex < values.length) {
-      const index = nextIndex++
-      results[index] = await callback(values[index])
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(DASHBOARD_QUERY_CONCURRENCY, values.length) }, worker))
-  return results
 }
 
 function noteDate(note: Pick<DashboardNote, 'data_emissao' | 'data_referencia'>) {
@@ -132,79 +98,20 @@ function createNoteCollection(notes: DashboardNote[], filterOptions: Pick<Dashbo
   }
 }
 
-function escapePostgrestValue(value: string) {
-  return `\"${String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}\"`
+type DashboardOperationalSourcesPayload = {
+  notes?: DashboardNote[]
+  processes?: DashboardFstdProcess[]
+  invoiceItems?: DashboardInvoiceItem[]
+  products?: DashboardFstdProduct[]
+  productReasons?: DashboardProductReason[]
+  reasons?: DashboardReason[]
+  catalogProducts?: DashboardCatalogProduct[]
+  unknown?: DashboardUnknownNfd[]
+  legacy?: DashboardLegacyFstd[]
 }
 
-async function listLegacyFstd(notes: DashboardNote[]): Promise<DashboardLegacyFstd[]> {
-  const uniquePairs = new Map<string, { storeCode: string; noteNumber: string }>()
-  notes.forEach((note) => {
-    if (note.codigo_cliente === null || note.nota_fiscal === null) return
-    const storeCode = String(note.codigo_cliente)
-    const noteNumber = String(note.nota_fiscal)
-    uniquePairs.set(`${storeCode}:${noteNumber}`, { storeCode, noteNumber })
-  })
-
-  const pairs = [...uniquePairs.values()]
-  const chunks = Array.from({ length: Math.ceil(pairs.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
-    pairs.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
-  const pages = await mapWithConcurrency(chunks, async (chunk) => {
-    const expression = chunk.map(({ storeCode, noteNumber }) => (
-      `and(codigo_loja.eq.${escapePostgrestValue(storeCode)},numero_nfd.eq.${escapePostgrestValue(noteNumber)})`
-    )).join(',')
-    const { data, error } = await supabase
-      .from('fstd_legado')
-      .select('legado_id, codigo_loja, numero_nfd, data_preenchimento, motivo, qtd_total_galinha, qtd_retorno_galinha, qtd_total_codorna, qtd_retorno_codorna')
-      .or(expression)
-      .order('legado_id', { ascending: true })
-    if (error) throw error
-    return (data ?? []) as DashboardLegacyFstd[]
-  })
-  return pages.flat()
-}
-
-async function listFstdProcessesByAccessKeys(accessKeys: string[]) {
-  const chunks = Array.from({ length: Math.ceil(accessKeys.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
-    accessKeys.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
-  const pages = await mapWithConcurrency(chunks, async (chunk) => {
-    const { data, error } = await supabase
-      .from('fstd_processos')
-      .select('id, nfd_chave_acesso, status, finalizada_em, created_at, is_avulsa')
-      .in('nfd_chave_acesso', chunk)
-
-    if (error) throw error
-    return (data ?? []) as DashboardFstdProcess[]
-  }).catch((error) => ({ error }))
-  if (!Array.isArray(pages)) return { data: null, error: pages.error }
-  return { data: pages.flat(), error: null }
-}
-
-async function listInvoiceItemsByAccessKeys(accessKeys: string[]) {
-  const chunks = Array.from({ length: Math.ceil(accessKeys.length / LEGACY_QUERY_CHUNK_SIZE) }, (_, index) =>
-    accessKeys.slice(index * LEGACY_QUERY_CHUNK_SIZE, (index + 1) * LEGACY_QUERY_CHUNK_SIZE))
-  const pages = await mapWithConcurrency(chunks, async (chunk) => {
-    const { data, error } = await supabase
-      .from('nfd_itens')
-      .select('chave_acesso, codigo_produto, quantidade_galinha, valor_galinha, quantidade_codorna, valor_codorna')
-      .in('chave_acesso', chunk)
-    if (error) throw error
-    return (data ?? []) as DashboardInvoiceItem[]
-  }).catch((error) => ({ error }))
-  if (!Array.isArray(pages)) return { data: null, error: pages.error }
-  return { data: pages.flat(), error: null }
-}
-
-async function listFstdReports(filters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate'>) {
-  let query = supabase
-    .from('fstd_relatorio')
-    .select('nome_abreviado, galinha_nfd, codorna_nfd, galinha_retorno, codorna_retorno')
-  if (filters.startDate) query = query.gte('data_emissao', filters.startDate)
-  if (filters.endDate) query = query.lte('data_emissao', filters.endDate)
-  return query
-}
-
-function emptySource() {
-  return { data: [], error: null }
+function arrayFromPayload<T>(value: T[] | undefined) {
+  return Array.isArray(value) ? value : []
 }
 
 export function collectDashboardReasonIds(
@@ -217,37 +124,28 @@ export function collectDashboardReasonIds(
   ].filter((value): value is string => Boolean(value)))]
 }
 
-async function readOperationalSources(notes: DashboardNote[], reportFilters: Pick<ManagementDashboardFilters, 'startDate' | 'endDate'>) {
-  const accessKeys = [...new Set(notes.map((note) => note.chave_acesso).filter((value): value is string => Boolean(value)))]
-  const [invoiceItems, processes, unknown, reports] = await Promise.all([
-    accessKeys.length ? listInvoiceItemsByAccessKeys(accessKeys) : emptySource(),
-    accessKeys.length ? listFstdProcessesByAccessKeys(accessKeys) : emptySource(),
-    supabase.from('nfd_desconhecimentos').select('nfd_chave_acesso, nfd_referencia, loja_codigo, nfd_numero').is('reconhecida_em', null),
-    listFstdReports(reportFilters),
-  ])
-  if (processes.error || unknown.error) return { processes, unknown, invoiceItems, reports, products: emptySource(), productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
+async function readManagementDashboard(filters: ManagementDashboardFilters, signal?: AbortSignal) {
+  const request = supabase.rpc('carregar_dashboard_gerencial', {
+    p_data_inicial: filters.startDate,
+    p_data_final: filters.endDate,
+    p_uf: filters.uf || null,
+    p_cidade: filters.city || null,
+  })
+  const { data, error } = await (signal ? request.abortSignal(signal) : request)
+  if (error) throw error
 
-  const processIds = [...new Set((processes.data ?? []).map((process) => process.id))]
-  const products = processIds.length
-    ? await supabase.from('fstd_produtos').select('id, processo_id, produto_id, codigo_produto, nome, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, status').in('processo_id', processIds)
-    : emptySource()
-  if (products.error) return { processes, unknown, invoiceItems, reports, products, productReasons: emptySource(), reasons: emptySource(), catalogProducts: emptySource() }
-
-  const productIds = [...new Set((products.data ?? []).map((product) => product.id))]
-  const catalogIds = [...new Set((products.data ?? []).map((product) => product.produto_id).filter((value): value is string => Boolean(value)))]
-  const [productReasons, catalogProducts] = await Promise.all([
-    productIds.length ? supabase.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade_faturada, quantidade').in('produto_id', productIds) : emptySource(),
-    catalogIds.length ? supabase.from('produtos').select('id, nome, categoria').in('id', catalogIds) : emptySource(),
-  ])
-  const reasonIds = collectDashboardReasonIds(
-    (products.data ?? []) as DashboardFstdProduct[],
-    (productReasons.data ?? []) as DashboardProductReason[],
-  )
-  const reasons = reasonIds.length
-    ? await supabase.from('motivos_devolucao').select('id, nome').in('id', reasonIds)
-    : emptySource()
-
-  return { processes, invoiceItems, products, productReasons, reasons, catalogProducts, unknown, reports }
+  const payload = (data ?? {}) as DashboardOperationalSourcesPayload
+  return {
+    notes: arrayFromPayload(payload.notes),
+    processes: { data: arrayFromPayload(payload.processes), error: null },
+    invoiceItems: { data: arrayFromPayload(payload.invoiceItems), error: null },
+    products: { data: arrayFromPayload(payload.products), error: null },
+    productReasons: { data: arrayFromPayload(payload.productReasons), error: null },
+    reasons: { data: arrayFromPayload(payload.reasons), error: null },
+    catalogProducts: { data: arrayFromPayload(payload.catalogProducts), error: null },
+    unknown: { data: arrayFromPayload(payload.unknown), error: null },
+    legacy: arrayFromPayload(payload.legacy),
+  }
 }
 
 function sourceFailure(source: string, error: unknown): DashboardSourceError {
@@ -257,24 +155,17 @@ function sourceFailure(source: string, error: unknown): DashboardSourceError {
 export async function loadManagementDashboard(filters: ManagementDashboardFilters, signal?: AbortSignal): Promise<ManagementDashboardSource> {
   const sourceErrors: DashboardSourceError[] = []
   const previousFilters = getPreviousPeriod(filters)
-  const notesQueryFilters = { ...filters, startDate: previousFilters.startDate, endDate: filters.endDate }
-  const allNotes = await listAccessibleNfdNotes(notesQueryFilters, signal)
-  const allNotesRows = allNotes as DashboardNote[]
+  const operational = await readManagementDashboard(filters, signal)
+  const allNotesRows = operational.notes
   const currentBaseNotes = filterNfdNotes(allNotesRows, filters)
   const previousBaseNotes = filterNfdNotes(allNotesRows, previousFilters)
-  const [loadedLegacy, operational] = await Promise.all([
-    listLegacyFstd([...currentBaseNotes, ...previousBaseNotes]).catch((error) => {
-      throw toAppError(error, 'Não foi possível carregar os status legados das NFDs da dashboard.')
-    }),
-    readOperationalSources([...currentBaseNotes, ...previousBaseNotes], filters),
-  ])
   const processesError = operational.processes.error
   const unknownError = operational.unknown.error
   if (processesError || unknownError) {
     throw toAppError(processesError ?? unknownError, 'Não foi possível carregar os status das NFDs da dashboard.')
   }
 
-  const legacy = loadedLegacy
+  const legacy = operational.legacy
   const processes = (operational.processes.data ?? []) as DashboardFstdProcess[]
   const unknown = (operational.unknown.data ?? []) as DashboardUnknownNfd[]
   const current = createNoteCollection(
@@ -286,7 +177,7 @@ export async function loadManagementDashboard(filters: ManagementDashboardFilter
     previousBaseNotes,
   )
 
-  const entries = Object.entries(operational) as Array<[string, { error: unknown; data: unknown }]>
+  const entries = Object.entries(operational).filter(([source]) => source !== 'legacy' && source !== 'notes') as Array<[string, { error: unknown; data: unknown }]>
   const failureBySource = new Map(entries.filter(([, result]) => result.error).map(([source, result]) => [source, result.error]))
   const modernReturnFailure = failureBySource.get('products')
   const reasonFailure = failureBySource.get('productReasons') ?? failureBySource.get('reasons')
@@ -304,7 +195,6 @@ export async function loadManagementDashboard(filters: ManagementDashboardFilter
     productReasons: operational.productReasons.data && !operational.productReasons.error ? operational.productReasons.data as DashboardProductReason[] : [],
     reasons: operational.reasons.data && !operational.reasons.error ? operational.reasons.data as DashboardReason[] : [],
     catalogProducts: operational.catalogProducts.data && !operational.catalogProducts.error ? operational.catalogProducts.data as DashboardCatalogProduct[] : [],
-    reports: operational.reports.data && !operational.reports.error ? operational.reports.data as DashboardFstdReport[] : [],
     legacy,
     sourceErrors,
   }

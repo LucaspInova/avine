@@ -476,11 +476,14 @@ function StoreIcon({ status }) {
 }
 
 export function InvoiceIcon({ status }) {
-  const iconVariant = status === 'sent'
+  // Some legacy/API rows expose the tab status (`finalizada`) instead of the
+  // visual status (`sent`). Keep both contracts visually equivalent.
+  const visualStatus = status === 'finalizada' ? 'sent' : status
+  const iconVariant = visualStatus === 'sent'
     ? 'finalized'
-    : status === 'avulsa' || status === 'avulsa-finalizada' || status === 'avulsa-erro'
+    : visualStatus === 'avulsa' || visualStatus === 'avulsa-finalizada' || visualStatus === 'avulsa-erro'
       ? 'avulsa'
-      : status === 'on-time' || status === 'unknown'
+      : visualStatus === 'on-time' || visualStatus === 'unknown'
         ? 'unknown'
         : null
 
@@ -503,7 +506,7 @@ export function InvoiceIcon({ status }) {
 
     return (
       <svg
-        className={`document-glyph is-${status}`}
+        className={`document-glyph is-${visualStatus}`}
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         fill="currentColor"
@@ -518,7 +521,7 @@ export function InvoiceIcon({ status }) {
 
   return (
     <svg
-      className={`document-glyph is-${status}`}
+      className={`document-glyph is-${visualStatus}`}
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="currentColor"
