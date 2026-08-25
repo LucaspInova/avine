@@ -5,6 +5,14 @@ import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 import AvineLogin from '../../shared/components/auth/AvineLogin.jsx'
 import './RoleAccess.css'
 
+export function getSignInErrorMessage(signInError) {
+  if (signInError?.code === 'invalid_credentials' || signInError?.status === 400) {
+    return 'E-mail ou senha inválidos.'
+  }
+
+  return 'Não foi possível conectar ao serviço de autenticação. Tente novamente.'
+}
+
 function RoleEntry() {
   const navigate = useNavigate()
   const auth = useAuth()
@@ -43,7 +51,7 @@ function RoleEntry() {
     const result = await auth.signIn({ email, password, keepSession })
 
     if (result.error) {
-      setError('E-mail ou senha inválidos.')
+      setError(getSignInErrorMessage(result.error))
       setBusy(false)
       return
     }

@@ -2867,6 +2867,7 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
 function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocument, documentBusy, documentError }) {
   const [document, setDocument] = useState(null)
   const [documentLoadError, setDocumentLoadError] = useState('')
+  const [invoiceCopied, setInvoiceCopied] = useState(false)
   const nfdRef = useRef(nfd)
   const nfdProcessId = nfd?.fstd_process_id
 
@@ -2902,6 +2903,21 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
     : products.reduce((total, product) => total + Number(product.quantidade_retorno ?? 0), 0)
   const title = `${getStoreCode(store, nfd)} - ${getNfdNumber(nfd)}`
   const error = documentLoadError || documentError
+  const photoProducts = products.filter((product) => Array.isArray(product.fotos) && product.fotos.length > 0)
+
+  async function handleOpenInvoice() {
+    window.open('https://meudanfe.com.br/#', '_blank', 'noopener,noreferrer')
+
+    const accessKey = String(nfd?.chave_acesso ?? '').trim()
+    if (!accessKey) return
+
+    try {
+      await navigator.clipboard.writeText(accessKey)
+      setInvoiceCopied(true)
+    } catch {
+      setInvoiceCopied(false)
+    }
+  }
 
   return (
     <main className="gerencial-finalized-page">
@@ -2911,13 +2927,18 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
       </header>
 
       <section className="gerencial-finalized-summary">
-        <div className="gerencial-finalized-summary-item">
+        <button
+          className="gerencial-finalized-summary-item is-invoice"
+          type="button"
+          onClick={handleOpenInvoice}
+          aria-label="Abrir DANFE e copiar a chave de acesso"
+        >
           <InvoiceIcon status="sent" />
           <span>
             <strong>NFD</strong>
-            <small>Emitida em {formatDate(nfd?.data_emissao)}</small>
+            <small>Finaliza em: {formatDate(nfd?.fstd_legado?.data_preenchimento ?? nfd?.fstd_process?.finalizada_em)}</small>
           </span>
-        </div>
+        </button>
         <button
           className="gerencial-finalized-summary-item is-editable"
           type="button"
@@ -2945,6 +2966,17 @@ function GerencialFinalizedNfdScreen({ store, nfd, onClose, onEdit, onViewDocume
           <dl>
             <div><dt>Total</dt><dd>{returnedTotal.toLocaleString('pt-BR')} ovos</dd></div>
           </dl>
+          <section className="gerencial-finalized-photos">
+            <h2>Fotos</h2>
+            {photoProducts.length === 0 ? <p>Nenhuma foto enviada.</p> : photoProducts.map((product) => (
+              <FstdStoredPhotos
+                key={product.id ?? product.codigo_produto}
+                paths={[...new Set(product.fotos)]}
+                associationLabel={`Produto: ${product.nome}`}
+              />
+            ))}
+          </section>
+          {invoiceCopied && <p className="gerencial-finalized-copy-feedback" role="status">Chave de acesso copiada.</p>}
         </div>
 
         <div className="gerencial-finalized-pdf">

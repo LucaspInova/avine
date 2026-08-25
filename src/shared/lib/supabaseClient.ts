@@ -4,7 +4,27 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database.types'
 
 const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim()
-const supabaseUrl = projectId ? `https://${projectId}.supabase.co` : ''
+
+export function resolveSupabaseUrl(projectIdOrUrl?: string) {
+  const value = projectIdOrUrl?.trim()
+  if (!value) return ''
+
+  try {
+    const url = new URL(
+      /^https?:\/\//i.test(value) ? value : `https://${value}.supabase.co`,
+    )
+
+    return url.protocol === 'https:' && url.hostname.endsWith('.supabase.co')
+      ? url.origin
+      : ''
+  } catch {
+    return ''
+  }
+}
+
+// Aceita o ID do projeto (formato documentado) e a URL do projeto, formato
+// comum ao copiar a credencial diretamente do painel do Supabase.
+const supabaseUrl = resolveSupabaseUrl(projectId)
 const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
 import { can } from '../../domains/auth/model/capabilities'
 import { supabase } from '../../shared/lib/supabaseClient'
@@ -24,6 +24,7 @@ import { InvoiceIcon } from '../../shared/components/InvoiceIcon.jsx'
 import { GerencialFstdModal } from './features/fstd/GerencialFstdModal.jsx'
 import { GerencialFinalizedNfdModal } from './features/fstd/GerencialFinalizedNfdModal.jsx'
 import { ManagementDashboard } from './features/dashboard/ManagementDashboard.jsx'
+import { AttachedPhotosScreen } from './features/attached-photos/AttachedPhotosScreen.jsx'
 import { GerencialApplicationShell } from './features/shell/GerencialApplicationShell.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
@@ -48,6 +49,7 @@ const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
   { id: 'notas', label: 'Notas', icon: 'notes' },
+  { id: 'fotos-anexadas', label: 'Fotos', icon: 'camera' },
   { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
 ]
@@ -55,11 +57,13 @@ const navItems = [
 const supportWhatsappMessage = 'Olá! Preciso de suporte na plataforma Avine.'
 const supportWhatsappUrl = `https://wa.me/5585986532599?text=${encodeURIComponent(supportWhatsappMessage)}`
 
-const gerencialScreenIds = ['dashboard', 'usuarios', 'lojas', 'notas']
+const gerencialScreenIds = ['dashboard', 'usuarios', 'lojas', 'notas', 'fotos-anexadas']
 const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
 
 function getInitialGerencialScreen() {
   if (typeof window === 'undefined') return 'dashboard'
+
+  if (window.location.pathname.endsWith('/fotos-anexadas')) return 'fotos-anexadas'
 
   try {
     const savedScreen = window.localStorage.getItem(gerencialScreenStorageKey)
@@ -2400,6 +2404,7 @@ function PlaceholderScreen({ title }) {
 
 function GerencialApp({ capabilities }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     session,
     profile: currentUser,
@@ -2611,6 +2616,7 @@ function GerencialApp({ capabilities }) {
   const isUsuarios = selectedItem === 'usuarios'
   const isDashboard = selectedItem === 'dashboard'
   const isNotas = selectedItem === 'notas'
+  const isAttachedPhotos = selectedItem === 'fotos-anexadas'
   const isMotivos = selectedItem === 'motivos'
   const isRecolhimento = selectedItem === 'recolhimento'
   const isRelatorios = selectedItem === 'relatorios'
@@ -2620,8 +2626,10 @@ function GerencialApp({ capabilities }) {
     ? 'Lojas'
     : isDashboard
           ? 'Dashboard Geral'
-          : isNotas
+    : isNotas
             ? 'Notas Fiscais de Devolução'
+            : isAttachedPhotos
+              ? 'Fotos Anexadas'
             : isMotivos
               ? 'Motivos'
               : isRecolhimento
@@ -2635,8 +2643,10 @@ function GerencialApp({ capabilities }) {
     ? 'Roteirização dos promotores.'
     : isDashboard
           ? 'Visão geral da operação de devoluções e retornos.'
-          : isNotas
-            ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
+    : isNotas
+          ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
+          : isAttachedPhotos
+            ? 'Fotos enviadas pelos promotores referentes às suas devoluções'
             : isMotivos
               ? 'Cadastro de motivos de devolução.'
               : isRecolhimento
@@ -2650,6 +2660,8 @@ function GerencialApp({ capabilities }) {
     ? 'pin'
     : isDashboard
       ? 'chart'
+    : isAttachedPhotos
+      ? 'camera'
     : isNotas || isMotivos
           ? 'notes'
           : isRecolhimento
@@ -3132,6 +3144,9 @@ function GerencialApp({ capabilities }) {
   }
 
   function handleSelectItem(item) {
+    if (location.pathname.endsWith('/fotos-anexadas')) {
+      navigate(location.pathname.replace(/\/fotos-anexadas\/?$/, ''), { replace: true })
+    }
     setSelectedItem(item)
     setSearch('')
     setFilterOpen(false)
@@ -3221,6 +3236,8 @@ function GerencialApp({ capabilities }) {
           />
         ) : isDashboard ? (
           <ManagementDashboard restrictedUfs={gerencialCapabilities.allowedUfs} />
+        ) : isAttachedPhotos ? (
+          <AttachedPhotosScreen canEditFinalized={can(currentUser, 'fstd.editFinalized')} />
         ) : isRelatorios ? (
           <ReportScreen />
         ) : isNotas ? (

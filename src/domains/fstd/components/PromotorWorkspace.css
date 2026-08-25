@@ -2795,6 +2795,27 @@
   gap: 14px;
 }
 
+.gerencial-finalized-summary-item.is-invoice {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.gerencial-finalized-summary-item.is-invoice:hover,
+.gerencial-finalized-summary-item.is-invoice:focus-visible {
+  outline: 0;
+  background: rgb(255 255 255 / 12%);
+  transform: translateY(-1px);
+}
+
 .gerencial-finalized-summary-item.is-editable {
   position: relative;
   width: 100%;
@@ -2900,6 +2921,34 @@
   color: #555;
   font-weight: 700;
 }
+
+.gerencial-finalized-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.gerencial-finalized-photos h2 {
+  flex-basis: 100%;
+  margin-bottom: 4px;
+}
+
+.gerencial-finalized-photos > p {
+  flex-basis: 100%;
+  margin: 0;
+  color: #818781;
+  font-size: .9rem;
+}
+
+.gerencial-finalized-photos .fstd-photo-previews {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0;
+}
+.gerencial-finalized-copy-feedback { margin: 14px 0 0; color: #237537; font-size: .82rem; font-weight: 700; }
 
 .gerencial-finalized-pdf {
   display: flex;
