@@ -6,6 +6,7 @@ export function ConfirmDialog({ cancelLabel = 'Cancelar', confirmLabel = 'Confir
     <Modal
       className="ui-confirm-dialog"
       isOpen={isOpen}
+      layerClassName="ui-confirm-dialog-layer"
       onClose={isLoading ? undefined : onCancel}
       title={title}
       footer={(

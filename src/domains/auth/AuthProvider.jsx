@@ -48,16 +48,21 @@ export function AuthProvider({ children }) {
   const requestVersion = useRef(0)
   const accessRecordedFor = useRef(new Set())
 
+  const clearAuthenticationState = useCallback((message = '') => {
+    requestVersion.current += 1
+    accessRecordedFor.current.clear()
+    setSession(null)
+    setProfile(null)
+    setError(message)
+    setLoading(false)
+  }, [])
+
   const resolveProfile = useCallback(async (activeSession) => {
     const version = ++requestVersion.current
     const userId = activeSession?.user?.id
 
     if (!userId) {
-      accessRecordedFor.current.clear()
-      setSession(null)
-      setProfile(null)
-      setError('')
-      setLoading(false)
+      clearAuthenticationState()
       return null
     }
 
@@ -100,23 +105,51 @@ export function AuthProvider({ children }) {
     setError('')
     setLoading(false)
     return profileWithAuthRole
-  }, [])
+  }, [clearAuthenticationState])
+
+  const validateSession = useCallback(async () => {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    const activeSession = sessionData.session
+
+    if (sessionError || !activeSession) {
+      clearAuthenticationState()
+      return null
+    }
+
+    setLoading(true)
+
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    const authenticatedUser = userData.user
+
+    if (userError || !authenticatedUser || authenticatedUser.id !== activeSession.user.id) {
+      clearAuthenticationState()
+      await supabase.auth.signOut({ scope: 'local' })
+      return null
+    }
+
+    const { data: refreshedSessionData, error: refreshedSessionError } = await supabase.auth.getSession()
+    const refreshedSession = refreshedSessionData.session
+
+    if (refreshedSessionError || !refreshedSession) {
+      clearAuthenticationState()
+      await supabase.auth.signOut({ scope: 'local' })
+      return null
+    }
+
+    return resolveProfile({
+      ...refreshedSession,
+      user: authenticatedUser,
+    })
+  }, [clearAuthenticationState, resolveProfile])
 
   useEffect(() => {
     let mounted = true
 
-    supabase.auth
-      .getSession()
-      .then(({ data, error: sessionError }) => {
-        if (!mounted) return
-        if (sessionError) throw sessionError
-        return resolveProfile(data.session)
+    const initialValidationTimer = window.setTimeout(() => {
+      void validateSession().catch((sessionError) => {
+        if (mounted) clearAuthenticationState(sessionError.message)
       })
-      .catch((sessionError) => {
-        if (!mounted) return
-        setError(sessionError.message)
-        setLoading(false)
-      })
+    }, 0)
 
     const {
       data: { subscription },
@@ -124,16 +157,45 @@ export function AuthProvider({ children }) {
       if (!mounted) return
       // Keep the Auth callback synchronous; resolve database state afterwards.
       window.setTimeout(() => {
-        if (mounted) void resolveProfile(nextSession)
+        if (!mounted) return
+        if (!nextSession) {
+          clearAuthenticationState()
+          return
+        }
+        void validateSession()
       }, 0)
     })
+
+    const validateWhenReturningToApp = () => {
+      if (mounted && document.visibilityState === 'visible') {
+        void validateSession()
+      }
+    }
+
+    window.addEventListener('focus', validateWhenReturningToApp)
+    document.addEventListener('visibilitychange', validateWhenReturningToApp)
 
     return () => {
       mounted = false
       requestVersion.current += 1
       subscription.unsubscribe()
+      window.clearTimeout(initialValidationTimer)
+      window.removeEventListener('focus', validateWhenReturningToApp)
+      document.removeEventListener('visibilitychange', validateWhenReturningToApp)
     }
-  }, [resolveProfile])
+  }, [clearAuthenticationState, validateSession])
+
+  useEffect(() => {
+    const expiresAt = session?.expires_at
+    if (!expiresAt) return undefined
+
+    const delay = Math.max(expiresAt * 1000 - Date.now(), 0)
+    const timeoutId = window.setTimeout(() => {
+      void validateSession()
+    }, delay)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [session?.expires_at, validateSession])
 
   const signIn = useCallback(
     async ({ email, password, keepSession = true }) => {
@@ -158,14 +220,9 @@ export function AuthProvider({ children }) {
   )
 
   const signOut = useCallback(async () => {
-    requestVersion.current += 1
-    accessRecordedFor.current.clear()
     await supabase.auth.signOut()
-    setSession(null)
-    setProfile(null)
-    setError('')
-    setLoading(false)
-  }, [])
+    clearAuthenticationState()
+  }, [clearAuthenticationState])
 
   const refreshProfile = useCallback(
     () => resolveProfile(session),

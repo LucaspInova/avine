@@ -1,6 +1,6 @@
 import { useEffect, useId } from 'react'
 
-export function Modal({ children, className = '', isOpen = true, label, onClose, title, footer }) {
+export function Modal({ children, className = '', footer, isOpen = true, label, layerClassName = '', onClose, title }) {
   const generatedId = useId()
   const titleId = title ? `${generatedId}-title` : undefined
 
@@ -14,7 +14,7 @@ export function Modal({ children, className = '', isOpen = true, label, onClose,
   if (!isOpen) return null
 
   return (
-    <div className="ui-modal-layer" role="presentation">
+    <div className={`ui-modal-layer ${layerClassName}`.trim()} role="presentation">
       <button className="ui-modal-backdrop" type="button" aria-label="Fechar modal" onClick={onClose} />
       <section className={`ui-modal ${className}`.trim()} role="dialog" aria-modal="true" aria-label={label} aria-labelledby={titleId}>
         {title && <header className="ui-modal__header"><h2 id={titleId}>{title}</h2></header>}

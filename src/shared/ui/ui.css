@@ -43,3 +43,20 @@
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 @media (max-width: 1100px) and (min-width: 768px) { .ui-page-toolbar { align-items: flex-start; flex-wrap: wrap; }.ui-page-toolbar__controls { flex: 1 1 32rem; flex-wrap: wrap; }.ui-page-toolbar__search { flex: 1 1 18rem; }.ui-page-toolbar__actions, .ui-page-toolbar__controls > .toolbar-actions { margin-left: auto; } }
 @media (max-width: 767px) { .ui-modal-layer { align-items: end; padding: 0; }.ui-modal { max-height: 90vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }.ui-modal__footer { position: sticky; bottom: 0; background: var(--color-surface); }.ui-button { min-height: 3rem; }.ui-page-toolbar { align-items: stretch; flex-direction: column; }.ui-page-toolbar__controls { align-items: stretch; flex-direction: column; justify-content: stretch; width: 100%; }.ui-page-toolbar__search, .ui-page-toolbar__controls > *, .ui-page-toolbar__actions, .ui-page-toolbar__controls > .toolbar-actions { width: 100%; max-width: none; }.ui-page-toolbar__search { flex: 0 0 44px; height: 44px; min-height: 44px; }.ui-page-toolbar__actions > *, .ui-page-toolbar__controls > .toolbar-actions > *, .ui-filter-popover, .ui-filter-trigger { width: 100%; }.ui-filter-trigger { justify-content: center; }.ui-filter-popover__panel { inset: auto 0 0 !important; width: 100% !important; max-height: min(80dvh, 40rem) !important; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: env(safe-area-inset-bottom); }.ui-filter-popover__panel :is(button, input, select, textarea) { -webkit-tap-highlight-color: transparent; }.ui-filter-popover__panel :is(input, select, textarea):focus { outline: none; box-shadow: none; background-color: var(--color-surface); }.ui-filter-popover__sections button:active, .ui-filter-popover__sections button:focus { background-color: transparent; }.ui-filter-popover__footer > * { min-height: var(--touch-target); } }
+
+@media (max-width: 767px) {
+  .ui-confirm-dialog-layer {
+    align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .ui-confirm-dialog-layer .ui-confirm-dialog {
+    width: min(100%, 22.5rem);
+    max-height: calc(100dvh - 32px);
+    border-radius: var(--radius-lg);
+  }
+
+  .ui-confirm-dialog-layer .ui-modal__footer {
+    position: static;
+  }
+}
