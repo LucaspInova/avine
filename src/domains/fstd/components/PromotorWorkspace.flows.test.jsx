@@ -36,6 +36,27 @@ describe('NFD avulsa', () => {
     const addProductsButton = screen.getByRole('button', { name: '+ Adicionar mais produtos' })
     expect(totalRow.compareDocumentPosition(addProductsButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  it('restaura o rascunho local sem enviar alterações', () => {
+    const product = {
+      codigo_produto: '123',
+      nome: 'CAIPIRA C/10',
+      descricao: 'CAIPIRA C/10',
+      imagem_url: '',
+      quantidade_faturada_galinha: 0,
+      quantidade_faturada_codorna: 0,
+      is_avulsa: true,
+    }
+    const onSubmit = vi.fn()
+    render(<FstdTableEditor products={[product]} motivos={[{ id: 'm1', nome: 'Avaria', ativo: true }]} busy={false} processFinalized={false} allowFinalizedEdit={false} onAddProducts={noop} onSubmit={onSubmit} />)
+
+    const billedInput = screen.getByRole('spinbutton', { name: 'Faturado de CAIPIRA C/10' })
+    fireEvent.change(billedInput, { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Restaurar alterações', hidden: true }))
+
+    expect(billedInput.value).toBe('')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
 })
 const storesProps = {
   stores: [], nfds: [], loading: false, search: '', onSearch: noop, onMenu: noop,

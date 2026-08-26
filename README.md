@@ -33,10 +33,10 @@ npm ci
 npm run dev
 ```
 
-Antes de iniciar, crie o arquivo `../.env` a partir de `.env.example` e preencha as credenciais publicáveis do projeto Supabase. O Vite está configurado para ler esse arquivo na raiz do repositório:
+Antes de iniciar, crie o arquivo `.env.local` a partir de `.env.example` e preencha as credenciais publicáveis do projeto Supabase. O Vite lê esse arquivo no diretório do aplicativo:
 
 ```bash
-cp avine/.env.example .env
+cp .env.example .env.local
 npm run dev
 npm run verify
 npm run test:e2e

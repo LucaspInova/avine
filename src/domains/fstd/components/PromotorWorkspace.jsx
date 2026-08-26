@@ -13,7 +13,6 @@ import LogoutConfirmDialog from '../../../shared/components/LogoutConfirmDialog.
 import { AppSelect, EmptyState, SearchField } from '../../../shared/ui'
 import avineLogo from '../../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../../shared/assets/ui-icons/do-utilizador.png'
-import pdfIcon from '../../../shared/assets/ui-icons/arquivo-pdf.png'
 import cameraIcon from '../../../shared/assets/fstd-icons/camera.png'
 import './PromotorWorkspace.css'
 
@@ -2195,32 +2194,6 @@ function FstdQuickProductForm({ product, motivos, busy, error, initialDraft = nu
 const fstdLegacyComponentReferences = [FstdProductForm, FstdProductSummary, FstdQuickProductForm]
 void fstdLegacyComponentReferences
 
-function FstdDocumentPreview({ document, onClose }) {
-  if (!document) return null
-
-  return (
-    <div className="fstd-document-layer" role="dialog" aria-modal="true" aria-label="Pré-visualização do FSTD">
-      <button className="fstd-document-backdrop" onClick={onClose} type="button" aria-label="Fechar pré-visualização" />
-      <section className="fstd-document-dialog">
-        <header className="fstd-document-header">
-          <div>
-            <strong>FSTD {document.controlNumber}</strong>
-            <span>Pré-visualização do PDF</span>
-          </div>
-          <button onClick={onClose} type="button" aria-label="Fechar">×</button>
-        </header>
-        <iframe className="fstd-document-frame" src={document.url} title={`FSTD ${document.controlNumber}`} />
-        <footer className="fstd-document-footer">
-          <a href={document.url} download={`FSTD-${document.controlNumber}.pdf`} rel="noreferrer" target="_blank">
-            Baixar PDF
-          </a>
-          <button onClick={onClose} type="button">Fechar</button>
-        </footer>
-      </section>
-    </div>
-  )
-}
-
 function createFstdTableRow(product, division, index, fotosExistentes = []) {
   return {
     id: `${product.codigo_produto}-${index}`,
@@ -2417,6 +2390,15 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
     setGlobalPhotos((current) => current.filter((_, index) => index !== indexToRemove))
   }
 
+  function restoreChanges() {
+    setDrafts(Object.fromEntries(
+      products.map((product) => [product.codigo_produto, createFstdTableDraft(product)]),
+    ))
+    observationTouchedRef.current = false
+    setObservation(getEditableObservation(persistedObservation))
+    setGlobalPhotos([])
+  }
+
   function removeRowPhoto(product, rowId, indexToRemove) {
     updateDraft(product.codigo_produto, (draft) => ({
       ...draft,
@@ -2556,8 +2538,8 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
             <tr>
               <th scope="col">Produto <b aria-hidden="true" className="fstd-required-mark">*</b></th>
               <th scope="col">Motivo <b aria-hidden="true" className="fstd-required-mark">*</b></th>
-              <th scope="col">Fat <b aria-hidden="true" className="fstd-required-mark">*</b></th>
-              <th scope="col">Ret <b aria-hidden="true" className="fstd-required-mark">*</b></th>
+              <th scope="col"><span>Fat <b aria-hidden="true" className="fstd-required-mark">*</b></span><small>(Faturado)</small></th>
+              <th scope="col"><span>Ret <b aria-hidden="true" className="fstd-required-mark">*</b></span><small>(Retorno)</small></th>
               <th scope="col">Foto <b aria-hidden="true" className="fstd-required-mark">*</b></th>
             </tr>
           </thead>
@@ -2584,7 +2566,10 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
                 return (
                   <tr className={`${row.isAdditional ? 'is-additional ' : ''}${rowCompleted ? 'is-complete' : 'is-pending'}`} key={row.id}>
                     <th className="fstd-table-product" scope="row">
-                      <span>{product.nome}</span>
+                      <span>
+                        <strong>{product.nome}</strong>
+                        {product.codigo_produto && <small>Cód. do produto<br />{product.codigo_produto}</small>}
+                      </span>
                     </th>
                     <td className="fstd-spreadsheet-cell fstd-motivo-spreadsheet-cell">
                       <div className="fstd-motivo-cell">
@@ -2791,13 +2776,20 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
         {busy ? 'Salvando...' : 'Finalizar'}
         </button>
       )}
+      {!finalizationLocked && (
+        <footer className="fstd-desktop-actions">
+          <button type="button" onClick={restoreChanges}>Restaurar alterações</button>
+          <button disabled={!canSubmit} type="submit">
+            {busy ? 'Salvando...' : allowFinalizedEdit ? 'Salvar alterações' : 'Finalizar'}
+          </button>
+        </footer>
+      )}
       <FstdPhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
     </form>
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, documentBusy, documentError, onBack, onClose, hideBack = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize, onViewDocument }) {
-  const [documentPreview, setDocumentPreview] = useState(null)
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, onBack, onClose, hideBack = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize }) {
   const processProducts = process?.produtos ?? []
   const persistedByKey = new Map(processProducts.map((product) => [getProductGroupKey(product), product]))
   const products = (nfd?.produtos ?? []).map((product) => ({
@@ -2805,14 +2797,8 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
     persisted: persistedByKey.get(getProductGroupKey(product)),
     is_avulsa: Boolean(nfd?.is_avulsa),
   }))
-  const allCompleted = products.length > 0 && products.every((product) => product.persisted?.status === 'concluido')
   const processFinalized = process?.status === 'concluida'
   const isAvulsa = Boolean(nfd?.is_avulsa)
-
-  async function handleViewDocument() {
-    const preview = await onViewDocument()
-    if (preview) setDocumentPreview(preview)
-  }
 
   async function handleSubmitProducts(payloads) {
     for (const payload of payloads) {
@@ -2825,11 +2811,11 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
     <>
       <main className={`promotor-app fstd-app fstd-list-page${isAvulsa ? ' is-avulsa' : ''}`}>
         <header className="fstd-list-topbar">
-          {hideBack ? <button type="button" onClick={onClose} aria-label="Fechar preenchimento">‹</button> : <button type="button" onClick={onBack}>‹</button>}
-          <strong>{hideBack ? allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD' : 'FSTD'}</strong>
           {hideBack
-            ? <button className="fstd-list-close" type="button" onClick={onClose} aria-label="Fechar FSTD">×</button>
-            : <span />}
+            ? <button className="fstd-back-button" type="button" onClick={onClose} aria-label="Voltar"><span aria-hidden="true">‹</span><em>Voltar</em></button>
+            : <button className="fstd-back-button" type="button" onClick={onBack} aria-label="Voltar"><span aria-hidden="true">‹</span><em>Voltar</em></button>}
+          <strong>{hideBack ? allowFinalizedEdit ? 'Editar NFD' : 'Preencher NFD' : 'FSTD'}</strong>
+          <span />
         </header>
 
         <section className="fstd-list-hero">
@@ -2851,15 +2837,8 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, d
           products={products}
         />
 
-        {(error || documentError) && <strong className="promotor-error fstd-list-error">{error || documentError}</strong>}
-        {allCompleted && processFinalized && !isAvulsa && (
-          <button className="fstd-finalize-button fstd-view-button" disabled={documentBusy} onClick={handleViewDocument} type="button">
-            <span>{documentBusy ? 'Abrindo...' : 'Ver FSTD'}</span>
-            <img src={pdfIcon} alt="" aria-hidden="true" />
-          </button>
-        )}
+        {error && <strong className="promotor-error fstd-list-error">{error}</strong>}
       </main>
-      <FstdDocumentPreview document={documentPreview} onClose={() => setDocumentPreview(null)} />
     </>
   )
 }
@@ -3688,8 +3667,6 @@ export function PromotorWorkspace({
         busy={fstdProductMutation.isPending}
         error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
         finalizeBusy={finalizarFstdMutation.isPending}
-        documentBusy={fstdDocumentMutation.isPending}
-        documentError={fstdDocumentMutation.error?.message}
         hideBack
         embeddedFstd
         allowFinalizedEdit={allowFinalizedEdit}
@@ -3698,7 +3675,6 @@ export function PromotorWorkspace({
         onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
         onAddProducts={() => {}}
         onFinalize={() => finalizarFstdMutation.mutate()}
-        onViewDocument={() => fstdDocumentMutation.mutateAsync()}
       />
     )
   }
@@ -3714,13 +3690,10 @@ export function PromotorWorkspace({
           busy={fstdProductMutation.isPending}
           error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
           finalizeBusy={finalizarFstdMutation.isPending}
-          documentBusy={fstdDocumentMutation.isPending}
-          documentError={fstdDocumentMutation.error?.message}
           onBack={() => setFstdTarget(undefined)}
           onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
           onAddProducts={() => setAvulsaAddProductsTarget(currentFstdTarget)}
           onFinalize={() => finalizarFstdMutation.mutate()}
-          onViewDocument={() => fstdDocumentMutation.mutateAsync()}
         />
         {conferenceAlert}
       </>

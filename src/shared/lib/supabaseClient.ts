@@ -3,7 +3,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '../../types/database.types'
 
-const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim()
+const projectIdOrUrl =
+  import.meta.env.VITE_SUPABASE_URL?.trim() ||
+  import.meta.env.VITE_SUPABASE_PROJECT_ID?.trim()
 
 export function resolveSupabaseUrl(projectIdOrUrl?: string) {
   const value = projectIdOrUrl?.trim()
@@ -24,14 +26,14 @@ export function resolveSupabaseUrl(projectIdOrUrl?: string) {
 
 // Aceita o ID do projeto (formato documentado) e a URL do projeto, formato
 // comum ao copiar a credencial diretamente do painel do Supabase.
-const supabaseUrl = resolveSupabaseUrl(projectId)
+const supabaseUrl = resolveSupabaseUrl(projectIdOrUrl)
 const supabaseKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
   import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 export const supabaseConfigError =
   !supabaseUrl || !supabaseKey
-    ? 'Configure VITE_SUPABASE_PROJECT_ID e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.'
+    ? 'Configure VITE_SUPABASE_URL (ou VITE_SUPABASE_PROJECT_ID) e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.'
     : null
 
 const AUTH_PERSISTENCE_KEY = 'avine-auth-persistence'

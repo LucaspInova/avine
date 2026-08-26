@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   // O arquivo de ambiente do repositório fica um nível acima do app Vite.
   // Sem isso, as credenciais do Supabase não são incluídas no cliente local.
-  envDir: '..',
+  envDir: '.',
   plugins: [react()],
   build: {
     manifest: true,
