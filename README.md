@@ -60,6 +60,7 @@ supabase gen types typescript --linked --schema public > src/types/database.type
 ## Documentacao
 
 - [Contexto](docs/CONTEXTO.md)
+- [Handover técnico](docs/HANDOVER_TECNICO.md)
 - [Supabase](docs/SUPABASE.md)
 - [Sincronizacao de NFDs](docs/NFD_SYNC.md)
 

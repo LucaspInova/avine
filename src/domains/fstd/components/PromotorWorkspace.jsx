@@ -2247,6 +2247,63 @@ function getFstdTableBilledSplit(product, total) {
   }
 }
 
+export function FstdLegacyTotalsEditor({ legacy, billedGalinha = 0, billedCodorna = 0, busy, error, onSubmit }) {
+  const [galinha, setGalinha] = useState(() => String(legacy?.qtd_retorno_galinha ?? 0))
+  const [codorna, setCodorna] = useState(() => String(legacy?.qtd_retorno_codorna ?? 0))
+  const [validationError, setValidationError] = useState('')
+
+  function parseQuantity(value) {
+    const normalized = String(value).trim()
+    if (!/^\d+$/.test(normalized)) return null
+    return Number(normalized)
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    const retornoGalinha = parseQuantity(galinha)
+    const retornoCodorna = parseQuantity(codorna)
+
+    if (retornoGalinha === null || retornoCodorna === null) {
+      setValidationError('Informe quantidades inteiras iguais ou maiores que zero.')
+      return
+    }
+
+    if ((Number(billedGalinha) > 0 && retornoGalinha > Number(billedGalinha))
+      || (Number(billedCodorna) > 0 && retornoCodorna > Number(billedCodorna))) {
+      setValidationError('A quantidade de retorno não pode ser maior que a quantidade faturada.')
+      return
+    }
+
+    setValidationError('')
+    onSubmit({ legadoId: legacy.legado_id, retornoGalinha, retornoCodorna })
+  }
+
+  return (
+    <form className="fstd-legacy-totals-editor" onSubmit={handleSubmit}>
+      <section className="fstd-legacy-totals-intro">
+        <h2>Retorno por tipo de ovo</h2>
+        <p>Esta NFD não possui produtos detalhados. Por isso, a edição é feita somente pelos totais de Galinha e Codorna.</p>
+      </section>
+      <div className="fstd-legacy-totals-grid">
+        <label>
+          <span>Galinha</span>
+          <small>Faturado: {Number(billedGalinha).toLocaleString('pt-BR')} ovos</small>
+          <input aria-label="Retorno de Galinha" inputMode="numeric" min="0" onChange={(event) => setGalinha(event.target.value)} type="number" value={galinha} />
+        </label>
+        <label>
+          <span>Codorna</span>
+          <small>Faturado: {Number(billedCodorna).toLocaleString('pt-BR')} ovos</small>
+          <input aria-label="Retorno de Codorna" inputMode="numeric" min="0" onChange={(event) => setCodorna(event.target.value)} type="number" value={codorna} />
+        </label>
+      </div>
+      {(validationError || error) && <strong className="promotor-error">{validationError || error}</strong>}
+      <footer className="fstd-legacy-totals-actions">
+        <button disabled={busy} type="submit">{busy ? 'Salvando...' : 'Salvar alterações'}</button>
+      </footer>
+    </form>
+  )
+}
+
 export function FstdTableEditor({ products, motivos, busy, processFinalized, allowFinalizedEdit, onAddProducts, onSubmit }) {
   const finalizationLocked = processFinalized && !allowFinalizedEdit
   const canEdit = !finalizationLocked
@@ -2789,7 +2846,7 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
   )
 }
 
-function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, onBack, onClose, hideBack = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize }) {
+function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, legacyTotals, legacyTotalsBusy, legacyTotalsError, onSaveLegacyTotals, onBack, onClose, hideBack = false, allowFinalizedEdit = false, onSubmitProduct, onAddProducts, onFinalize }) {
   const processProducts = process?.produtos ?? []
   const persistedByKey = new Map(processProducts.map((product) => [getProductGroupKey(product), product]))
   const products = (nfd?.produtos ?? []).map((product) => ({
@@ -2826,16 +2883,30 @@ function FstdScreen({ store, nfd, motivos, process, busy, error, finalizeBusy, o
           </div>
         </section>
 
-        <FstdTableEditor
-          key={products.map((product) => product.codigo_produto).join('|')}
-          allowFinalizedEdit={allowFinalizedEdit}
-          busy={busy || finalizeBusy}
-          motivos={motivos}
-          onAddProducts={onAddProducts}
-          onSubmit={handleSubmitProducts}
-          processFinalized={processFinalized}
-          products={products}
-        />
+        {products.length === 0 && legacyTotalsBusy && <p className="fstd-summary-empty">Carregando totais da FSTD...</p>}
+        {products.length === 0 && !legacyTotalsBusy && legacyTotals && (
+          <FstdLegacyTotalsEditor
+            key={legacyTotals.legado_id}
+            billedCodorna={Number(nfd?.quantidade_codorna ?? legacyTotals.qtd_total_codorna ?? 0)}
+            billedGalinha={Number(nfd?.quantidade_galinha ?? legacyTotals.qtd_total_galinha ?? 0)}
+            busy={busy}
+            error={legacyTotalsError || error}
+            legacy={legacyTotals}
+            onSubmit={onSaveLegacyTotals}
+          />
+        )}
+        {!(products.length === 0 && (legacyTotalsBusy || legacyTotals)) && (
+          <FstdTableEditor
+            key={products.map((product) => product.codigo_produto).join('|')}
+            allowFinalizedEdit={allowFinalizedEdit}
+            busy={busy || finalizeBusy}
+            motivos={motivos}
+            onAddProducts={onAddProducts}
+            onSubmit={handleSubmitProducts}
+            processFinalized={processFinalized}
+            products={products}
+          />
+        )}
 
         {error && <strong className="promotor-error fstd-list-error">{error}</strong>}
       </main>
@@ -3197,6 +3268,21 @@ export function PromotorWorkspace({
       }
     : undefined
 
+  const hasNoDetailedProducts = Boolean(
+    allowFinalizedEdit
+    && currentFstdTarget
+    && (currentFstdTarget.produtos ?? []).length === 0,
+  )
+  const legacyTotalsQuery = useQuery({
+    enabled: hasNoDetailedProducts && Boolean(selectedStore?.codigo),
+    queryKey: ['fstd-legacy-totals', selectedStore?.codigo, currentFstdTarget?.nota_fiscal ?? currentFstdTarget?.numero],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('obter_fstd_legado', legacyFstdLookupParams(currentFstdTarget, selectedStore))
+      if (error) throw error
+      return Array.isArray(data) ? data[0] ?? null : data
+    },
+  })
+
   const conferenceAlertNfd = conferenceAlertDismissed
     ? null
     : nfds.find((nfd) => nfd.is_avulsa && nfd.conferencia_status === 'divergente')
@@ -3259,6 +3345,24 @@ export function PromotorWorkspace({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] })
       await queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] })
+    },
+  })
+
+  const legacyTotalsMutation = useMutation({
+    mutationFn: async ({ legadoId, retornoGalinha, retornoCodorna }) => {
+      const { data, error } = await supabase.rpc('ajustar_fstd_legado_totais', {
+        p_legado_id: legadoId,
+        p_qtd_retorno_galinha: retornoGalinha,
+        p_qtd_retorno_codorna: retornoCodorna,
+      })
+      if (error) throw error
+      return Array.isArray(data) ? data[0] ?? data : data
+    },
+    onSuccess: async (legacy) => {
+      await legacyTotalsQuery.refetch()
+      if (embeddedFstd) {
+        onEmbeddedComplete?.({ kind: 'legacy-totals-saved', legacy })
+      }
     },
   })
 
@@ -3664,15 +3768,19 @@ export function PromotorWorkspace({
         nfd={currentFstdTarget}
         process={currentFstdTarget?.fstd_process ?? null}
         motivos={motivosQuery.data ?? []}
-        busy={fstdProductMutation.isPending}
+        busy={fstdProductMutation.isPending || legacyTotalsMutation.isPending}
         error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
         finalizeBusy={finalizarFstdMutation.isPending}
+        legacyTotals={legacyTotalsQuery.data}
+        legacyTotalsBusy={legacyTotalsQuery.isLoading}
+        legacyTotalsError={legacyTotalsQuery.error?.message || legacyTotalsMutation.error?.message}
         hideBack
         embeddedFstd
         allowFinalizedEdit={allowFinalizedEdit}
         onClose={onEmbeddedClose}
         onBack={() => {}}
         onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
+        onSaveLegacyTotals={(payload) => legacyTotalsMutation.mutate(payload)}
         onAddProducts={() => {}}
         onFinalize={() => finalizarFstdMutation.mutate()}
       />
@@ -3687,11 +3795,15 @@ export function PromotorWorkspace({
           nfd={currentFstdTarget}
           process={currentFstdTarget.fstd_process ?? null}
           motivos={motivosQuery.data ?? []}
-          busy={fstdProductMutation.isPending}
+          busy={fstdProductMutation.isPending || legacyTotalsMutation.isPending}
           error={fstdProductMutation.error?.message || finalizarFstdMutation.error?.message}
           finalizeBusy={finalizarFstdMutation.isPending}
+          legacyTotals={legacyTotalsQuery.data}
+          legacyTotalsBusy={legacyTotalsQuery.isLoading}
+          legacyTotalsError={legacyTotalsQuery.error?.message || legacyTotalsMutation.error?.message}
           onBack={() => setFstdTarget(undefined)}
           onSubmitProduct={(payload) => fstdProductMutation.mutateAsync(payload)}
+          onSaveLegacyTotals={(payload) => legacyTotalsMutation.mutate(payload)}
           onAddProducts={() => setAvulsaAddProductsTarget(currentFstdTarget)}
           onFinalize={() => finalizarFstdMutation.mutate()}
         />

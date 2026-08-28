@@ -22,15 +22,18 @@
 ## Sincronizacao de NFDs
 
 1. Conferir `supabase migration list` antes de qualquer alteracao remota.
-2. Implantar `sync-devolucoes-avine-api` e `sync-devolucoes-avine-sheets`, mas
-   manter temporariamente a funcao legada publicada.
+2. Implantar `sync-devolucoes-avine-api`, `sync-devolucoes-avine-sheets` e
+   `sync-fstd-legado-copia-v1`, mas manter temporariamente a funcao legada
+   publicada.
 3. Rodar `supabase db push --linked --dry-run` e revisar a migration de logs e
    cron antes do push real.
-4. Aplicar a migration e confirmar os jobs `sync-devolucoes-avine-api-diario`
-   e `sync-devolucoes-avine-sheets-diario` em `cron.job`.
-5. Fazer smoke manual das duas funcoes para uma data conhecida e conferir
-   `nfd_logs.fonte`, contagens, invalidos e ausencia de duplicatas em
-   `(chave_acesso, codigo_produto)`.
+4. Aplicar a migration e confirmar os jobs `sync-devolucoes-avine-api-diario`,
+   `sync-devolucoes-avine-sheets-diario` e `sync-fstd-legado-copia-v1` em
+   `cron.job`; o ultimo deve usar `5,35 * * * *`.
+5. Fazer smoke manual das funcoes para uma data conhecida e conferir
+   `nfd_logs.fonte`, contagens, invalidos e ausencia de duplicatas. Para a
+   COPIA V1, conferir tambem que registros divergentes permanecem em
+   `fstd_legado`.
 6. Excluir `sync-devolucoes-avine` somente depois do smoke e manter observacao
    dos dois jobs por pelo menos 24 horas.
 

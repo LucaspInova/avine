@@ -88,3 +88,8 @@ entrypoint = "./functions/sync-devolucoes-avine-api/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/sync-devolucoes-avine-sheets/index.ts"
+
+[functions.sync-fstd-legado-copia-v1]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sync-fstd-legado-copia-v1/index.ts"

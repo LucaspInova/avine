@@ -93,6 +93,23 @@ describe('AuthProvider', () => {
     expect(screen.queryByText('Área protegida')).not.toBeInTheDocument()
   })
 
+  it('mantém a rota protegida visível durante a revalidação em segundo plano', async () => {
+    renderProtectedRoute()
+    expect(await screen.findByText('Área protegida')).toBeVisible()
+
+    let resolveUser
+    auth.getUser.mockReturnValueOnce(new Promise((resolve) => {
+      resolveUser = resolve
+    }))
+    window.dispatchEvent(new Event('focus'))
+
+    await waitFor(() => expect(auth.getUser).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('Área protegida')).toBeVisible()
+
+    resolveUser({ data: { user: validSession.user }, error: null })
+    await waitFor(() => expect(database.maybeSingle).toHaveBeenCalledTimes(2))
+  })
+
   it('revalida ao voltar para a aplicação e bloqueia a rota se a sessão expirou', async () => {
     renderProtectedRoute()
     expect(await screen.findByText('Área protegida')).toBeVisible()

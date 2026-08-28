@@ -16,7 +16,7 @@ function isPasswordRecoveryRedirect() {
 
 export default function RootApp() {
   return (
-    <Suspense fallback={<main className="route-loading" aria-busy="true">Carregando...</main>}>
+    <Suspense fallback={null}>
       <Routes>
         <Route path={applicationRoutes.entry} element={isPasswordRecoveryRedirect() ? <ResetPasswordScreen /> : <RoleEntry />} />
         <Route path={applicationRoutes.forgotPassword} element={<ForgotPasswordScreen />} />

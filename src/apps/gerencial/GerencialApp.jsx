@@ -2143,7 +2143,7 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedFstd({ note: editableNote, store, allowFinalizedEdit: true })
   }
 
-  function handleFstdCompleted() {
+  function handleFstdCompleted(result) {
     if (!selectedFstd?.note || !selectedFstd?.store) return
 
     const finalizedNote = {
@@ -2153,7 +2153,10 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     }
 
     void invoicesQuery.refetch()
-    setCompletionMessage(`NFD ${finalizedNote.nota_fiscal ?? finalizedNote.numero} finalizada com sucesso.`)
+    const message = result?.kind === 'legacy-totals-saved'
+      ? `NFD ${finalizedNote.nota_fiscal ?? finalizedNote.numero} atualizada com sucesso.`
+      : `NFD ${finalizedNote.nota_fiscal ?? finalizedNote.numero} finalizada com sucesso.`
+    setCompletionMessage(message)
     setSelectedFstd(null)
     setSelectedFinalized({ note: finalizedNote, store: selectedFstd.store })
   }

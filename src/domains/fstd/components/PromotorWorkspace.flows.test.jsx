@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { FstdAvulsaFlow, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { FstdAvulsaFlow, FstdLegacyTotalsEditor, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
 import { keepNumericNfdCode } from '../model/validation'
 
 const noop = vi.fn()
@@ -55,6 +55,39 @@ describe('NFD avulsa', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restaurar alterações', hidden: true }))
 
     expect(billedInput.value).toBe('')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
+describe('FSTD legada sem produtos detalhados', () => {
+  it('edita somente os retornos agregados de Galinha e Codorna', () => {
+    const onSubmit = vi.fn()
+    render(
+      <FstdLegacyTotalsEditor
+        legacy={{ legado_id: 7, qtd_retorno_galinha: 10, qtd_retorno_codorna: 2 }}
+        billedGalinha={100}
+        billedCodorna={20}
+        busy={false}
+        onSubmit={onSubmit}
+      />,
+    )
+
+    expect(screen.getByText(/não possui produtos detalhados/i)).toBeVisible()
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Retorno de Galinha' }), { target: { value: '25' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Retorno de Codorna' }), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(onSubmit).toHaveBeenCalledWith({ legadoId: 7, retornoGalinha: 25, retornoCodorna: 5 })
+  })
+
+  it('rejeita retorno maior que o faturado', () => {
+    const onSubmit = vi.fn()
+    render(<FstdLegacyTotalsEditor legacy={{ legado_id: 7 }} billedGalinha={10} billedCodorna={0} busy={false} onSubmit={onSubmit} />)
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Retorno de Galinha' }), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+    expect(screen.getByText(/não pode ser maior/i)).toBeVisible()
     expect(onSubmit).not.toHaveBeenCalled()
   })
 })

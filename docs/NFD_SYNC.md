@@ -6,6 +6,7 @@
 | --- | --- | --- | --- | --- |
 | API Avine | `sync-devolucoes-avine-api` | dia anterior | `0 10 * * *` | horario legado |
 | Google Sheets | `sync-devolucoes-avine-sheets` | ultimos 21 dias ate ontem | `0 17 * * *` | 14:00 Brasilia |
+| COPIA V1 (Glide) | `sync-fstd-legado-copia-v1` | aba completa | `5,35 * * * *` | a cada 30 min. (minutos 5 e 35) |
 
 As duas funcoes aceitam `due_date=YYYY-MM-DD`. A funcao Sheets tambem aceita
 `start_date` e `end_date`, com limite de 31 dias por chamada. A janela movel
@@ -44,6 +45,20 @@ sequenciais. A URL da função é derivada de `SUPABASE_PROJECT_ID`; o mesmo
 `Cliente/NFD`, razao social, CNPJ, canal de venda, item/descricao do fornecedor
 e CFOP nao fazem parte do contrato atual de `nfd_itens` e sao ignorados.
 
+## Mapeamento da aba `COPIA V1`
+
+A funcao de legado grava somente em `public.fstd_legado`: `NFD`, `FSTD`,
+`ID` (incluindo o codigo da loja), `Data da Baixa`, `Responsavel FSTD`,
+`Motivo da Emissao` e as quatro quantidades de galinha/codorna. `origem` e
+sempre `COPIA V1`. Data de emissao, valores, motorista e nome abreviado nao
+possuem coluna nessa tabela e nao sao gravados.
+
+O `ID` precisa seguir `codigo da loja - NFD` e conferir com a coluna `NFD`.
+A comparacao considera todos os campos suportados e a ocorrencia de cada
+registro repetido. O hash de origem e estavel entre execucoes, por isso uma
+reexecucao nao duplica registros; registros que desaparecerem da planilha sao
+mantidos e anotados como divergencia no log.
+
 ## Tratamento e idempotencia
 
 A planilha e consultada pelo endpoint publico do Google Visualization com
@@ -64,7 +79,7 @@ a garantia final contra concorrencia e retries. Ambas as funcoes usam conflito
 
 - `nfd_itens` preserva RLS e grants existentes; as funcoes escrevem com secret
   server-side e nunca expõem a chave privilegiada ao frontend.
-- `nfd_logs` permanece sem policy de cliente e ganha `fonte = api | sheets`.
+- `nfd_logs` permanece sem policy de cliente e registra `fonte = api | sheets | copia_v1`.
 - O header do cron usa `avine_cron_secret` no Supabase Vault. A migration tenta
   migrar o valor do job legado sem gravar o segredo no repositorio.
 - Se a planilha deixar de ser publica, o fallback falhara de forma explicita.

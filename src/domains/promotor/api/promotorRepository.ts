@@ -38,7 +38,7 @@ export async function listPromotorInvoices(stores: any[]) {
     .gte('data_emissao', startDate)
     .order('data_emissao', { ascending: false })
     .order('nota_fiscal', { ascending: false }))
-  const legacy = await paginateSupabase<any>((from, to) => supabase!.from('fstd_legado').select('legado_id, codigo_loja, numero_nfd, numero_controle, data_preenchimento, responsavel_fstd, motivo, qtd_total_galinha, qtd_retorno_galinha, qtd_total_codorna, qtd_retorno_codorna, id').in('codigo_loja', codes.map(String)).order('legado_id', { ascending: false }).range(from, to))
+  const legacy = await paginateSupabase<any>((from, to) => supabase!.from('fstd_legado_canonico').select('legado_id, codigo_loja, numero_nfd, numero_controle, data_preenchimento, responsavel_fstd, motivo, qtd_total_galinha, qtd_retorno_galinha, qtd_total_codorna, qtd_retorno_codorna, id').in('codigo_loja', codes.map(String)).order('legado_id', { ascending: false }).range(from, to))
   const legacyByKey = new Map(legacy.map((item) => [`${item.codigo_loja}:${item.numero_nfd}`, item]))
   return notes.map((note: any) => {
     const store = byCode.get(String(note.codigo_cliente))

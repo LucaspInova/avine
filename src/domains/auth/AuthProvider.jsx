@@ -107,7 +107,7 @@ export function AuthProvider({ children }) {
     return profileWithAuthRole
   }, [clearAuthenticationState])
 
-  const validateSession = useCallback(async () => {
+  const validateSession = useCallback(async ({ background = false } = {}) => {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
     const activeSession = sessionData.session
 
@@ -116,7 +116,7 @@ export function AuthProvider({ children }) {
       return null
     }
 
-    setLoading(true)
+    if (!background) setLoading(true)
 
     const { data: userData, error: userError } = await supabase.auth.getUser()
     const authenticatedUser = userData.user
@@ -162,13 +162,13 @@ export function AuthProvider({ children }) {
           clearAuthenticationState()
           return
         }
-        void validateSession()
+        void validateSession({ background: true })
       }, 0)
     })
 
     const validateWhenReturningToApp = () => {
       if (mounted && document.visibilityState === 'visible') {
-        void validateSession()
+        void validateSession({ background: true })
       }
     }
 
@@ -191,7 +191,7 @@ export function AuthProvider({ children }) {
 
     const delay = Math.max(expiresAt * 1000 - Date.now(), 0)
     const timeoutId = window.setTimeout(() => {
-      void validateSession()
+      void validateSession({ background: true })
     }, delay)
 
     return () => window.clearTimeout(timeoutId)
@@ -261,7 +261,7 @@ export function RequireRole({ profile: requiredProfile, authRole: requiredAuthRo
   const auth = useAuth()
 
   if (auth.loading) {
-    return <main className="route-loading" aria-busy="true">Carregando...</main>
+    return null
   }
 
   if (!auth.session || !auth.hasAccess) {

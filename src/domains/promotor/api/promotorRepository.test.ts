@@ -71,7 +71,7 @@ describe('consulta focalizada de processos FSTD', () => {
     const inFilter = vi.fn().mockReturnValue({ order })
     const select = vi.fn().mockReturnValue({ in: inFilter })
     boundary.from.mockImplementation((table: string) => {
-      if (table === 'fstd_legado') return { select }
+      if (table === 'fstd_legado_canonico') return { select }
       return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
     })
 

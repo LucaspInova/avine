@@ -246,10 +246,12 @@ export type Database = {
           status: string
           registros_recebidos: number
           registros_processados: number
+          registros_existentes: number
           url_consultada: string | null
           mensagem: string | null
           erro: string | null
           registros_invalidos: number
+          registros_divergentes: number
           detalhes_invalidos: Json | null
         }
         Insert: {
@@ -261,10 +263,12 @@ export type Database = {
           status?: string
           registros_recebidos?: number
           registros_processados?: number
+          registros_existentes?: number
           url_consultada?: string | null
           mensagem?: string | null
           erro?: string | null
           registros_invalidos?: number
+          registros_divergentes?: number
           detalhes_invalidos?: Json | null
         }
         Update: {
@@ -276,10 +280,12 @@ export type Database = {
           status?: string
           registros_recebidos?: number
           registros_processados?: number
+          registros_existentes?: number
           url_consultada?: string | null
           mensagem?: string | null
           erro?: string | null
           registros_invalidos?: number
+          registros_divergentes?: number
           detalhes_invalidos?: Json | null
         }
         Relationships: []
@@ -635,6 +641,48 @@ export type Database = {
         }
         Relationships: []
       }
+      fstd_legado_ajustes_totais: {
+        Row: {
+          legado_id: number
+          qtd_retorno_galinha: number
+          qtd_retorno_codorna: number
+          atualizado_por: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          legado_id: number
+          qtd_retorno_galinha: number
+          qtd_retorno_codorna: number
+          atualizado_por: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          legado_id?: number
+          qtd_retorno_galinha?: number
+          qtd_retorno_codorna?: number
+          atualizado_por?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'fstd_legado_ajustes_totais_legado_id_fkey'
+            columns: ['legado_id']
+            isOneToOne: true
+            referencedRelation: 'fstd_legado'
+            referencedColumns: ['legado_id']
+          },
+          {
+            foreignKeyName: 'fstd_legado_ajustes_totais_atualizado_por_fkey'
+            columns: ['atualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       fstd_legado_import_staging: {
         Row: {
           import_id: number
@@ -784,6 +832,10 @@ export type Database = {
         }
         Relationships: []
       }
+      fstd_legado_canonico: {
+        Row: Database['public']['Tables']['fstd_legado']['Row']
+        Relationships: []
+      }
       produtos_precos_unitarios: {
         Row: {
           codigo_produto: string | null
@@ -906,6 +958,10 @@ export type Database = {
       obter_fstd_legado: {
         Args: { p_codigo_loja: string; p_numero_nfd: string }
         Returns: Database['public']['Tables']['fstd_legado']['Row'][]
+      }
+      ajustar_fstd_legado_totais: {
+        Args: { p_legado_id: number; p_qtd_retorno_galinha: number; p_qtd_retorno_codorna: number }
+        Returns: Database['public']['Tables']['fstd_legado']['Row']
       }
       carregar_fontes_dashboard_gerencial: {
         Args: { p_chaves_acesso?: string[]; p_referencias_legadas?: Json }

@@ -13,9 +13,12 @@ feitas por migrations, testadas localmente e nunca por reset do banco remoto.
 - `fstd_processos`, `fstd_produtos` e `fstd_produto_motivos`: fluxo FSTD atual.
 - `fstd_documentos`: número de controle curto e imutável, snapshot dos produtos
   e caminho do PDF persistido por FSTD.
+- `fstd_legado_canonico`: view operacional com uma única versão por loja/NFD;
+  preserva as origens completas em `fstd_legado` e aplica a prioridade definida
+  para leituras do aplicativo.
 - `nfd_desconhecimentos`: declaracoes de NFD nao reconhecida.
 - `motivos_devolucao`: catalogo administravel de motivos.
-- `nfd_logs`: log interno da sincronizacao, com `fonte = api | sheets`.
+- `nfd_logs`: log interno da sincronizacao, com `fonte = api | sheets | copia_v1`.
 
 `fstds` pertencia ao dominio anterior e foi removida depois da verificacao de
 que nao havia chamadas no aplicativo. `solicitar_fstd` e seus overloads antigos
@@ -93,11 +96,12 @@ nova migration deve restaurar a versao anterior da RPC antes de remover o
 helper. Os indices trigrama podem permanecer porque nao alteram dados nem o
 contrato da consulta.
 
-As Edge Functions `sync-devolucoes-avine-api` e
-`sync-devolucoes-avine-sheets` usam o mesmo `CRON_SECRET`, mantido como secret
-da Edge Function. Os jobs leem a copia correspondente do Vault
-(`avine_cron_secret`), sem incluir o valor no SQL versionado. A API roda as
-10:00 UTC (horario legado) e o fallback Sheets as 14:00 UTC/11:00 de Sao Paulo.
+As Edge Functions `sync-devolucoes-avine-api`,
+`sync-devolucoes-avine-sheets` e `sync-fstd-legado-copia-v1` usam o mesmo
+`CRON_SECRET`, mantido como secret da Edge Function. Os jobs leem a copia
+correspondente do Vault (`avine_cron_secret`), sem incluir o valor no SQL
+versionado. A API roda as 10:00 UTC (horario legado), o fallback Sheets as
+14:00 UTC/11:00 de Sao Paulo e a COPIA V1 nos minutos 5 e 35 de cada hora.
 
 Os defaults de objetos criados por `postgres` no schema `public` revogam
 privilegios de `PUBLIC`, `anon` e `authenticated`. Os defaults pertencentes ao
