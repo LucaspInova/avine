@@ -1285,7 +1285,9 @@ export type Database = {
       };
       listar_nfd_notas_gerencial: {
         Args: {
+          p_atualizado_por_id?: string;
           p_cidade?: string;
+          p_criado_por_id?: string;
           p_data_final?: string;
           p_data_inicial?: string;
           p_deslocamento?: number;
@@ -1293,6 +1295,8 @@ export type Database = {
           p_limite?: number;
           p_ordenar_por?: string;
           p_pesquisa?: string;
+          p_promotor_rota_id?: string;
+          p_responsavel_id?: string;
           p_status?: string;
           p_uf?: string;
         };

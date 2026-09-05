@@ -27,6 +27,8 @@ export async function listInvoicesOverview(filters: InvoiceListFilters, signal?:
     const request = (supabase as any).rpc('listar_nfd_notas_gerencial', {
       p_data_inicial: filters.startDate || null, p_data_final: filters.endDate || null,
       p_status: filters.status || null, p_uf: filters.uf || null, p_cidade: filters.city || null,
+      p_responsavel_id: filters.responsibleId || null, p_criado_por_id: filters.createdById || null,
+      p_atualizado_por_id: filters.updatedById || null, p_promotor_rota_id: filters.routePromoterId || null,
       p_pesquisa: filters.search?.trim() || null, p_ordenar_por: filters.sortBy ?? 'data_emissao',
       p_direcao: filters.direction ?? 'desc', p_limite: pageSize, p_deslocamento: (page - 1) * pageSize,
     })

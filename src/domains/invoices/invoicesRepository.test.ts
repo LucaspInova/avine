@@ -15,10 +15,11 @@ describe('repositório paginado de NFDs', () => {
   it('envia filtros, ordenação, limite e deslocamento ao RPC uma única vez', async () => {
     const response = { rows: [{ chave_acesso: '1' }], total: 21, counts: { Finalizada: 1, Pendente: 20, Desconhecida: 0 }, ufs: ['CE'], cities: ['Fortaleza'] }
     rpc.mockResolvedValue({ data: response, error: null })
-    await expect(listInvoicesOverview({ startDate: '2026-08-01', endDate: '2026-08-10', status: 'Pendente', uf: 'CE', city: 'Fortaleza', search: 'Loja 10', sortBy: 'nota_fiscal', direction: 'asc', page: 3, pageSize: 10 })).resolves.toEqual(response)
+    await expect(listInvoicesOverview({ startDate: '2026-08-01', endDate: '2026-08-10', status: 'Pendente', uf: 'CE', city: 'Fortaleza', responsibleId: 'u1', createdById: 'u2', updatedById: 'u3', routePromoterId: 'u4', search: 'Loja 10', sortBy: 'nota_fiscal', direction: 'asc', page: 3, pageSize: 10 })).resolves.toEqual(response)
     expect(rpc).toHaveBeenCalledTimes(1)
     expect(rpc).toHaveBeenCalledWith('listar_nfd_notas_gerencial', expect.objectContaining({
       p_status: 'Pendente', p_uf: 'CE', p_cidade: 'Fortaleza', p_pesquisa: 'Loja 10',
+      p_responsavel_id: 'u1', p_criado_por_id: 'u2', p_atualizado_por_id: 'u3', p_promotor_rota_id: 'u4',
       p_ordenar_por: 'nota_fiscal', p_direcao: 'asc', p_limite: 10, p_deslocamento: 20,
     }))
   })

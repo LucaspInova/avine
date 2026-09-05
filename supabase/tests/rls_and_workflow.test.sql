@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(61);
+select plan(63);
 
 insert into auth.users (id, email)
 values
@@ -784,6 +784,21 @@ select results_eq(
 
 set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
+
+select is(
+  (public.listar_nfd_notas_gerencial(
+    p_responsavel_id => '20000000-0000-0000-0000-000000000011'::uuid
+  ) ->> 'total')::integer,
+  1,
+  'responsible filter uses the original author for a finalized FSTD'
+);
+select is(
+  (public.listar_nfd_notas_gerencial(
+    p_atualizado_por_id => '30000000-0000-0000-0000-000000000011'::uuid
+  ) ->> 'total')::integer,
+  0,
+  'latest-editor filter does not mix another Promotor into the result'
+);
 
 select lives_ok(
   $$

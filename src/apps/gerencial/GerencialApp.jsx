@@ -1988,7 +1988,7 @@ function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
   )
 }
 
-export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUfs = [], canEditFinalized = false }) {
+export function NotasScreen({ search, onSearch, lojas, usuarios = [], currentUser, restrictedUfs = [], canEditFinalized = false }) {
   const defaults = useMemo(() => getDefaultNoteDates(), [])
   const today = defaults.end
   const [startDate, setStartDate] = useState(defaults.start)
@@ -1996,7 +1996,14 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
   const [selectedStatus, setSelectedStatus] = useState('')
   const [selectedUf, setSelectedUf] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
-  const [draftFilters, setDraftFilters] = useState(() => ({ startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [] }))
+  const [selectedResponsible, setSelectedResponsible] = useState('')
+  const [selectedCreatedBy, setSelectedCreatedBy] = useState('')
+  const [selectedUpdatedBy, setSelectedUpdatedBy] = useState('')
+  const [selectedRoutePromoter, setSelectedRoutePromoter] = useState('')
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [],
+    responsibleId: '', createdById: '', updatedById: '', routePromoterId: '',
+  }))
   const [selectedNote, setSelectedNote] = useState(null)
   const [selectedFstd, setSelectedFstd] = useState(null)
   const [selectedFinalized, setSelectedFinalized] = useState(null)
@@ -2020,13 +2027,17 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
       status: selectedStatus,
       uf: selectedUf,
       city: selectedCity,
+      responsibleId: selectedResponsible,
+      createdById: selectedCreatedBy,
+      updatedById: selectedUpdatedBy,
+      routePromoterId: selectedRoutePromoter,
       search: normalizedSearch,
       sortBy: sort.key,
       direction: sort.direction === 'ascending' ? 'asc' : 'desc',
       page: currentPage,
       pageSize,
     }
-  }, [restrictedUfs, startDate, endDate, defaults, selectedStatus, selectedUf, selectedCity, debouncedSearch, sort, currentPage, pageSize])
+  }, [restrictedUfs, startDate, endDate, defaults, selectedStatus, selectedUf, selectedCity, selectedResponsible, selectedCreatedBy, selectedUpdatedBy, selectedRoutePromoter, debouncedSearch, sort, currentPage, pageSize])
   const invoicesQuery = useInvoices(invoiceFilters)
   const invoiceMutations = useInvoiceMutations()
   const result = invoicesQuery.data ?? { rows: [], total: 0, counts: {}, ufs: [], cities: [] }
@@ -2068,10 +2079,21 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     const candidates = selectedUfValues.length > 0 && storeCities.length > 0 ? storeCities : [...responseCities, ...storeCities]
     return [...new Set(candidates)].sort((left, right) => left.localeCompare(right, 'pt-BR'))
   }, [draftFilters.uf, result.cities, scopedStores])
+  const responsibilityUsers = useMemo(() => (
+    (usuarios ?? [])
+      .filter((user) => user?.id && user?.nome && user?.ativo !== false && user?.acesso_habilitado !== false)
+      .sort((left, right) => left.nome.localeCompare(right.nome, 'pt-BR'))
+  ), [usuarios])
+  const routePromoters = useMemo(() => (
+    responsibilityUsers.filter((user) => user.perfil === 'Promotor')
+  ), [responsibilityUsers])
   // The product's default reporting period is the neutral state: only dates that
   // differ from getDefaultNoteDates contribute to the active-filter badge.
   const periodFilterCount = Number(draftFilters.startDate !== defaults.start) + Number(draftFilters.endDate !== defaults.end)
-  const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status)) + draftFilters.uf.length + draftFilters.city.length
+  const activeFilterCount = periodFilterCount + Number(Boolean(draftFilters.status))
+    + draftFilters.uf.length + draftFilters.city.length
+    + Number(Boolean(draftFilters.responsibleId)) + Number(Boolean(draftFilters.createdById))
+    + Number(Boolean(draftFilters.updatedById)) + Number(Boolean(draftFilters.routePromoterId))
   const totals = { Geral: result.total, Finalizada: result.counts?.Finalizada ?? 0,
     Pendente: result.counts?.Pendente ?? 0, Desconhecida: result.counts?.Desconhecida ?? 0 }
 
@@ -2179,6 +2201,10 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedStatus(draftFilters.status)
     setSelectedUf(draftFilters.uf.join(','))
     setSelectedCity(draftFilters.city.join(','))
+    setSelectedResponsible(draftFilters.responsibleId)
+    setSelectedCreatedBy(draftFilters.createdById)
+    setSelectedUpdatedBy(draftFilters.updatedById)
+    setSelectedRoutePromoter(draftFilters.routePromoterId)
     setIsFilterOpen(false)
   }
 
@@ -2189,7 +2215,14 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
     setSelectedStatus('')
     setSelectedUf('')
     setSelectedCity('')
-    setDraftFilters({ startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [] })
+    setSelectedResponsible('')
+    setSelectedCreatedBy('')
+    setSelectedUpdatedBy('')
+    setSelectedRoutePromoter('')
+    setDraftFilters({
+      startDate: defaults.start, endDate: defaults.end, status: '', uf: [], city: [],
+      responsibleId: '', createdById: '', updatedById: '', routePromoterId: '',
+    })
   }
 
   function toggleDraftUf(uf) {
@@ -2209,6 +2242,10 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
 
   function toggleDraftStatus(status) {
     setDraftFilters((current) => ({ ...current, status: current.status === status ? '' : status }))
+  }
+
+  function toggleDraftUser(field, userId) {
+    setDraftFilters((current) => ({ ...current, [field]: current[field] === userId ? '' : userId }))
   }
 
   function handleSort(key) {
@@ -2270,6 +2307,48 @@ export function NotasScreen({ search, onSearch, lojas, currentUser, restrictedUf
                   </label>
                 ))}
                 {cities.length === 0 && <p className="filter-empty">Nenhuma cidade disponível.</p>}
+              </div>
+            </FilterSection>
+            <FilterSection title="Responsável" count={Number(Boolean(draftFilters.responsibleId))} id="note-filter-responsible">
+              <p className="filter-hint">Usa a rota enquanto pendente e o autor depois da finalização.</p>
+              <div className="filter-options">
+                {responsibilityUsers.map((user) => (
+                  <label key={user.id} className="filter-option">
+                    <span>{user.nome}</span>
+                    <input aria-label={`Responsável: ${user.nome}`} checked={draftFilters.responsibleId === user.id} onChange={() => toggleDraftUser('responsibleId', user.id)} type="checkbox" />
+                  </label>
+                ))}
+                {responsibilityUsers.length === 0 && <p className="filter-empty">Nenhum usuário disponível.</p>}
+              </div>
+            </FilterSection>
+            <FilterSection title="Criado por" count={Number(Boolean(draftFilters.createdById))} id="note-filter-created-by">
+              <div className="filter-options">
+                {responsibilityUsers.map((user) => (
+                  <label key={user.id} className="filter-option">
+                    <span>{user.nome}</span>
+                    <input aria-label={`Criado por: ${user.nome}`} checked={draftFilters.createdById === user.id} onChange={() => toggleDraftUser('createdById', user.id)} type="checkbox" />
+                  </label>
+                ))}
+              </div>
+            </FilterSection>
+            <FilterSection title="Atualizado por" count={Number(Boolean(draftFilters.updatedById))} id="note-filter-updated-by">
+              <div className="filter-options">
+                {responsibilityUsers.map((user) => (
+                  <label key={user.id} className="filter-option">
+                    <span>{user.nome}</span>
+                    <input aria-label={`Atualizado por: ${user.nome}`} checked={draftFilters.updatedById === user.id} onChange={() => toggleDraftUser('updatedById', user.id)} type="checkbox" />
+                  </label>
+                ))}
+              </div>
+            </FilterSection>
+            <FilterSection title="Promotor da rota" count={Number(Boolean(draftFilters.routePromoterId))} id="note-filter-route-promoter">
+              <div className="filter-options">
+                {routePromoters.map((user) => (
+                  <label key={user.id} className="filter-option">
+                    <span>{user.nome}</span>
+                    <input aria-label={`Promotor da rota: ${user.nome}`} checked={draftFilters.routePromoterId === user.id} onChange={() => toggleDraftUser('routePromoterId', user.id)} type="checkbox" />
+                  </label>
+                ))}
               </div>
             </FilterSection>
           </FilterPopover>
@@ -3249,6 +3328,7 @@ function GerencialApp({ capabilities }) {
             search={search}
             onSearch={setSearch}
             lojas={lojas}
+            usuarios={usuarios}
             currentUser={currentUser}
             restrictedUfs={gerencialCapabilities.allowedUfs}
             canEditFinalized={can(currentUser, 'fstd.editFinalized')}

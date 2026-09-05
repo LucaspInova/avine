@@ -59,6 +59,35 @@ describe('fluxo paginado das Notas gerenciais', () => {
     expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 25, status: 'Pendente', uf: 'CE', city: 'Fortaleza', sortBy: 'nota_fiscal', direction: 'asc' }))
   })
 
+  it('separa responsável, criador, editor e promotor da rota nos filtros', () => {
+    const usuarios = [
+      { id: 'p1', nome: 'Promotor Um', perfil: 'Promotor', ativo: true, acesso_habilitado: true },
+      { id: 'g1', nome: 'Gerencial Um', perfil: 'Gerencial', ativo: true, acesso_habilitado: true },
+    ]
+    render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} usuarios={usuarios} currentUser={{ id: 'a1' }} />)
+    const dialog = openFilters()
+
+    for (const [section, label] of [
+      ['Responsável', 'Responsável: Promotor Um'],
+      ['Criado por', 'Criado por: Gerencial Um'],
+      ['Atualizado por', 'Atualizado por: Promotor Um'],
+      ['Promotor da rota', 'Promotor da rota: Promotor Um'],
+    ]) {
+      if (!screen.queryByRole('checkbox', { name: label })) {
+        fireEvent.click(within(dialog).getByRole('button', { name: section }))
+      }
+      fireEvent.click(screen.getByRole('checkbox', { name: label }))
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar Filtros' }))
+    expect(invoiceBoundary.useInvoices).toHaveBeenLastCalledWith(expect.objectContaining({
+      responsibleId: 'p1',
+      createdById: 'g1',
+      updatedById: 'p1',
+      routePromoterId: 'p1',
+    }))
+  })
+
   it('exibe o indicador de ordenação somente na coluna ativa', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     const table = screen.getByRole('table', { name: 'Notas fiscais' })

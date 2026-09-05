@@ -654,6 +654,14 @@
   font-size: 13px;
 }
 
+.filter-hint {
+  margin: 0;
+  padding: 0 16px 9px;
+  color: #68706b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .primary-button,
 .secondary-button {
   height: 34px;
