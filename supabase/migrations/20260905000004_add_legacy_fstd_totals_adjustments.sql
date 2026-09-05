@@ -74,8 +74,8 @@ as $function$
     fl.qtd_total_codorna,
     coalesce(ajuste.qtd_retorno_codorna, fl.qtd_retorno_codorna),
     fl.origem,
-    fl.source_hash,
-    fl.created_at
+    fl.created_at,
+    fl.source_hash
   from public.fstd_legado_canonico fl
   left join public.fstd_legado_ajustes_totais ajuste on ajuste.legado_id = fl.legado_id
   where fl.codigo_loja = trim(p_codigo_loja)
