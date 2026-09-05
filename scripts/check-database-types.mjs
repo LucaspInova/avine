@@ -176,6 +176,32 @@ function validateDomainTypeReferences(committedPath, committedManifest) {
   }
 }
 
+function describeManifestDifferences(generated, committed) {
+  const differences = []
+
+  for (const group of ['tables', 'views', 'functions']) {
+    const generatedNames = new Set(Object.keys(generated[group]))
+    const committedNames = new Set(Object.keys(committed[group]))
+
+    for (const name of generatedNames) {
+      if (!committedNames.has(name)) differences.push(`ausente no arquivo: ${group}.${name}`)
+    }
+    for (const name of committedNames) {
+      if (!generatedNames.has(name)) differences.push(`não existe no schema: ${group}.${name}`)
+    }
+    for (const name of generatedNames) {
+      if (!committedNames.has(name)) continue
+      const expected = JSON.stringify(generated[group][name])
+      const actual = JSON.stringify(committed[group][name])
+      if (expected !== actual) {
+        differences.push(`membros divergentes: ${group}.${name}\n  schema=${expected}\n  arquivo=${actual}`)
+      }
+    }
+  }
+
+  return differences
+}
+
 const generatedManifest = manifest(generatedPath)
 const committedManifest = manifest(committedPath)
 validateDomainTypeReferences(committedPath, committedManifest)
@@ -185,6 +211,9 @@ if (JSON.stringify(generatedManifest) !== JSON.stringify(committedManifest)) {
     'database.types.ts está desatualizado: tabelas, colunas, views ou argumentos de RPC divergiram.',
   )
   console.error('Regere o arquivo com `supabase gen types typescript`.')
+  for (const difference of describeManifestDifferences(generatedManifest, committedManifest)) {
+    console.error(`- ${difference}`)
+  }
   process.exit(1)
 }
 
