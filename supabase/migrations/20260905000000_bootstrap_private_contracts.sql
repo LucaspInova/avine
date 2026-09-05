@@ -6,6 +6,8 @@
 create schema if not exists app_private;
 revoke all on schema app_private from public, anon;
 
+create extension if not exists pg_trgm with schema extensions;
+
 create function app_private.can_current_user_access_loja(p_loja_id uuid)
 returns boolean language sql stable as $$ select false $$;
 
@@ -27,8 +29,6 @@ returns text[] language sql stable as $$ select array[]::text[] $$;
 create function app_private.search_nfd_chaves_by_name(p_search text)
 returns table(chave_acesso text) language sql stable
 as $$ select null::text where false $$;
-
 create function app_private.search_nfd_chaves_numeric(p_search text)
 returns table(chave_acesso text) language sql stable
 as $$ select null::text where false $$;
-
