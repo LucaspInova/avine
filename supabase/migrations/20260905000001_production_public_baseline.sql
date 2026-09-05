@@ -3377,10 +3377,6 @@ CREATE OR REPLACE TRIGGER "fstd_documentos_set_updated_at" BEFORE UPDATE ON "pub
 
 
 
-CREATE CONSTRAINT TRIGGER "fstd_processos_ensure_document" AFTER INSERT OR UPDATE OF "status" ON "public"."fstd_processos" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW WHEN (("new"."status" = 'concluida'::"text")) EXECUTE FUNCTION "app_private"."fstd_processos_ensure_document"();
-
-
-
 CREATE OR REPLACE TRIGGER "fstd_processos_set_updated_at" BEFORE UPDATE ON "public"."fstd_processos" FOR EACH ROW EXECUTE FUNCTION "public"."fstd_processos_set_updated_at"();
 
 

@@ -212,6 +212,9 @@ $$;
 ALTER FUNCTION "app_private"."fstd_processos_ensure_document"() OWNER TO "postgres";
 
 
+CREATE CONSTRAINT TRIGGER "fstd_processos_ensure_document" AFTER INSERT OR UPDATE OF "status" ON "public"."fstd_processos" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW WHEN (("new"."status" = 'concluida'::"text")) EXECUTE FUNCTION "app_private"."fstd_processos_ensure_document"();
+
+
 CREATE OR REPLACE FUNCTION "app_private"."is_current_user_admin_ativo"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
