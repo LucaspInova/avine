@@ -17,11 +17,26 @@ returns boolean language sql stable as $$ select false $$;
 create function app_private.can_current_user_access_product(p_produto_id uuid)
 returns boolean language sql stable as $$ select false $$;
 
+create function app_private.can_current_user_assign_promotor(
+  p_loja_id uuid,
+  p_promotor_id uuid
+)
+returns boolean language sql stable as $$ select false $$;
+
+create function app_private.can_current_user_manage_uf(p_uf text)
+returns boolean language sql stable as $$ select false $$;
+
 create function app_private.is_current_user_admin_ativo()
 returns boolean language sql stable as $$ select false $$;
 
 create function app_private.is_current_user_gerencial_ativo()
 returns boolean language sql stable as $$ select false $$;
+
+create function app_private.is_current_user_scoped_gerencial_ativo()
+returns boolean language sql stable as $$ select false $$;
+
+create function app_private.current_user_uf()
+returns text language sql stable as $$ select null::text $$;
 
 create function app_private.current_user_ufs()
 returns text[] language sql stable as $$ select array[]::text[] $$;
