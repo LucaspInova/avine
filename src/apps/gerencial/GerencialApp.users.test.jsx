@@ -105,7 +105,8 @@ describe('Cadastro de Usuários', () => {
     const userSummary = screen.getByLabelText('Resumo de usuários')
     expect(within(userSummary).getByText('Total').closest('article')).toHaveTextContent('3100%')
     expect(within(userSummary).getByText('Off-Line').closest('article')).toHaveTextContent('266,7%')
-    expect(within(userSummary).getByText('Inativo').closest('article')).toHaveTextContent('133,3%')
+    expect(within(userSummary).getByText('Inativo').closest('article')).toHaveTextContent('00%')
+    expect(within(userSummary).getByText('Desativado').closest('article')).toHaveTextContent('133,3%')
     expect(within(userSummary).getByLabelText(/Ativo: Usuários cujo último acesso/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Promotor (2)' }))
     expect(within(table).getByText('BRUNO PROMOTOR')).toBeInTheDocument()
@@ -160,6 +161,14 @@ describe('Cadastro de Usuários', () => {
       onSubmit={noop} onDelete={noop} allowedProfiles={['Admin', 'Gerencial', 'Promotor']} />)
     expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Gerencial' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Desativar acesso' })).toBeInTheDocument()
+  })
+
+  it('oferece reativação explícita para uma conta bloqueada', () => {
+    render(<EditarUsuarioModal form={{ ...usuarios[2], senha: '' }} usuarios={usuarios} usuarioId="promotor-2"
+      busy={false} deleting={false} error="" onChange={noop} onBack={noop} onClose={noop}
+      onSubmit={noop} onDelete={noop} onToggleAccess={noop} accessEnabled={false} />)
+    expect(screen.getByRole('button', { name: 'Reativar acesso' })).toBeInTheDocument()
   })
 
   it('confirma a exclusão de acesso em um modal sem oferecer cancelamento redundante', () => {

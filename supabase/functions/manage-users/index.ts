@@ -212,13 +212,15 @@ Deno.serve(async (request) => {
 
   const { data: callerProfile, error: callerProfileError } = await adminClient
     .from("usuarios")
-    .select("id, perfil, estado, ufs")
+    .select("id, perfil, estado, ufs, ativo, acesso_habilitado")
     .eq("auth_user_id", caller.id)
     .maybeSingle();
 
   if (
     callerProfileError ||
-    !["Admin", "Gerencial"].includes(callerProfile?.perfil ?? "")
+    !["Admin", "Gerencial"].includes(callerProfile?.perfil ?? "") ||
+    callerProfile?.ativo !== true ||
+    callerProfile?.acesso_habilitado !== true
   ) {
     return jsonResponse(403, {
       error: "Apenas Admins ou Gerenciais cadastrados podem administrar usuarios.",
@@ -292,6 +294,7 @@ Deno.serve(async (request) => {
     if (target.perfil === "Admin" && target.auth_user_id) {
       const { count, error: countError } = await adminClient.from("usuarios")
         .select("id", { count: "exact", head: true }).eq("perfil", "Admin")
+        .eq("ativo", true).eq("acesso_habilitado", true)
         .not("auth_user_id", "is", null).neq("id", target.id);
       if (countError) return jsonResponse(400, { error: countError.message });
       if ((count ?? 0) === 0) return jsonResponse(400, {
@@ -300,7 +303,7 @@ Deno.serve(async (request) => {
     }
     if (target.perfil === "Promotor") {
       const { error: routeError } = await adminClient.from("loja_promotores")
-        .update({ promotor_id: null }).eq("promotor_id", target.id);
+        .delete().eq("promotor_id", target.id);
       if (routeError) return jsonResponse(400, { error: routeError.message });
     }
 
@@ -334,6 +337,89 @@ Deno.serve(async (request) => {
       }
     }
     return jsonResponse(200, { deleted: true });
+  }
+
+  if (action === "set_access") {
+    const usuarioId = text(body.usuario_id);
+    const enabled = body.enabled;
+    if (!usuarioId || typeof enabled !== "boolean") {
+      return jsonResponse(400, {
+        error: "Usuario alvo e estado de acesso sao obrigatorios.",
+      });
+    }
+
+    const { data: target, error: targetError } = await adminClient
+      .from("usuarios")
+      .select(
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+      )
+      .eq("id", usuarioId)
+      .maybeSingle();
+
+    if (targetError || !target) {
+      return jsonResponse(404, { error: "Usuario nao encontrado." });
+    }
+    if (!canManageTarget(target)) {
+      return jsonResponse(403, {
+        error: "O Gerencial somente pode administrar Promotores das suas UFs.",
+      });
+    }
+    if (target.auth_user_id === caller.id && !enabled) {
+      return jsonResponse(400, { error: "Voce nao pode desativar o proprio acesso." });
+    }
+    if (!target.auth_user_id) {
+      return jsonResponse(400, {
+        error: "Este perfil nao possui uma conta de acesso vinculada.",
+      });
+    }
+
+    if (!enabled && target.perfil === "Admin") {
+      const { count, error: countError } = await adminClient
+        .from("usuarios")
+        .select("id", { count: "exact", head: true })
+        .eq("perfil", "Admin")
+        .eq("ativo", true)
+        .eq("acesso_habilitado", true)
+        .not("auth_user_id", "is", null)
+        .neq("id", target.id);
+
+      if (countError) return jsonResponse(400, { error: countError.message });
+      if ((count ?? 0) === 0) {
+        return jsonResponse(400, {
+          error: "Nao e permitido desativar o ultimo Admin com acesso.",
+        });
+      }
+    }
+
+    const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
+      target.auth_user_id,
+      { ban_duration: enabled ? "none" : "876000h" },
+    );
+    if (authUpdateError) {
+      return jsonResponse(400, { error: authUpdateError.message });
+    }
+
+    const { data: updated, error: updateError } = await adminClient
+      .from("usuarios")
+      .update({ ativo: enabled, acesso_habilitado: enabled })
+      .eq("id", target.id)
+      .select(
+        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+      )
+      .single();
+
+    if (updateError || !updated) {
+      await adminClient.auth.admin.updateUserById(target.auth_user_id, {
+        ban_duration: target.ativo && target.acesso_habilitado ? "none" : "876000h",
+      });
+      return jsonResponse(400, {
+        error: updateError?.message ?? "Nao foi possivel alterar o acesso.",
+      });
+    }
+
+    return jsonResponse(200, {
+      usuario: publicProfile(updated as UserProfile, target.perfil.toLowerCase()),
+    });
   }
 
   if (action === "create") {
@@ -487,6 +573,8 @@ Deno.serve(async (request) => {
         .from("usuarios")
         .select("id", { count: "exact", head: true })
         .eq("perfil", "Admin")
+        .eq("ativo", true)
+        .eq("acesso_habilitado", true)
         .not("auth_user_id", "is", null)
         .neq("id", target.id);
 
@@ -532,7 +620,7 @@ Deno.serve(async (request) => {
       app_metadata: {
         role: authRole,
       },
-      ban_duration: "none",
+      ban_duration: target.ativo && target.acesso_habilitado ? "none" : "876000h",
     };
 
     if (target.auth_user_id) {
@@ -551,8 +639,8 @@ Deno.serve(async (request) => {
       .from("usuarios")
       .update({
         ...nextProfile,
-        ativo: true,
-        acesso_habilitado: true,
+        ativo: target.ativo,
+        acesso_habilitado: target.acesso_habilitado,
       })
       .eq("id", target.id)
       .select(
@@ -568,7 +656,7 @@ Deno.serve(async (request) => {
           app_metadata: {
             role: target.perfil === "Admin" ? "admin" : target.perfil.toLowerCase(),
           },
-          ban_duration: "none",
+          ban_duration: target.ativo && target.acesso_habilitado ? "none" : "876000h",
         });
       }
 

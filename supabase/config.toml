@@ -69,11 +69,6 @@ policy = "per_worker"
 inspector_port = 8083
 deno_version = 2
 
-[functions.create-gerencial-user]
-enabled = true
-verify_jwt = true
-entrypoint = "./functions/create-gerencial-user/index.ts"
-
 [functions.manage-users]
 enabled = true
 verify_jwt = true

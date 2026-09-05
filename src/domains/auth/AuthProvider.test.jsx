@@ -40,6 +40,8 @@ const validProfile = {
   id: 'profile-1',
   auth_user_id: 'auth-1',
   perfil: 'Promotor',
+  ativo: true,
+  acesso_habilitado: true,
 }
 
 function ProtectedRoute() {

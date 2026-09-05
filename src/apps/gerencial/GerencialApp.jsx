@@ -10,6 +10,7 @@ import {
   deleteManagedUser,
   getUserActivityStatus,
   listManagedUsers,
+  setManagedUserAccess,
   updateManagedUser,
 } from '../../domains/users'
 import {
@@ -633,7 +634,8 @@ export function Sidebar({ isMobile = false, expanded, canCollapse, selectedItem,
 
 export function UsuarioModal({
   mode = 'create', form, usuarios, currentUser, usuarioId = '', busy, deleting = false, error,
-  onChange, onBack, onClose, onSubmit, onDelete, deleteConfirmationOpen = false,
+  onChange, onBack, onClose, onSubmit, onDelete, onToggleAccess, accessBusy = false,
+  accessEnabled = true, canToggleAccess = true, deleteConfirmationOpen = false,
   onCancelDelete, allowedProfiles = perfisCadastro,
 }) {
   const [touched, setTouched] = useState({})
@@ -660,7 +662,7 @@ export function UsuarioModal({
     ? selectedUfs.length > 0 && selectedUfs.every((uf) => allowedStates.includes(uf))
     : selectedUfs.length === 1 && allowedStates.includes(selectedUfs[0]))
   const canSubmit = isEmailValid && !hasEmailDuplicado && isNameValid && !hasNomeDuplicado &&
-    isPasswordValid && isProfileValid && isEstadoValid && !busy && !deleting
+    isPasswordValid && isProfileValid && isEstadoValid && !busy && !deleting && !accessBusy
 
   const feedback = (field, valid, validText, invalidText) => touched[field] && (
     <strong className={valid ? 'field-success' : 'field-error'}>{valid ? validText : invalidText}</strong>
@@ -728,6 +730,14 @@ export function UsuarioModal({
         {error && <p className="form-error">{error}</p>}
         {isEdit ? <div className="edit-actions">
           <button className="danger-button" type="button" onClick={onDelete} disabled={busy || deleting}>Excluir acesso</button>
+          <button
+            className={accessEnabled ? 'warning-button' : 'reactivate-button'}
+            type="button"
+            onClick={onToggleAccess}
+            disabled={busy || deleting || accessBusy || !canToggleAccess}
+          >
+            {accessBusy ? 'Alterando...' : accessEnabled ? 'Desativar acesso' : 'Reativar acesso'}
+          </button>
           <button className="primary-button edit-submit" type="submit" disabled={!canSubmit}>{busy ? 'Salvando...' : 'Salvar'}</button>
         </div> : <button className="modal-submit" type="submit" disabled={!canSubmit}><Icon name="plus" /><span>{busy ? 'Cadastrando...' : 'Cadastrar'}</span></button>}
       </form>
@@ -893,6 +903,10 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
             <div>
               <dt>Estado</dt>
               <dd>{getUserUfLabel(usuario, 'Escopo global')}</dd>
+            </div>
+            <div>
+              <dt>Acesso</dt>
+              <dd>{usuario.ativo && usuario.acesso_habilitado ? 'Habilitado' : 'Desativado'}</dd>
             </div>
           </dl>
         </div>
@@ -1321,7 +1335,7 @@ export function UsuariosScreen({
   const statusCounts = useMemo(() => usuarios.reduce((summary, usuario) => {
     summary[getUserActivityStatus(usuario)] += 1
     return summary
-  }, { active: 0, offline: 0, inactive: 0 }), [usuarios])
+  }, { active: 0, offline: 0, inactive: 0, blocked: 0 }), [usuarios])
   const availableUfs = useMemo(
     () => [...new Set(usuarios.map((usuario) => usuario.estado).filter((uf) =>
       uf && (restrictedUfs.length === 0 || restrictedUfs.includes(uf))))]
@@ -1417,6 +1431,7 @@ export function UsuariosScreen({
               <option value="active">Ativo</option>
               <option value="offline">Off-Line</option>
               <option value="inactive">Inativo</option>
+              <option value="blocked">Desativado</option>
             </AppSelect>
           </FilterSection>
         </FilterPopover>
@@ -1435,6 +1450,7 @@ export function UsuariosScreen({
           { key: 'active', label: 'Ativo', total: statusCounts.active, helper: 'Usuários cujo último acesso aconteceu entre agora e 3 dias atrás.' },
           { key: 'offline', label: 'Off-Line', total: statusCounts.offline, helper: 'Usuários que acessaram o sistema pela última vez há mais de 3 dias.' },
           { key: 'inactive', label: 'Inativo', total: statusCounts.inactive, helper: 'Usuários que nunca acessaram o sistema.' },
+          { key: 'blocked', label: 'Desativado', total: statusCounts.blocked, helper: 'Contas bloqueadas manualmente, com histórico preservado.' },
         ].map((item) => {
           const percentage = usuarios.length ? (item.total / usuarios.length) * 100 : 0
           return (
@@ -1495,7 +1511,11 @@ export function UsuariosScreen({
             {pageUsers.map((usuario) => {
               const profileClass = getManagedRoleKey(usuario).toLowerCase()
               const activityStatus = getUserActivityStatus(usuario)
-              const activityLabel = activityStatus === 'active' ? 'Ativo' : activityStatus === 'offline' ? 'Off-Line' : 'Inativo'
+              const activityLabel = activityStatus === 'active'
+                ? 'Ativo'
+                : activityStatus === 'offline'
+                  ? 'Off-Line'
+                  : activityStatus === 'blocked' ? 'Desativado' : 'Inativo'
 
               return (
                 <div
@@ -2524,6 +2544,7 @@ function GerencialApp({ capabilities }) {
   const [editError, setEditError] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingUser, setDeletingUser] = useState(false)
+  const [accessBusy, setAccessBusy] = useState(false)
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const [isEditOpen, setEditOpen] = useState(false)
 
@@ -2985,6 +3006,7 @@ function GerencialApp({ capabilities }) {
     setSelectedUsuario(null)
     setEditForm(initialUserForm)
     setEditError('')
+    setAccessBusy(false)
     setEditOpen(false)
     setDeleteConfirmationOpen(false)
   }
@@ -3065,6 +3087,34 @@ function GerencialApp({ capabilities }) {
     }
 
     setDeletingUser(false)
+    closeUserModals()
+    await loadUsuarios()
+    await loadLojas()
+  }
+
+  async function handleToggleUsuarioAccess() {
+    if (!selectedUsuario) return
+
+    const accessEnabled = selectedUsuario.ativo && selectedUsuario.acesso_habilitado
+    if (accessEnabled) {
+      const shouldDisable = window.confirm(
+        `Desativar o acesso de ${selectedUsuario.nome}? O histórico e as rotas serão preservados.`,
+      )
+      if (!shouldDisable) return
+    }
+
+    setAccessBusy(true)
+    setEditError('')
+
+    try {
+      await setManagedUserAccess(selectedUsuario.id, !accessEnabled)
+    } catch (accessError) {
+      setEditError(accessError instanceof Error ? accessError.message : 'Não foi possível alterar o acesso do usuário.')
+      setAccessBusy(false)
+      return
+    }
+
+    setAccessBusy(false)
     closeUserModals()
     await loadUsuarios()
     await loadLojas()
@@ -3414,6 +3464,9 @@ function GerencialApp({ capabilities }) {
           usuarioId={selectedUsuario.id}
           busy={savingEdit}
           deleting={deletingUser}
+          accessBusy={accessBusy}
+          accessEnabled={selectedUsuario.ativo && selectedUsuario.acesso_habilitado}
+          canToggleAccess={selectedUsuario.id !== currentUser?.id}
           error={editError}
           onChange={(patch) => setEditForm((current) => ({ ...current, ...patch }))}
           onBack={() => {
@@ -3423,6 +3476,7 @@ function GerencialApp({ capabilities }) {
           onClose={closeUserModals}
           onSubmit={handleEditUsuario}
           onDelete={handleDeleteUsuario}
+          onToggleAccess={handleToggleUsuarioAccess}
           deleteConfirmationOpen={deleteConfirmationOpen}
           onCancelDelete={() => setDeleteConfirmationOpen(false)}
           allowedProfiles={gerencialCapabilities.isAdmin ? perfisEditaveis : ['Promotor']}

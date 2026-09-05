@@ -18,4 +18,11 @@ describe('user activity status', () => {
     expect(isUserActive({ last_access_at: lastAccessAt }, now)).toBe(false)
     expect(getUserActivityStatus({ last_access_at: lastAccessAt }, now)).toBe('inactive')
   })
+
+  it.each([
+    { ativo: false, acesso_habilitado: true },
+    { ativo: true, acesso_habilitado: false },
+  ])('distinguishes a blocked account from a user who never signed in', (access) => {
+    expect(getUserActivityStatus({ ...access, last_access_at: '2026-08-10T11:00:00.000Z' }, now)).toBe('blocked')
+  })
 })

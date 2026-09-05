@@ -1700,6 +1700,30 @@ fieldset legend {
   padding: 0 16px;
 }
 
+.warning-button,
+.reactivate-button {
+  height: 34px;
+  min-width: 110px;
+  border-radius: 7px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.warning-button {
+  border: 1px solid #e1c47b;
+  color: #765510;
+  background: #fff8e6;
+}
+
+.reactivate-button {
+  border: 1px solid #9cc9a6;
+  color: #235f32;
+  background: #edf8ef;
+}
+
 .danger-button {
   height: 34px;
   border: 1px solid #efb8b8;
@@ -1724,6 +1748,8 @@ fieldset legend {
 .delete-confirm-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
 
 .danger-button:disabled,
+.warning-button:disabled,
+.reactivate-button:disabled,
 .edit-submit:disabled {
   cursor: not-allowed;
   opacity: 0.6;
@@ -1923,7 +1949,7 @@ select:focus-visible {
 
 .user-status-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -1942,6 +1968,7 @@ select:focus-visible {
 .user-status-summary-card.is-active { border-top-color: #2f642b; }
 .user-status-summary-card.is-offline { border-top-color: #b77900; }
 .user-status-summary-card.is-inactive { border-top-color: #8a3d36; }
+.user-status-summary-card.is-blocked { border-top-color: #6a4b8a; }
 
 .user-status-summary-title,
 .user-status-summary-value {
@@ -1961,6 +1988,7 @@ select:focus-visible {
 .user-status-summary-card.is-active .user-status-summary-title { color: #2f642b; }
 .user-status-summary-card.is-offline .user-status-summary-title { color: #8a6100; }
 .user-status-summary-card.is-inactive .user-status-summary-title { color: #8a3d36; }
+.user-status-summary-card.is-blocked .user-status-summary-title { color: #6a4b8a; }
 .user-status-summary-value { align-items: baseline; }
 .user-status-summary-value strong { font-size: clamp(26px, 2vw, 34px); line-height: 1; letter-spacing: -.035em; }
 .user-status-summary-value small { color: #5f6861; font-size: 13px; font-weight: 750; }
@@ -2222,6 +2250,11 @@ select:focus-visible {
 .status-pill.is-offline {
   color: #8a6100;
   background: #fff2c7;
+}
+
+.status-pill.is-blocked {
+  color: #6a4b8a;
+  background: #f0e8f7;
 }
 
 .status-dot {

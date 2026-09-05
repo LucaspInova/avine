@@ -14,9 +14,13 @@ export function getUserInitials(name: unknown) {
 
 const ACTIVE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
 
-export type UserActivityStatus = 'active' | 'offline' | 'inactive'
+export type UserActivityStatus = 'active' | 'offline' | 'inactive' | 'blocked'
 
-export function getUserActivityStatus(user: { last_access_at?: string | null }, now = Date.now()): UserActivityStatus {
+export function getUserActivityStatus(
+  user: { last_access_at?: string | null; ativo?: boolean | null; acesso_habilitado?: boolean | null },
+  now = Date.now(),
+): UserActivityStatus {
+  if (user.ativo === false || user.acesso_habilitado === false) return 'blocked'
   if (!user.last_access_at) return 'inactive'
 
   const lastAccess = new Date(user.last_access_at).getTime()

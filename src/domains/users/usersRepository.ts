@@ -105,3 +105,16 @@ export async function updateManagedUser(
 export async function deleteManagedUser(usuarioId: string): Promise<void> {
   await invokeManageUsers({ action: 'delete', usuario_id: usuarioId })
 }
+
+export async function setManagedUserAccess(
+  usuarioId: string,
+  enabled: boolean,
+): Promise<ManagedUserViewModel> {
+  const data = await invokeManageUsers({
+    action: 'set_access',
+    usuario_id: usuarioId,
+    enabled,
+  })
+  if (!data.usuario) throw new Error('A função não retornou o usuário atualizado.')
+  return data.usuario
+}

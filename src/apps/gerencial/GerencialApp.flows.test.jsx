@@ -220,7 +220,7 @@ describe('fluxo proprietário de usuários', () => {
     fireEvent.click(screen.getByRole('button', { name: 'UF' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'UF' }), { target: { value: 'CE' } })
     fireEvent.click(screen.getByRole('button', { name: 'Status' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'inactive' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'blocked' } })
     expect(screen.getByText('Usuário 11')).toBeVisible()
     expect(within(screen.getByRole('button', { name: /Filtrar/ })).getByLabelText('2 filtros ativos')).toBeVisible()
   })

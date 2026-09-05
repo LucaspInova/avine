@@ -35,7 +35,7 @@ describe('auth capabilities', () => {
   it.each([
     [{ ...base, ativo: false, perfil: 'Admin', auth_role: 'admin' }],
     [{ ...base, acesso_habilitado: false, perfil: 'Admin', auth_role: 'admin' }],
-  ])('does not use legacy status flags as access control', (profile) => {
-    expect(can(profile, 'admin.runRestrictedOperations')).toBe(true)
+  ])('blocks capabilities immediately when operational access is disabled', (profile) => {
+    expect(can(profile, 'admin.runRestrictedOperations')).toBe(false)
   })
 })

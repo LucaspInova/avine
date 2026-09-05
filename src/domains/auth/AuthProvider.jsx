@@ -36,6 +36,8 @@ function hasApplicationAccess(profile) {
   return Boolean(
     profile &&
       profile.auth_user_id &&
+      profile.ativo === true &&
+      profile.acesso_habilitado === true &&
       hasConsistentRole(profile),
   )
 }
