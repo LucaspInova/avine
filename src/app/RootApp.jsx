@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { RequireRole } from '../domains/auth/AuthProvider.jsx'
 import { RoleAccessScreen, RoleEntry } from '../domains/auth/RoleAccess.jsx'
 import { ForgotPasswordScreen, ResetPasswordScreen } from '../shared/components/auth/PasswordRecovery.jsx'
@@ -14,6 +14,12 @@ function isPasswordRecoveryRedirect() {
   return Boolean(hashParams.get('type') === 'recovery' || hashParams.get('error') || hashParams.get('error_code'))
 }
 
+function LegacyPromotorRedirect() {
+  const location = useLocation()
+  const suffix = location.pathname.replace(/^\/promotor(?=\/|$)/, '')
+  return <Navigate to={`/acesso/promotor${suffix || '/lojas'}${location.search}${location.hash}`} replace />
+}
+
 export default function RootApp() {
   return (
     <Suspense fallback={null}>
@@ -25,7 +31,7 @@ export default function RootApp() {
         <Route path={applicationRoutes.gerencial} element={<RequireRole profile="Gerencial" authRole="gerencial"><GerencialRoutes /></RequireRole>} />
         <Route path={applicationRoutes.promotor} element={<RequireRole profile="Promotor" authRole="promotor"><PromotorRoutes /></RequireRole>} />
         <Route path={applicationRoutes.roleAccess} element={<RoleAccessScreen />} />
-        <Route path={applicationRoutes.legacyPromotor} element={<Navigate to="/acesso/promotor" replace />} />
+        <Route path={applicationRoutes.legacyPromotor} element={<LegacyPromotorRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

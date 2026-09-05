@@ -54,8 +54,8 @@ describe('RootApp — contrato de URLs e autorização', () => {
   })
 
   it('restaura URLs legadas e desconhecidas com replace', async () => {
-    const { unmount } = renderRoute('/promotor/lojas')
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/acesso/promotor'))
+    const { unmount } = renderRoute('/promotor/lojas/loja-1/notas')
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/acesso/promotor/lojas/loja-1/notas'))
     unmount()
     renderRoute('/url-inexistente')
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/'))

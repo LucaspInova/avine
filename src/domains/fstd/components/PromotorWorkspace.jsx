@@ -3055,17 +3055,40 @@ export function PromotorWorkspace({
   const openInvoice = navigation.openInvoice ?? ignoreNavigation
   const queryClient = useQueryClient()
   const [savedNavigation] = useState(() => embeddedFstd || embeddedFinalized ? null : readNavigation(profile.id))
-  const [selectedStore, setSelectedStore] = useState(() => initialStore ?? savedNavigation?.selectedStore ?? null)
-  const [selectedNfd, setSelectedNfd] = useState(() => embeddedFstd || embeddedFinalized ? null : savedNavigation?.selectedNfd ?? null)
-  const [fstdTarget, setFstdTarget] = useState(() => embeddedFstd || embeddedFinalized ? initialFstdTarget : savedNavigation?.fstdTarget)
-  const [isAvulsaOpen, setAvulsaOpen] = useState(false)
-  const [avulsaAddProductsTarget, setAvulsaAddProductsTarget] = useState(null)
+  const initialRoute = savedNavigation?.route ?? { view: 'stores' }
+  const [selectedStoreId, setSelectedStoreId] = useState(() => (
+    initialStore?.id ?? initialRoute.storeId ?? savedNavigation?.selectedStore?.id ?? null
+  ))
+  const [selectedNfdKey, setSelectedNfdKey] = useState(() => (
+    ['invoice', 'fstd'].includes(initialRoute.view)
+      ? initialRoute.invoiceKey
+      : null
+  ))
+  const [fstdTargetKey, setFstdTargetKey] = useState(() => (
+    initialRoute.view === 'fstd'
+      ? initialRoute.invoiceKey
+      : (embeddedFstd || embeddedFinalized ? getNfdKey(initialFstdTarget) : null)
+  ))
+  const [fstdTargetSnapshot, setFstdTargetSnapshot] = useState(() => (
+    embeddedFstd || embeddedFinalized
+      ? initialFstdTarget
+      : initialRoute.view === 'fstd'
+        ? savedNavigation?.fstdTarget
+        : undefined
+  ))
+  const [isAvulsaOpen, setAvulsaOpen] = useState(() => initialRoute.view === 'manual')
+  const [avulsaAddProductsKey, setAvulsaAddProductsKey] = useState(() => (
+    initialRoute.view === 'add-products' ? initialRoute.invoiceKey : null
+  ))
+  const [avulsaAddProductsSnapshot, setAvulsaAddProductsSnapshot] = useState(() => (
+    initialRoute.view === 'add-products' ? savedNavigation?.avulsaAddProductsTarget ?? null : null
+  ))
   const [conferenceAlertDismissed, setConferenceAlertDismissed] = useState(false)
   const [storeSearch, setStoreSearch] = useState(() => savedNavigation?.storeSearch ?? '')
   const [nfdSearch, setNfdSearch] = useState(() => savedNavigation?.nfdSearch ?? '')
   const [statusFilter, setStatusFilter] = useState(() => savedNavigation?.statusFilter ?? 'atrasada')
   const [unknownNfdComments, setUnknownNfdComments] = useState(() => readUnknownNfdComments(profile.id))
-  const [isProfilePageOpen, setProfilePageOpen] = useState(false)
+  const [isProfilePageOpen, setProfilePageOpen] = useState(() => initialRoute.view === 'profile')
   const [isProfileMenuOpen, setProfileMenuOpen] = useState(false)
   const [profilePhoto, setProfilePhoto] = useState('')
 
@@ -3091,19 +3114,6 @@ export function PromotorWorkspace({
     }
   }, [profile?.foto_url])
 
-  useEffect(() => {
-    if (embeddedFstd || embeddedFinalized) return
-
-    saveNavigation(profile.id, {
-      selectedStore,
-      selectedNfd,
-      fstdTarget,
-      storeSearch,
-      nfdSearch,
-      statusFilter,
-    })
-  }, [embeddedFinalized, embeddedFstd, fstdTarget, nfdSearch, profile.id, saveNavigation, selectedNfd, selectedStore, statusFilter, storeSearch])
-
   const workspaceQueries = usePromotorWorkspace(profile, {
     fstdAccessKey: embeddedFstd || embeddedFinalized ? initialFstdTarget?.chave_acesso : null,
   })
@@ -3115,6 +3125,12 @@ export function PromotorWorkspace({
   const motivosQuery = workspaceQueries.reasons
 
   const stores = useMemo(() => storesQuery.data ?? [], [storesQuery.data])
+  const selectedStore = initialStore
+    ?? stores.find((store) => String(store.id) === String(selectedStoreId))
+    ?? (selectedStoreId && String(savedNavigation?.selectedStore?.id) === String(selectedStoreId)
+      ? savedNavigation.selectedStore
+      : null)
+    ?? null
   const databaseUnknownNfdComments = useMemo(() => {
     const comments = {}
 
@@ -3231,6 +3247,71 @@ export function PromotorWorkspace({
     },
     [allUnknownNfdComments, fstdProcessosByNfd, fstdProcessosQuery.data, nfdsQuery.data, produtosCatalogQuery.data, stores],
   )
+  const findNfdByNavigationKey = (navigationKey) => nfds.find((nfd) => (
+    String(getNfdKey(nfd)) === String(navigationKey)
+    || String(nfd.chave_acesso) === String(navigationKey)
+  ))
+  const selectedNfd = selectedNfdKey ? findNfdByNavigationKey(selectedNfdKey) ?? null : null
+  const fstdTarget = fstdTargetSnapshot
+    ?? (fstdTargetKey ? findNfdByNavigationKey(fstdTargetKey) : undefined)
+  const avulsaAddProductsTarget = avulsaAddProductsSnapshot
+    ?? (avulsaAddProductsKey ? findNfdByNavigationKey(avulsaAddProductsKey) : null)
+
+  function setSelectedStore(store) {
+    setSelectedStoreId(store?.id ?? null)
+  }
+
+  function setSelectedNfd(nfd) {
+    setSelectedNfdKey(nfd ? getNfdKey(nfd) : null)
+  }
+
+  function setFstdTarget(target) {
+    setFstdTargetSnapshot(target)
+    setFstdTargetKey(target ? getNfdKey(target) : null)
+  }
+
+  function setAvulsaAddProductsTarget(target) {
+    setAvulsaAddProductsSnapshot(target)
+    setAvulsaAddProductsKey(target ? getNfdKey(target) : null)
+  }
+
+  useEffect(() => {
+    if (embeddedFstd || embeddedFinalized) return
+
+    saveNavigation(profile.id, {
+      selectedStore,
+      selectedStoreId,
+      selectedNfd,
+      selectedNfdKey,
+      fstdTarget,
+      fstdTargetKey,
+      isAvulsaOpen,
+      avulsaAddProductsTarget,
+      avulsaAddProductsKey,
+      isProfilePageOpen,
+      storeSearch,
+      nfdSearch,
+      statusFilter,
+    })
+  }, [
+    avulsaAddProductsKey,
+    avulsaAddProductsTarget,
+    embeddedFinalized,
+    embeddedFstd,
+    fstdTarget,
+    fstdTargetKey,
+    isAvulsaOpen,
+    isProfilePageOpen,
+    nfdSearch,
+    profile.id,
+    saveNavigation,
+    selectedNfd,
+    selectedNfdKey,
+    selectedStore,
+    selectedStoreId,
+    statusFilter,
+    storeSearch,
+  ])
   const selectedStoreNfds = selectedStore ? nfds.filter((nfd) => nfd.loja_id === selectedStore.id) : []
   const fallbackFstdProcess = fstdTarget
     ? fstdProcessosByNfd.get(String(fstdTarget.chave_acesso))
