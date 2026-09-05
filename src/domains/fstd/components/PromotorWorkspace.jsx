@@ -1313,14 +1313,21 @@ function FieldCard({ title, icon, required = false, className = '', children }) 
   )
 }
 
-export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onSubmit }) {
+export function LegacyFstdScreen({ store, nfd, motivos, summary = null, busy, error, onBack, onSubmit }) {
   const [form, setForm] = useState(() => ({
     ...initialFstdForm,
-    gal: nfd ? '' : '',
-    cod: nfd ? '' : '',
+    gal: summary ? String(summary.quantidade_retorno_galinha ?? 0) : '',
+    cod: summary ? String(summary.quantidade_retorno_codorna ?? 0) : '',
+    motivoId: summary?.motivo_id ?? '',
+    observacao: summary?.observacao ?? '',
+    fotosExistentes: Array.isArray(summary?.fotos) ? summary.fotos : [],
   }))
-  const totalReturn = normalizeQuantity(form.gal) + normalizeQuantity(form.cod)
-  const canSubmit = Boolean(store && form.motivoId && totalReturn > 0 && !busy)
+  const returnGalinha = normalizeQuantity(form.gal)
+  const returnCodorna = normalizeQuantity(form.cod)
+  const totalReturn = returnGalinha + returnCodorna
+  const quantitiesAreValid = returnGalinha <= getBilledGal(nfd) && returnCodorna <= getBilledCod(nfd)
+  const photoCount = form.fotosExistentes.length + form.fotos.length
+  const canSubmit = Boolean(store && form.motivoId && totalReturn > 0 && quantitiesAreValid && photoCount > 0 && !busy)
 
   function updateForm(patch) {
     setForm((current) => ({ ...current, ...patch }))
@@ -1329,20 +1336,13 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
   function handleSubmit(event) {
     event.preventDefault()
 
-    const observacao = [
-      form.notaVenda.trim() ? `Nota de venda: ${form.notaVenda.trim()}` : '',
-      form.lotes.trim() ? `Lotes: ${form.lotes.trim()}` : '',
-    ].filter(Boolean).join('\n')
-
     onSubmit({
-      p_loja_id: store.id,
-      p_motivo_id: form.motivoId,
-      p_nfd_id: nfd?.id ?? null,
-      p_quantidade_gal: normalizeQuantity(form.gal),
-      p_quantidade_cod: normalizeQuantity(form.cod),
-      p_quantidade_siu: 0,
-      p_fotos: [],
-      p_observacao: observacao || null,
+      motivoId: form.motivoId,
+      retornoGalinha: returnGalinha,
+      retornoCodorna: returnCodorna,
+      observacao: form.observacao.trim() || null,
+      fotos: form.fotos,
+      fotosExistentes: form.fotosExistentes,
     })
   }
 
@@ -1445,17 +1445,13 @@ export function LegacyFstdScreen({ store, nfd, motivos, busy, error, onBack, onS
               />
               Envio de imagens
             </label>
-            {form.fotos.length > 0 && <p className="photo-count">{form.fotos.length} foto(s) selecionada(s)</p>}
+            {photoCount > 0 && <p className="photo-count">{photoCount} foto(s) vinculada(s)</p>}
           </FieldCard>
 
-          <FieldCard title="Adicional">
+          <FieldCard title="Observações">
             <label className="mobile-field">
-              <span>Nota de Venda</span>
-              <input value={form.notaVenda} onChange={(event) => updateForm({ notaVenda: event.target.value })} />
-            </label>
-            <label className="mobile-field">
-              <span>Lotes</span>
-              <textarea value={form.lotes} onChange={(event) => updateForm({ lotes: event.target.value })} rows="3" />
+              <span>Informações adicionais</span>
+              <textarea value={form.observacao} onChange={(event) => updateForm({ observacao: event.target.value })} rows="4" placeholder="Use para nota de venda, lotes ou qualquer comentário relevante sobre esta FSTD." />
             </label>
           </FieldCard>
 
@@ -3363,6 +3359,9 @@ export function PromotorWorkspace({
         fstd_process: fallbackFstdProcess,
       }
     : undefined
+  const currentCollectionMode = currentFstdTarget?.fstd_process?.modo_coleta
+    ?? (currentFstdTarget?.is_avulsa ? 'produto' : profile.modo_coleta ?? 'produto')
+  const isAggregateCollection = currentCollectionMode === 'agregado'
 
   const hasNoDetailedProducts = Boolean(
     allowFinalizedEdit
@@ -3482,6 +3481,95 @@ export function PromotorWorkspace({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] })
       await queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] })
+    },
+  })
+
+  const aggregateFstdMutation = useMutation({
+    mutationFn: async ({ motivoId, retornoGalinha, retornoCodorna, observacao, fotos = [], fotosExistentes = [] }) => {
+      let processoId = currentFstdTarget?.fstd_process_id ?? currentFstdTarget?.fstd_process?.id
+      if (!processoId) {
+        const { data, error } = await supabase.rpc('iniciar_fstd_agregada', {
+          p_loja_id: selectedStore.id,
+          p_nfd_chave_acesso: String(currentFstdTarget.chave_acesso),
+        })
+        if (error) throw error
+        processoId = data
+      }
+
+      const uploadedPaths = []
+      try {
+        for (const file of fotos) validateFstdPhoto(file)
+        if (fotos.length > 0) {
+          const { data: authData, error: authError } = await supabase.auth.getUser()
+          if (authError) throw authError
+          if (!authData.user) throw new Error('Sessão expirada. Entre novamente para enviar as fotos.')
+
+          for (const file of fotos) {
+            const safeFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-').toLowerCase()
+            const path = `${authData.user.id}/${processoId}/agregado/${globalThis.crypto.randomUUID()}-${safeFileName}`
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('fstd-fotos')
+              .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+            if (uploadError) throw uploadError
+            uploadedPaths.push(uploadData.path)
+          }
+        }
+
+        const paths = [...fotosExistentes, ...uploadedPaths]
+        const { data, error } = await supabase.rpc('salvar_fstd_agregada', {
+          p_processo_id: processoId,
+          p_motivo_id: motivoId,
+          p_quantidade_retorno_galinha: retornoGalinha,
+          p_quantidade_retorno_codorna: retornoCodorna,
+          p_observacao: observacao,
+          p_fotos: paths,
+          p_finalizar: true,
+        })
+        if (error) throw error
+        const process = Array.isArray(data) ? data[0] : data
+        return {
+          process,
+          summary: {
+            processo_id: processoId,
+            motivo_id: motivoId,
+            quantidade_faturada_galinha: getBilledGal(currentFstdTarget),
+            quantidade_retorno_galinha: retornoGalinha,
+            quantidade_faturada_codorna: getBilledCod(currentFstdTarget),
+            quantidade_retorno_codorna: retornoCodorna,
+            observacao,
+            fotos: paths,
+          },
+        }
+      } catch (error) {
+        if (uploadedPaths.length > 0) await supabase.storage.from('fstd-fotos').remove(uploadedPaths)
+        throw error
+      }
+    },
+    onSuccess: ({ process, summary }) => {
+      const refreshQueries = Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] }),
+      ])
+      const completedTarget = {
+        ...currentFstdTarget,
+        fstd_process_id: process.id,
+        fstd_process_status: process.status,
+        fstd_process: { ...process, resumo_agregado: summary, produtos: [] },
+      }
+      void fstdDocumentMutation.mutateAsync(completedTarget).catch((pdfError) => {
+        console.error('A FSTD agregada foi finalizada, mas o PDF ficou pendente.', pdfError)
+      })
+      void refreshQueries.catch((refreshError) => {
+        console.error('Não foi possível atualizar a lista após finalizar a FSTD agregada.', refreshError)
+      })
+      if (embeddedFstd) {
+        onEmbeddedComplete?.(process)
+        if (!onEmbeddedComplete) onEmbeddedClose?.()
+        return
+      }
+      setFstdTarget(undefined)
+      setSelectedNfd(null)
+      setStatusFilter('finalizada')
     },
   })
 
@@ -3919,6 +4007,21 @@ export function PromotorWorkspace({
       return <div className="gerencial-fstd-loading">Carregando FSTD...</div>
     }
 
+    if (isAggregateCollection) {
+      return (
+        <LegacyFstdScreen
+          store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
+          nfd={currentFstdTarget}
+          motivos={motivosQuery.data ?? []}
+          summary={currentFstdTarget?.fstd_process?.resumo_agregado}
+          busy={aggregateFstdMutation.isPending}
+          error={aggregateFstdMutation.error?.message}
+          onBack={onEmbeddedClose}
+          onSubmit={(payload) => aggregateFstdMutation.mutate(payload)}
+        />
+      )
+    }
+
     return (
       <FstdScreen
         store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
@@ -3945,6 +4048,23 @@ export function PromotorWorkspace({
   }
 
   if (currentFstdTarget !== undefined && selectedStore) {
+    if (isAggregateCollection) {
+      return (
+        <>
+          <LegacyFstdScreen
+            store={{ ...selectedStore, responsavel: getFirstName(profile.nome).toUpperCase() }}
+            nfd={currentFstdTarget}
+            motivos={motivosQuery.data ?? []}
+            summary={currentFstdTarget?.fstd_process?.resumo_agregado}
+            busy={aggregateFstdMutation.isPending}
+            error={aggregateFstdMutation.error?.message}
+            onBack={() => setFstdTarget(undefined)}
+            onSubmit={(payload) => aggregateFstdMutation.mutate(payload)}
+          />
+          {conferenceAlert}
+        </>
+      )
+    }
     return (
       <>
         <FstdScreen

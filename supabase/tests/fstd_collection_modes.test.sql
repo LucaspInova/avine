@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(24);
+select plan(25);
 
 select has_column('public', 'usuarios', 'modo_coleta', 'usuario possui preferencia de coleta');
 select has_column('public', 'fstd_processos', 'modo_coleta', 'processo preserva snapshot do modo');
@@ -40,8 +40,8 @@ select is(
 );
 select is(
   (select count(*) from public.fstd_documentos where processo_id = (select id from public.fstd_processos where nfd_chave_acesso = 'HOM-900002-990002')),
-  1::bigint,
-  'processo agregado participa do mesmo ciclo de documentos'
+  0::bigint,
+  'processo agregado ainda nao gera documento durante o preenchimento'
 );
 select throws_ok(
   $$select public.salvar_fstd_agregada((select id from public.fstd_processos where nfd_chave_acesso = 'HOM-900002-990002'), '50000000-0000-4000-8000-000000000001', 7, 0, null, '["teste/foto.webp"]', true)$$,
@@ -63,6 +63,11 @@ select is(
   (select status from public.fstd_processos where nfd_chave_acesso = 'HOM-900002-990002'),
   'concluida',
   'processo agregado fica concluido'
+);
+select is(
+  (select count(*) from public.fstd_documentos where processo_id = (select id from public.fstd_processos where nfd_chave_acesso = 'HOM-900002-990002')),
+  1::bigint,
+  'processo agregado entra no ciclo de documentos depois de concluido'
 );
 select results_eq(
   $$select galinha_nfd, galinha_retorno from public.fstd_relatorio where nfd = '990002'$$,

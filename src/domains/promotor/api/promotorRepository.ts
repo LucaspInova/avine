@@ -62,15 +62,20 @@ export async function listUnknownInvoices(profile: any) {
   return (await result<any[]>(query)) ?? []
 }
 
-const fstdProcessSelect = 'id, nfd_chave_acesso, nfd_numero, loja_id, promotor_id, criado_por, atualizado_por, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em'
+const fstdProcessSelect = 'id, nfd_chave_acesso, nfd_numero, loja_id, promotor_id, criado_por, atualizado_por, modo_coleta, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em'
 const fstdProductSelect = 'id, processo_id, produto_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em'
 
 async function hydrateFstdProcesses(processes: any[]) {
   if (!processes.length) return []
   const products = (await result<any[]>(supabase!.from('fstd_produtos').select(fstdProductSelect).in('processo_id', processes.map((item) => item.id)))) ?? []
+  const summaries = (await result<any[]>(supabase!.from('fstd_resumos_agregados').select('processo_id, motivo_id, quantidade_faturada_galinha, quantidade_retorno_galinha, quantidade_faturada_codorna, quantidade_retorno_codorna, observacao, fotos, created_at, updated_at').in('processo_id', processes.map((item) => item.id)))) ?? []
   const productIds = products.map((item) => item.id)
   const divisions = productIds.length ? (await result<any[]>(supabase!.from('fstd_produto_motivos').select('produto_id, motivo_id, quantidade_faturada, quantidade').in('produto_id', productIds))) ?? [] : []
-  return processes.map((process) => ({ ...process, produtos: products.filter((product) => product.processo_id === process.id).map((product) => ({ ...product, divisoes: divisions.filter((division) => division.produto_id === product.id) })) }))
+  return processes.map((process) => ({
+    ...process,
+    resumo_agregado: summaries.find((summary) => summary.processo_id === process.id) ?? null,
+    produtos: products.filter((product) => product.processo_id === process.id).map((product) => ({ ...product, divisoes: divisions.filter((division) => division.produto_id === product.id) })),
+  }))
 }
 
 export async function listFstdProcesses() {

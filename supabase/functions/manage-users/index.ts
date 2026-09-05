@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const allowedRoles = new Set(["Promotor", "Gerencial", "Admin"]);
 const allowedAuthRoles = new Set(["admin", "gerencial", "promotor"]);
+const allowedCollectionModes = new Set(["agregado", "produto"]);
 const PASSWORD_MIN_LENGTH = 8;
 const DEFAULT_PROMOTER_PASSWORD = "Promotor12345";
 const PASSWORD_POLICY_ERROR =
@@ -39,6 +40,7 @@ type UserProfile = {
   perfil: string;
   estado: string;
   ufs: string[];
+  modo_coleta: "agregado" | "produto";
   fotos_habilitadas: boolean;
   ativo: boolean;
   acesso_habilitado: boolean;
@@ -115,6 +117,8 @@ function validateProfile(input: JsonRecord) {
   const estadoInput = text(input.estado);
   const ufs = perfil === "Admin" ? [] : [...new Set((requestedUfs.length ? requestedUfs : estadoInput ? [estadoInput] : []).map((uf) => uf.toUpperCase()))];
   const estado = perfil === "Admin" ? "CE" : ufs[0] ?? "";
+  const modoColetaInput = text(input.modo_coleta) || "produto";
+  const modo_coleta = perfil === "Promotor" ? modoColetaInput : "produto";
 
   if (nome.length < 4) throw new Error("Informe um nome valido.");
   if (nome !== nome.toUpperCase()) throw new Error("O nome deve conter apenas letras maiusculas.");
@@ -124,6 +128,7 @@ function validateProfile(input: JsonRecord) {
   if (perfil === "Admin" && ufs.length) throw new Error("Admin deve possuir escopo global.");
   if (perfil === "Gerencial" && ufs.length < 1) throw new Error("Gerencial deve possuir ao menos uma UF.");
   if (perfil === "Promotor" && ufs.length !== 1) throw new Error("Promotor deve possuir exatamente uma UF.");
+  if (!allowedCollectionModes.has(modo_coleta)) throw new Error("Modo de coleta invalido.");
 
   return {
     nome,
@@ -131,6 +136,7 @@ function validateProfile(input: JsonRecord) {
     perfil,
     estado,
     ufs,
+    modo_coleta,
     fotos_habilitadas: true,
   };
 }
@@ -144,6 +150,7 @@ function publicProfile(profile: UserProfile, authRole: string | null = null) {
     perfil: profile.perfil,
     estado: profile.estado,
     ufs: profile.ufs,
+    modo_coleta: profile.modo_coleta,
     fotos_habilitadas: profile.fotos_habilitadas,
     ativo: profile.ativo,
     acesso_habilitado: profile.acesso_habilitado,
@@ -247,7 +254,7 @@ Deno.serve(async (request) => {
     let listQuery = adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .not("auth_user_id", "is", null);
 
@@ -351,7 +358,7 @@ Deno.serve(async (request) => {
     const { data: target, error: targetError } = await adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .eq("id", usuarioId)
       .maybeSingle();
@@ -404,7 +411,7 @@ Deno.serve(async (request) => {
       .update({ ativo: enabled, acesso_habilitado: enabled })
       .eq("id", target.id)
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .single();
 
@@ -515,7 +522,7 @@ Deno.serve(async (request) => {
 
     const { data: profile, error: profileError } = await profileRequest
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .single();
 
@@ -539,7 +546,7 @@ Deno.serve(async (request) => {
     const { data: target, error: targetError } = await adminClient
       .from("usuarios")
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .eq("id", usuarioId)
       .maybeSingle();
@@ -644,7 +651,7 @@ Deno.serve(async (request) => {
       })
       .eq("id", target.id)
       .select(
-        "id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
+        "id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, ativo, acesso_habilitado, foto_url, last_access_at, created_at",
       )
       .single();
 

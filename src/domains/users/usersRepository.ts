@@ -21,6 +21,7 @@ export type CreateOperationalUserPayload = {
   perfil: PerfilUsuario
   estado: Estado
   ufs: Estado[]
+  modo_coleta?: 'agregado' | 'produto'
 }
 
 export type UpdateManagedUserPayload = {
@@ -30,6 +31,7 @@ export type UpdateManagedUserPayload = {
   perfil: PerfilUsuario
   estado: Estado
   ufs: Estado[]
+  modo_coleta?: 'agregado' | 'produto'
   password?: string
   auth_role?: 'admin' | 'gerencial' | 'promotor'
 }

@@ -13,7 +13,7 @@ import { setAuthPersistence, supabase } from '../../shared/lib/supabaseClient'
 import { can as profileCan, getCapabilities } from './model/capabilities'
 
 const profileSelect =
-  'id, auth_user_id, email, nome, perfil, estado, ufs, fotos_habilitadas, foto_url, ativo, acesso_habilitado, last_access_at, created_at'
+  'id, auth_user_id, email, nome, perfil, estado, ufs, modo_coleta, fotos_habilitadas, foto_url, ativo, acesso_habilitado, last_access_at, created_at'
 
 const AuthContext = createContext(null)
 

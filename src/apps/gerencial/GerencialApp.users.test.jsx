@@ -225,6 +225,8 @@ describe('Cadastro de Usuários', () => {
     expect(screen.queryByLabelText('Gerencial responsável')).not.toBeInTheDocument()
     expect(screen.queryByText('Perfil válido.')).not.toBeInTheDocument()
     expect(screen.queryByText('Habilitar fotos?')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Modo da FSTD' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Por produto (V2)' })).toHaveClass('is-selected')
   })
 
 

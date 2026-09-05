@@ -66,6 +66,7 @@ const initialUserForm = {
   auth_role: 'admin',
   estado: '',
   ufs: [],
+  modo_coleta: 'produto',
 }
 
 const initialLojaForm = {
@@ -708,6 +709,22 @@ export function UsuarioModal({
               </fieldset>
               {touched.estado && form.perfil && feedback('estado', isEstadoValid, isAdmin ? 'Todas as UFs (seleção obrigatória).' : isGerencial ? 'Múltiplas UFs permitidas.' : 'Uma UF selecionada.', isGerencial ? 'Escolha uma ou mais UFs.' : 'Escolha uma única UF.')}
             </div>
+            {isPromotor && (
+              <div className="user-profile-field">
+                <fieldset>
+                  <legend>Modo da FSTD</legend>
+                  <div className="chip-group">
+                    <button className={`choice-chip ${form.modo_coleta === 'agregado' ? 'is-selected' : ''}`} type="button" onClick={() => onChange({ modo_coleta: 'agregado' })}>
+                      Agregado (V1)
+                    </button>
+                    <button className={`choice-chip ${form.modo_coleta !== 'agregado' ? 'is-selected' : ''}`} type="button" onClick={() => onChange({ modo_coleta: 'produto' })}>
+                      Por produto (V2)
+                    </button>
+                  </div>
+                  <small>Define somente as próximas FSTDs. Registros existentes preservam o formato original.</small>
+                </fieldset>
+              </div>
+            )}
           </div>
         </div>
         {error && <p className="form-error">{error}</p>}
@@ -891,6 +908,12 @@ export function InformacoesUsuarioModal({ usuario, lojas = [], onClose, onEdit, 
               <dt>Acesso</dt>
               <dd>{usuario.ativo && usuario.acesso_habilitado ? 'Habilitado' : 'Desativado'}</dd>
             </div>
+            {usuario.perfil === 'Promotor' && (
+              <div>
+                <dt>Modo da FSTD</dt>
+                <dd>{usuario.modo_coleta === 'agregado' ? 'Agregado (V1)' : 'Por produto (V2)'}</dd>
+              </div>
+            )}
           </dl>
         </div>
 
@@ -2769,6 +2792,7 @@ function GerencialApp({ capabilities }) {
       perfil: form.perfil,
       estado: form.ufs?.[0] ?? form.estado,
       ufs: form.perfil === 'Admin' ? [] : form.ufs,
+      modo_coleta: form.perfil === 'Promotor' ? form.modo_coleta : 'produto',
     }
 
     if (
@@ -2938,6 +2962,7 @@ function GerencialApp({ capabilities }) {
       perfil: selectedUsuario.perfil,
       estado: selectedUsuario.estado,
       ufs: selectedUsuario.ufs ?? [selectedUsuario.estado],
+      modo_coleta: selectedUsuario.modo_coleta ?? 'produto',
     })
     setEditError('')
     setEditOpen(true)
@@ -2963,6 +2988,7 @@ function GerencialApp({ capabilities }) {
       perfil: editForm.perfil,
       estado: editForm.estado,
       ufs: editForm.perfil === 'Admin' ? [] : (editForm.ufs ?? [editForm.estado]),
+      modo_coleta: editForm.perfil === 'Promotor' ? editForm.modo_coleta : 'produto',
       auth_role: editForm.perfil === 'Admin' ? 'admin' : editForm.perfil.toLowerCase(),
       ...(editForm.senha ? { password: editForm.senha } : {}),
     }

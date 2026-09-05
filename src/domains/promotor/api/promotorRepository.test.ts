@@ -21,12 +21,15 @@ describe('consulta focalizada de processos FSTD', () => {
     const processSelect = vi.fn().mockReturnValue({ eq })
     const productsIn = vi.fn().mockResolvedValue({ data: [{ id: 'produto-1', processo_id: 'processo-1', codigo_produto: 'P1' }], error: null })
     const productsSelect = vi.fn().mockReturnValue({ in: productsIn })
+    const summariesIn = vi.fn().mockResolvedValue({ data: [], error: null })
+    const summariesSelect = vi.fn().mockReturnValue({ in: summariesIn })
     const divisionsIn = vi.fn().mockResolvedValue({ data: [{ produto_id: 'produto-1', motivo_id: 'motivo-1', quantidade: 2 }], error: null })
     const divisionsSelect = vi.fn().mockReturnValue({ in: divisionsIn })
 
     boundary.from.mockImplementation((table: string) => {
       if (table === 'fstd_processos') return { select: processSelect }
       if (table === 'fstd_produtos') return { select: productsSelect }
+      if (table === 'fstd_resumos_agregados') return { select: summariesSelect }
       if (table === 'fstd_produto_motivos') return { select: divisionsSelect }
       return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
     })
@@ -45,6 +48,7 @@ describe('consulta focalizada de processos FSTD', () => {
     expect(boundary.from.mock.calls).toEqual([
       ['fstd_processos'],
       ['fstd_produtos'],
+      ['fstd_resumos_agregados'],
       ['fstd_produto_motivos'],
     ])
   })

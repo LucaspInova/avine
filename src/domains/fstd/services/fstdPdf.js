@@ -229,7 +229,20 @@ async function getImageDataUrl(url) {
 }
 
 export function productRows(process, motivosById) {
-  return (process?.produtos ?? []).map((product) => {
+  const aggregate = process?.modo_coleta === 'agregado' ? process?.resumo_agregado : null
+  const products = aggregate
+    ? [{
+      nome: 'Totais da nota',
+      quantidade_faturada_galinha: aggregate.quantidade_faturada_galinha,
+      quantidade_faturada_codorna: aggregate.quantidade_faturada_codorna,
+      quantidade_retorno_galinha: aggregate.quantidade_retorno_galinha,
+      quantidade_retorno_codorna: aggregate.quantidade_retorno_codorna,
+      motivo_id: aggregate.motivo_id,
+      observacao: aggregate.observacao,
+    }]
+    : (process?.produtos ?? [])
+
+  return products.map((product) => {
     const divisions = Array.isArray(product.divisoes) ? product.divisoes : []
     const reasons = divisions.length > 0
       ? divisions.map((division) => motivosById.get(division.motivo_id) ?? 'Motivo não informado').join(', ')

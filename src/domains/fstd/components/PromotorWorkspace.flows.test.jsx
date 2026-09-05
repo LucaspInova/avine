@@ -185,6 +185,33 @@ describe('telas proprietárias de lojas e notas do Promotor', () => {
 })
 
 describe('integração do formulário FSTD com o contrato de domínio', () => {
+  it('envia os totais agregados sem criar dados por produto', () => {
+    const onSubmit = vi.fn()
+    render(
+      <LegacyFstdScreen
+        store={{ id: 'loja-1', nome: 'Loja Centro' }}
+        nfd={{ numero: '123', quantidade_galinha: 10, quantidade_codorna: 4 }}
+        motivos={[{ id: 'motivo-1', nome: 'Avaria' }]}
+        summary={{ motivo_id: 'motivo-1', quantidade_retorno_galinha: 2, quantidade_retorno_codorna: 1, fotos: ['foto.webp'] }}
+        busy={false}
+        error=""
+        onBack={noop}
+        onSubmit={onSubmit}
+      />,
+    )
+
+    fireEvent.change(screen.getAllByRole('spinbutton')[0], { target: { value: '3' } })
+    fireEvent.change(screen.getByPlaceholderText(/nota de venda/i), { target: { value: 'Caixas conferidas' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      motivoId: 'motivo-1',
+      retornoGalinha: 3,
+      retornoCodorna: 1,
+      observacao: 'Caixas conferidas',
+      fotosExistentes: ['foto.webp'],
+    }))
+  })
+
   it('mostra erro da fronteira e não confirma uma mutação incompleta', () => {
     const onSubmit = vi.fn()
     render(<LegacyFstdScreen store={{ nome: 'Loja Centro' }} nfd={{ numero: '123' }} motivos={[]} busy={false} error="Falha ao salvar FSTD" onBack={noop} onSubmit={onSubmit} />)

@@ -284,6 +284,7 @@ export type Database = {
           id: string;
           is_avulsa: boolean;
           loja_id: string;
+          modo_coleta: string;
           nfd_chave_acesso: string;
           nfd_data_emissao: string | null;
           nfd_numero: string;
@@ -304,6 +305,7 @@ export type Database = {
           id?: string;
           is_avulsa?: boolean;
           loja_id: string;
+          modo_coleta?: string;
           nfd_chave_acesso: string;
           nfd_data_emissao?: string | null;
           nfd_numero: string;
@@ -324,6 +326,7 @@ export type Database = {
           id?: string;
           is_avulsa?: boolean;
           loja_id?: string;
+          modo_coleta?: string;
           nfd_chave_acesso?: string;
           nfd_data_emissao?: string | null;
           nfd_numero?: string;
@@ -482,6 +485,60 @@ export type Database = {
             foreignKeyName: "fstd_produtos_processo_id_fkey";
             columns: ["processo_id"];
             isOneToOne: false;
+            referencedRelation: "fstd_processos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fstd_resumos_agregados: {
+        Row: {
+          created_at: string;
+          fotos: Json;
+          motivo_id: string | null;
+          observacao: string | null;
+          processo_id: string;
+          quantidade_faturada_codorna: number;
+          quantidade_faturada_galinha: number;
+          quantidade_retorno_codorna: number;
+          quantidade_retorno_galinha: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          fotos?: Json;
+          motivo_id?: string | null;
+          observacao?: string | null;
+          processo_id: string;
+          quantidade_faturada_codorna?: number;
+          quantidade_faturada_galinha?: number;
+          quantidade_retorno_codorna?: number;
+          quantidade_retorno_galinha?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          fotos?: Json;
+          motivo_id?: string | null;
+          observacao?: string | null;
+          processo_id?: string;
+          quantidade_faturada_codorna?: number;
+          quantidade_faturada_galinha?: number;
+          quantidade_retorno_codorna?: number;
+          quantidade_retorno_galinha?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fstd_resumos_agregados_motivo_id_fkey";
+            columns: ["motivo_id"];
+            isOneToOne: false;
+            referencedRelation: "motivos_devolucao";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fstd_resumos_agregados_processo_id_fkey";
+            columns: ["processo_id"];
+            isOneToOne: true;
             referencedRelation: "fstd_processos";
             referencedColumns: ["id"];
           },
@@ -823,6 +880,7 @@ export type Database = {
           fotos_habilitadas: boolean;
           id: string;
           last_access_at: string | null;
+          modo_coleta: string;
           nome: string;
           perfil: string;
           ufs: string[];
@@ -838,6 +896,7 @@ export type Database = {
           fotos_habilitadas?: boolean;
           id?: string;
           last_access_at?: string | null;
+          modo_coleta?: string;
           nome: string;
           perfil: string;
           ufs?: string[];
@@ -853,6 +912,7 @@ export type Database = {
           fotos_habilitadas?: boolean;
           id?: string;
           last_access_at?: string | null;
+          modo_coleta?: string;
           nome?: string;
           perfil?: string;
           ufs?: string[];
@@ -1195,6 +1255,7 @@ export type Database = {
           id: string;
           is_avulsa: boolean;
           loja_id: string;
+          modo_coleta: string;
           nfd_chave_acesso: string;
           nfd_data_emissao: string | null;
           nfd_numero: string;
@@ -1244,6 +1305,10 @@ export type Database = {
           p_nfd_valor: number;
           p_produtos: Json;
         };
+        Returns: string;
+      };
+      iniciar_fstd_agregada: {
+        Args: { p_loja_id: string; p_nfd_chave_acesso: string };
         Returns: string;
       };
       iniciar_fstd_produtos_v2: {
@@ -1319,6 +1384,7 @@ export type Database = {
           id: string;
           is_avulsa: boolean;
           loja_id: string;
+          modo_coleta: string;
           nfd_chave_acesso: string;
           nfd_data_emissao: string | null;
           nfd_numero: string;
@@ -1356,6 +1422,44 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "fstd_documentos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      salvar_fstd_agregada: {
+        Args: {
+          p_finalizar?: boolean;
+          p_fotos?: Json;
+          p_motivo_id: string;
+          p_observacao?: string;
+          p_processo_id: string;
+          p_quantidade_retorno_codorna: number;
+          p_quantidade_retorno_galinha: number;
+        };
+        Returns: {
+          api_nfd_chave_acesso: string | null;
+          atualizado_por: string | null;
+          conferencia_detalhes: Json;
+          conferencia_em: string | null;
+          conferencia_status: string;
+          created_at: string;
+          criado_por: string | null;
+          finalizada_em: string | null;
+          id: string;
+          is_avulsa: boolean;
+          loja_id: string;
+          modo_coleta: string;
+          nfd_chave_acesso: string;
+          nfd_data_emissao: string | null;
+          nfd_numero: string;
+          nfd_valor: number | null;
+          promotor_id: string;
+          status: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "fstd_processos";
           isOneToOne: true;
           isSetofReturn: false;
         };
