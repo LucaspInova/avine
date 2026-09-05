@@ -99,6 +99,37 @@ describe('FSTD PDF data mapping', () => {
     }
   })
 
+  it('does not download or embed FSTD evidence photos in the PDF', async () => {
+    const originalFetch = globalThis.fetch
+    const fetchSpy = vi.fn(async () => ({ ok: false }))
+    globalThis.fetch = fetchSpy
+
+    try {
+      await generateFstdPdf({
+        document: { numero_controle: 100002 },
+        process: {
+          nfd_numero: '4568',
+          produtos: [{
+            nome: 'Produto com foto',
+            quantidade_faturada_galinha: 1,
+            quantidade_retorno: 1,
+            motivo_id: 'm1',
+            fotos: ['https://evidence.invalid/photo.webp'],
+          }],
+        },
+        nfd: { nota_fiscal: '4568' },
+        store: { codigo: '1200', nome: 'Loja central' },
+        createdBy: 'Maria',
+        updatedBy: 'Joana',
+        motivos: [{ id: 'm1', nome: 'Avaria' }],
+      })
+
+      expect(fetchSpy).not.toHaveBeenCalledWith('https://evidence.invalid/photo.webp')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   it('generates a real PDF blob for the legacy model too', async () => {
     let generatedBlob
     const createObjectURL = vi.fn((blob) => {

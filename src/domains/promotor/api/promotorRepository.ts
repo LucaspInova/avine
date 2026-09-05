@@ -62,7 +62,7 @@ export async function listUnknownInvoices(profile: any) {
   return (await result<any[]>(query)) ?? []
 }
 
-const fstdProcessSelect = 'id, nfd_chave_acesso, nfd_numero, loja_id, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em'
+const fstdProcessSelect = 'id, nfd_chave_acesso, nfd_numero, loja_id, promotor_id, criado_por, atualizado_por, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em'
 const fstdProductSelect = 'id, processo_id, produto_id, codigo_produto, nome, descricao, imagem_url, quantidade_faturada_galinha, quantidade_faturada_codorna, quantidade_retorno, motivo_id, observacao, fotos, status, concluido_em'
 
 async function hydrateFstdProcesses(processes: any[]) {

@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(52);
+select plan(61);
 
 insert into auth.users (id, email)
 values
@@ -702,6 +702,135 @@ select results_eq(
   $$,
   array[1::bigint],
   'repeated document creation request does not duplicate the document'
+);
+
+select results_eq(
+  $$
+    select criado_por, atualizado_por
+    from public.fstd_processos
+    where nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  $$
+    values (
+      '20000000-0000-0000-0000-000000000011'::uuid,
+      '20000000-0000-0000-0000-000000000011'::uuid
+    )
+  $$,
+  'new FSTD records the original author and current editor server-side'
+);
+select lives_ok(
+  $$
+    select public.get_fstd_document_payload(
+      (select id from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER')
+    )
+  $$,
+  'the owner can read a document payload without mutating authorship'
+);
+select lives_ok(
+  $$
+    select public.set_fstd_document_pdf(
+      (
+        select d.id
+        from public.fstd_documentos d
+        join public.fstd_processos p on p.id = d.processo_id
+        where p.nfd_chave_acesso = 'NFD-OWNER'
+      ),
+      '20000000-0000-0000-0000-000000000001/' ||
+        (select id::text from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER') ||
+        '/100000-v1.pdf',
+      '{"content_version":1,"template_version":9}'::jsonb
+    )
+  $$,
+  'the first PDF content version can be published'
+);
+select results_eq(
+  $$
+    select d.conteudo_versao, d.versao_publicada, d.pdf_status
+    from public.fstd_documentos d
+    join public.fstd_processos p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  $$values (1, 1, 'disponivel'::text)$$,
+  'the document points to the published content version'
+);
+select lives_ok(
+  $$
+    select public.set_fstd_document_pdf(
+      (
+        select d.id
+        from public.fstd_documentos d
+        join public.fstd_processos p on p.id = d.processo_id
+        where p.nfd_chave_acesso = 'NFD-OWNER'
+      ),
+      '20000000-0000-0000-0000-000000000001/' ||
+        (select id::text from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER') ||
+        '/100000-v1.pdf',
+      '{"content_version":1,"template_version":9}'::jsonb
+    )
+  $$,
+  'repeating the same PDF publication is idempotent'
+);
+select results_eq(
+  $$
+    select count(*)
+    from public.fstd_documento_versoes v
+    join public.fstd_documentos d on d.id = v.documento_id
+    join public.fstd_processos p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  array[1::bigint],
+  'idempotent publication preserves exactly one row per content version'
+);
+
+set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
+
+select lives_ok(
+  $$
+    select public.editar_fstd_produto(
+      (select id from public.fstd_produtos where codigo_produto = 'P1'),
+      jsonb_build_array(
+        jsonb_build_object(
+          'motivo_id', '20000000-0000-0000-0000-000000000041',
+          'quantidade_faturada', 9,
+          'quantidade_retorno', 2
+        )
+      ),
+      8,
+      1,
+      'editado pelo gerencial',
+      jsonb_build_array(
+        '20000000-0000-0000-0000-000000000001/' ||
+          (select id::text from public.fstd_processos where nfd_chave_acesso = 'NFD-OWNER') ||
+          '/owner.webp'
+      )
+    )
+  $$,
+  'an authorized Gerencial can edit the finalized FSTD'
+);
+select results_eq(
+  $$
+    select criado_por, atualizado_por
+    from public.fstd_processos
+    where nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  $$
+    values (
+      '20000000-0000-0000-0000-000000000011'::uuid,
+      '10000000-0000-0000-0000-000000000011'::uuid
+    )
+  $$,
+  'editing preserves the original author and records the latest editor'
+);
+select results_eq(
+  $$
+    select d.conteudo_versao, d.versao_publicada, d.pdf_status, d.pdf_path is null
+    from public.fstd_documentos d
+    join public.fstd_processos p on p.id = d.processo_id
+    where p.nfd_chave_acesso = 'NFD-OWNER'
+  $$,
+  $$values (2, 1, 'pendente'::text, true)$$,
+  'editing invalidates only the current pointer and preserves the prior PDF version'
 );
 
 reset role;

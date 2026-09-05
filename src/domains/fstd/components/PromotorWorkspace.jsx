@@ -1,7 +1,7 @@
 import { getFstdTargetProducts, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../invoices'
 import { buildSaveFstdProductCommand } from '../model/commands'
 import { keepNumericNfdCode } from '../model/validation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../shared/lib/supabaseClient'
 import { usePromotorWorkspace } from '../../promotor/hooks/usePromotorWorkspace'
@@ -1517,22 +1517,6 @@ function cleanLegacyPhotoObservation(value) {
     .filter((line) => !/^\s*Fotos selecionadas\s*:/i.test(line))
     .join('\n')
     .trim()
-}
-
-async function getFstdPhotoUrls(process) {
-  const paths = [...new Set((process?.produtos ?? []).flatMap((product) => (
-    Array.isArray(product.fotos) ? product.fotos : []
-  )))]
-
-  return Promise.all(paths.map(async (path) => {
-    if (/^https?:\/\//i.test(path)) return { path, url: path }
-
-    const { data, error } = await supabase.storage
-      .from('fstd-fotos')
-      .createSignedUrl(path, 3600)
-
-    return { path, url: error ? '' : data?.signedUrl ?? '' }
-  }))
 }
 
 function getEditableObservation(value) {
@@ -3306,7 +3290,7 @@ export function PromotorWorkspace({
 
       const { data: processo, error: processoReadError } = await supabase
         .from('fstd_processos')
-        .select('id, nfd_chave_acesso, nfd_numero, loja_id, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em')
+        .select('id, nfd_chave_acesso, nfd_numero, loja_id, promotor_id, criado_por, atualizado_por, is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes, conferencia_em, api_nfd_chave_acesso, status, finalizada_em')
         .eq('id', processoId)
         .single()
       if (processoReadError) throw processoReadError
@@ -3466,6 +3450,23 @@ export function PromotorWorkspace({
         queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] }),
       ])
 
+      const completedTarget = {
+        ...currentFstdTarget,
+        fstd_process_id: completedProcess.id,
+        fstd_process_status: completedProcess.status,
+        fstd_process: {
+          ...(currentFstdTarget?.fstd_process ?? {}),
+          ...completedProcess,
+        },
+      }
+
+      // A FSTD ja esta finalizada no banco. A materializacao do PDF e uma etapa
+      // recuperavel: se falhar, a abertura posterior tenta somente a versao
+      // pendente, sem desfazer ou duplicar a FSTD.
+      void fstdDocumentMutation.mutateAsync(completedTarget).catch((pdfError) => {
+        console.error('A FSTD foi finalizada, mas o PDF ficou pendente para nova tentativa.', pdfError)
+      })
+
       void refreshQueries.catch((refreshError) => {
         console.error('NÃ£o foi possÃ­vel atualizar a lista apÃ³s finalizar a FSTD.', refreshError)
       })
@@ -3503,15 +3504,17 @@ export function PromotorWorkspace({
         throw new Error('Finalize a FSTD antes de gerar o documento.')
       }
 
-      const { data: documentData, error: documentError } = await supabase.rpc('get_or_create_fstd_document', {
+      const { data: payload, error: documentError } = await supabase.rpc('get_fstd_document_payload', {
         p_processo_id: processoId,
       })
       if (documentError) throw documentError
 
-      let document = Array.isArray(documentData) ? documentData[0] : documentData
+      let document = payload?.documento
       if (!document) throw new Error('Não foi possível localizar o documento FSTD.')
 
       const pdfNeedsRefresh = !document.pdf_path
+        || document.pdf_status !== 'disponivel'
+        || Number(document.versao_publicada ?? 0) !== Number(document.conteudo_versao ?? 1)
         || Number(document.pdf_metadata?.template_version ?? 0) !== FSTD_PDF_TEMPLATE_VERSION
 
       if (pdfNeedsRefresh) {
@@ -3519,23 +3522,23 @@ export function PromotorWorkspace({
         if (authError) throw authError
         if (!authData.user) throw new Error('Sessão expirada. Entre novamente para visualizar o FSTD.')
 
-        const photoUrls = await getFstdPhotoUrls(documentTarget.fstd_process)
         const pdfBlob = await generateFstdPdf({
           document,
           process: documentTarget.fstd_process,
           nfd: documentTarget,
           store: selectedStore,
-          responsible: profile.nome,
+          responsible: payload.responsavel_nome,
+          createdBy: payload.autor_nome,
+          updatedBy: payload.responsavel_nome,
           motivos: motivosQuery.data ?? [],
-          photoUrls,
         })
-        const pdfPath = document.pdf_path
-          || `${authData.user.id}/${processoId}/${document.numero_controle}.pdf`
+        const contentVersion = Number(document.conteudo_versao ?? 1)
+        const pdfPath = `${authData.user.id}/${processoId}/${document.numero_controle}-v${contentVersion}.pdf`
         const { error: uploadError } = await supabase.storage
           .from('fstd-pdfs')
           .upload(pdfPath, pdfBlob, {
             contentType: 'application/pdf',
-            upsert: Boolean(document.pdf_path),
+            upsert: true,
           })
 
         if (uploadError && !/already exists|duplicate/i.test(uploadError.message ?? '')) {
@@ -3547,11 +3550,16 @@ export function PromotorWorkspace({
           p_pdf_path: pdfPath,
           p_pdf_metadata: {
             template_version: FSTD_PDF_TEMPLATE_VERSION,
+            content_version: contentVersion,
             processo_id: processoId,
             nfd_chave_acesso: documentTarget.chave_acesso,
             nfd_numero: documentTarget.nota_fiscal,
             loja: selectedStore,
-            produtos: documentTarget.fstd_process?.produtos ?? [],
+            criado_por: payload.criado_por,
+            atualizado_por: payload.atualizado_por,
+            autor_nome: payload.autor_nome,
+            responsavel_nome: payload.responsavel_nome,
+            autoria_historica_inferida: payload.autoria_historica_inferida,
           },
         })
         if (saveError) throw saveError
@@ -3572,11 +3580,7 @@ export function PromotorWorkspace({
     },
   })
 
-  const { mutateAsync: mutateFstdDocument } = fstdDocumentMutation
-  const viewFinalizedDocument = useCallback(
-    (target) => mutateFstdDocument(target),
-    [mutateFstdDocument],
-  )
+  const viewFinalizedDocument = (target) => fstdDocumentMutation.mutateAsync(target)
 
   const desconhecerMutation = useMutation({
     mutationFn: async ({ nfd, comment }) => {

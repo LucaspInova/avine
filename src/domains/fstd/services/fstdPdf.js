@@ -1,7 +1,6 @@
 import avineLogo from '../../../shared/assets/foto_logoavine.png'
 import infoIcon from '../../../shared/assets/fstd-icons/informacoes.png'
 import truckIcon from '../../../shared/assets/fstd-icons/lado-do-caminhao.png'
-import cameraIcon from '../../../shared/assets/fstd-icons/camera.png'
 import storeIcon from '../../../shared/assets/fstd-icons/loja-alt.png'
 
 const GREEN = [35, 105, 28]
@@ -9,7 +8,7 @@ const LIGHT_GREEN = [235, 241, 232]
 const GREY = [100, 105, 100]
 const PAGE_WIDTH = 210
 const PAGE_HEIGHT = 297
-export const FSTD_PDF_TEMPLATE_VERSION = 8
+export const FSTD_PDF_TEMPLATE_VERSION = 9
 
 function asText(value, fallback = '-') {
   const text = String(value ?? '').trim()
@@ -229,69 +228,6 @@ async function getImageDataUrl(url) {
   }
 }
 
-async function getPdfPhotoDataUrl(url) {
-  if (!url || typeof Image === 'undefined' || typeof document === 'undefined') return getImageDataUrl(url)
-
-  try {
-    const response = await fetch(url)
-    if (!response.ok) return null
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-
-    try {
-      return await new Promise((resolve) => {
-        const image = new Image()
-        image.onload = () => {
-          const longestSide = Math.max(image.naturalWidth, image.naturalHeight)
-          const scale = longestSide > 480 ? 480 / longestSide : 1
-          const width = Math.max(1, Math.round(image.naturalWidth * scale))
-          const height = Math.max(1, Math.round(image.naturalHeight * scale))
-          const canvas = document.createElement('canvas')
-          canvas.width = width
-          canvas.height = height
-          const context = canvas.getContext('2d')
-          if (!context) {
-            resolve(null)
-            return
-          }
-          context.drawImage(image, 0, 0, width, height)
-          resolve(canvas.toDataURL('image/jpeg', 0.68))
-        }
-        image.onerror = () => resolve(null)
-        image.src = objectUrl
-      })
-    } finally {
-      URL.revokeObjectURL(objectUrl)
-    }
-  } catch {
-    return null
-  }
-}
-
-function addImageContain(pdf, dataUrl, x, y, width, height) {
-  if (!dataUrl) return
-
-  try {
-    const properties = pdf.getImageProperties(dataUrl)
-    const scale = Math.min(width / properties.width, height / properties.height)
-    const imageWidth = properties.width * scale
-    const imageHeight = properties.height * scale
-    const imageType = String(dataUrl).startsWith('data:image/png') ? 'PNG' : 'JPEG'
-    pdf.addImage(
-      dataUrl,
-      imageType,
-      x + (width - imageWidth) / 2,
-      y + (height - imageHeight) / 2,
-      imageWidth,
-      imageHeight,
-      undefined,
-      'FAST',
-    )
-  } catch {
-    // An unsupported/corrupt image should leave the photo slot empty.
-  }
-}
-
 export function productRows(process, motivosById) {
   return (process?.produtos ?? []).map((product) => {
     const divisions = Array.isArray(product.divisoes) ? product.divisoes : []
@@ -308,7 +244,6 @@ export function productRows(process, motivosById) {
       returned: asNumber(product.quantidade_retorno),
       reasons,
       observation: cleanObservation(product.observacao),
-      photos: Array.isArray(product.fotos) ? product.fotos : [],
     }
   })
 }
@@ -318,21 +253,13 @@ export function productRows(process, motivosById) {
  * Supabase snapshot passed by the caller; this function does not query or
  * invent operational data.
  */
-export async function generateFstdPdf({ document, process, nfd, store, responsible, motivos = [], photoUrls = [] }) {
+export async function generateFstdPdf({ document, process, nfd, store, responsible, createdBy, updatedBy, motivos = [] }) {
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const contentWidth = PAGE_WIDTH - 14
   const motivosById = new Map(motivos.map((motivo) => [motivo.id, motivo.nome]))
   const rows = productRows(process, motivosById)
   const reasons = [...new Set(rows.flatMap((row) => row.reasons.split(', ').filter(Boolean)))]
-  const photoUrlByPath = new Map(photoUrls.map((photo) => [photo.path, photo.url]))
-  const photoDataByPath = new Map()
-  const photoPaths = [...new Set(rows.flatMap((row) => row.photos))]
-  await Promise.all(photoPaths.map(async (path) => {
-    const url = photoUrlByPath.get(path) ?? path
-    const dataUrl = /^(?:https?:\/\/|data:image\/)/i.test(url) ? await getPdfPhotoDataUrl(url) : null
-    if (dataUrl) photoDataByPath.set(path, dataUrl)
-  }))
 
   pdf.setProperties({
     title: `FSTD ${document?.numero_controle ?? process?.nfd_numero ?? nfd?.nota_fiscal ?? '-'}`,
@@ -344,11 +271,10 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   pdf.setLineWidth(0.35)
   pdf.roundedRect(4, 4, PAGE_WIDTH - 8, PAGE_HEIGHT - 8, 3, 3, 'S')
 
-  const [logo, infoIconData, truckIconData, cameraIconData, storeIconData] = await Promise.all([
+  const [logo, infoIconData, truckIconData, storeIconData] = await Promise.all([
     getLogoDataUrl(),
     getImageDataUrl(infoIcon),
     getImageDataUrl(truckIcon),
-    getImageDataUrl(cameraIcon),
     getImageDataUrl(storeIcon),
   ])
   // The source is a square canvas with transparent padding. Keeping the image
@@ -421,7 +347,9 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
   addInfoField(pdf, {
     icon: 'person',
     label: 'Responsável Avine',
-    value: responsible,
+    value: updatedBy && createdBy && updatedBy !== createdBy
+      ? `${updatedBy} (criado por ${createdBy})`
+      : (responsible ?? updatedBy ?? createdBy),
     x: 144,
     y: 56,
     width: 54,
@@ -504,53 +432,32 @@ export async function generateFstdPdf({ document, process, nfd, store, responsib
     pdf.text(pdf.splitTextToSize(row.observation, columns[5].width - 5)[0], columns[5].x + 3, y + 5.7)
   }
 
-  const photosY = 219
-  addSectionTitle(pdf, 'Fotos', 'camera', 8, photosY, cameraIconData)
-  addSectionTitle(pdf, 'Reservado para recebimento', 'truck', 128, photosY, truckIconData)
+  const logisticsY = 219
+  addSectionTitle(pdf, 'Reservado para recebimento', 'truck', 8, logisticsY, truckIconData)
   pdf.setFont('helvetica', 'normal')
   pdf.setFontSize(7)
   pdf.setTextColor(...GREY)
-  pdf.text('Anexe fotos que comprovem a ocorrência.', 12, photosY + 14)
-  pdf.text('Motorista', 134, photosY + 14)
-  pdf.line(158, photosY + 15, 199, photosY + 15)
-  pdf.text('Qtde recolhida', 134, photosY + 22)
-  pdf.line(158, photosY + 23, 199, photosY + 23)
-  pdf.text('Data recolhimento', 134, photosY + 30)
-  pdf.line(158, photosY + 31, 199, photosY + 31)
-
-  const photoSlots = rows.flatMap((row) => row.photos).slice(0, 10)
-
-  for (let index = 0; index < 10; index += 1) {
-    const column = index % 5
-    const row = Math.floor(index / 5)
-    const x = 11 + column * 22
-    const y = photosY + 18 + row * 22
-    pdf.setDrawColor(190, 200, 190)
-    pdf.setLineDashPattern([1, 1], 0)
-    pdf.roundedRect(x, y, 18, 19, 1.5, 1.5, 'S')
-    pdf.setLineDashPattern([], 0)
-    addImageContain(pdf, photoDataByPath.get(photoSlots[index]), x + 1, y + 1, 16, 14)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(7)
-    pdf.setTextColor(...GREEN)
-    pdf.text(String(index + 1).padStart(2, '0'), x + 9, y + 16.5, { align: 'center' })
-  }
-
+  pdf.text('Motorista', 14, logisticsY + 16)
+  pdf.line(38, logisticsY + 17, 96, logisticsY + 17)
+  pdf.text('Qtde recolhida', 14, logisticsY + 26)
+  pdf.line(40, logisticsY + 27, 96, logisticsY + 27)
+  pdf.text('Data recolhimento', 14, logisticsY + 36)
+  pdf.line(43, logisticsY + 37, 96, logisticsY + 37)
   pdf.setDrawColor(205, 215, 205)
-  pdf.roundedRect(128, photosY + 10, 75, 25, 2, 2, 'S')
-  pdf.line(132, photosY + 20, 199, photosY + 20)
-  pdf.line(132, photosY + 27, 199, photosY + 27)
+  pdf.roundedRect(8, logisticsY + 10, 92, 34, 2, 2, 'S')
+  pdf.line(12, logisticsY + 21, 96, logisticsY + 21)
+  pdf.line(12, logisticsY + 31, 96, logisticsY + 31)
 
-  addSectionTitle(pdf, 'Reservado para triagem', 'menu-burger', 128, photosY + 36)
+  addSectionTitle(pdf, 'Reservado para triagem', 'menu-burger', 108, logisticsY)
   pdf.setDrawColor(205, 215, 205)
-  pdf.roundedRect(128, photosY + 47, 75, 19, 2, 2, 'S')
+  pdf.roundedRect(108, logisticsY + 10, 95, 34, 2, 2, 'S')
   pdf.setFontSize(6.5)
-  pdf.text('Resp. triagem', 134, photosY + 52.5)
-  pdf.line(163, photosY + 53.5, 199, photosY + 53.5)
-  pdf.text('Qtde íntegros', 134, photosY + 58.5)
-  pdf.line(163, photosY + 59.5, 199, photosY + 59.5)
-  pdf.text('Qtde íntegros (codorna)', 134, photosY + 64)
-  pdf.line(178, photosY + 65, 199, photosY + 65)
+  pdf.text('Resp. triagem', 114, logisticsY + 16)
+  pdf.line(143, logisticsY + 17, 199, logisticsY + 17)
+  pdf.text('Qtde íntegros', 114, logisticsY + 26)
+  pdf.line(143, logisticsY + 27, 199, logisticsY + 27)
+  pdf.text('Qtde íntegros (codorna)', 114, logisticsY + 36)
+  pdf.line(158, logisticsY + 37, 199, logisticsY + 37)
 
   const footerY = 288
   pdf.setFillColor(...LIGHT_GREEN)
