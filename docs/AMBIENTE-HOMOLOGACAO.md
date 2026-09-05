@@ -25,6 +25,14 @@ Permitir implementação e validação do plano consolidado sem usar dados, cont
 10. A interface recebeu uma faixa amarela permanente quando `VITE_APP_ENV=homologacao`; ela não aparece em produção.
 11. O build da Vercel seleciona o arquivo `.env.homologacao` somente na branch Git de homologação. Em qualquer outra branch, mantém o modo de produção e as variáveis configuradas na Vercel.
 
+## Endereços operacionais
+
+- Branch Git: `inova/homologacao-plano-fstd`.
+- Frontend Preview: `https://fstddigital-git-inova-homologacao-8785a8-luiz-robertos-projects.vercel.app`.
+- Supabase Preview: `https://binxgymusventbechztf.supabase.co`.
+
+O Preview da Vercel está protegido. Pessoas autenticadas na equipe acessam o endereço estável; para uma validação externa pontual, deve-se gerar um link temporário no painel da Vercel.
+
 ## Contas sintéticas
 
 Todas usam a senha de teste `FstdTeste2026!` e existem somente na branch descartável:
