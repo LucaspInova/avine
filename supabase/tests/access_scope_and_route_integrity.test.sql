@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(38);
+select plan(41);
 
 insert into auth.users (id, email)
 values ('20000000-0000-4000-8000-000000000007', 'promotor.ba@homologacao.avine.test')
@@ -105,6 +105,24 @@ select has_trigger(
   'usuarios',
   'detach_invalid_promotor_routes',
   'Trigger remove rotas quando o perfil deixa de ser Promotor'
+);
+select hasnt_function(
+  'public',
+  'create_gerencial_user',
+  array['uuid', 'text', 'text'],
+  'RPC antiga de criacao administrativa foi removida'
+);
+select hasnt_function(
+  'public',
+  'update_gerencial_user',
+  array['uuid', 'text', 'text', 'boolean'],
+  'RPC antiga de edicao administrativa foi removida'
+);
+select hasnt_function(
+  'public',
+  'iniciar_fstd_produtos',
+  array['uuid', 'text', 'text', 'jsonb'],
+  'RPC antiga de inicio da FSTD foi removida'
 );
 
 set local role authenticated;

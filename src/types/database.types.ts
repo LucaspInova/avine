@@ -1117,30 +1117,6 @@ export type Database = {
         };
       };
       conferir_fstd_avulsas: { Args: never; Returns: Json };
-      create_gerencial_user: {
-        Args: { p_auth_user_id: string; p_email: string; p_nome: string };
-        Returns: {
-          acesso_habilitado: boolean;
-          ativo: boolean;
-          auth_user_id: string | null;
-          created_at: string;
-          email: string;
-          estado: string;
-          foto_url: string | null;
-          fotos_habilitadas: boolean;
-          id: string;
-          last_access_at: string | null;
-          nome: string;
-          perfil: string;
-          ufs: string[];
-        };
-        SetofOptions: {
-          from: "*";
-          to: "usuarios";
-          isOneToOne: true;
-          isSetofReturn: false;
-        };
-      };
       desconhecer_nfd_gerencial: {
         Args: {
           p_comentario?: string;
@@ -1270,15 +1246,6 @@ export type Database = {
         };
         Returns: string;
       };
-      iniciar_fstd_produtos: {
-        Args: {
-          p_loja_id: string;
-          p_nfd_chave_acesso: string;
-          p_nfd_numero: string;
-          p_produtos: Json;
-        };
-        Returns: string;
-      };
       iniciar_fstd_produtos_v2: {
         Args: { p_loja_id: string; p_nfd_chave_acesso: string };
         Returns: string;
@@ -1360,35 +1327,6 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "fstd_documentos";
-          isOneToOne: true;
-          isSetofReturn: false;
-        };
-      };
-      update_gerencial_user: {
-        Args: {
-          p_ativo: boolean;
-          p_email: string;
-          p_nome: string;
-          p_usuario_id: string;
-        };
-        Returns: {
-          acesso_habilitado: boolean;
-          ativo: boolean;
-          auth_user_id: string | null;
-          created_at: string;
-          email: string;
-          estado: string;
-          foto_url: string | null;
-          fotos_habilitadas: boolean;
-          id: string;
-          last_access_at: string | null;
-          nome: string;
-          perfil: string;
-          ufs: string[];
-        };
-        SetofOptions: {
-          from: "*";
-          to: "usuarios";
           isOneToOne: true;
           isSetofReturn: false;
         };

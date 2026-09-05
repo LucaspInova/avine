@@ -383,16 +383,11 @@ select results_eq(
   $$,
   'server-derived quantities match nfd_itens'
 );
-select lives_ok(
-  $$
-    select public.iniciar_fstd_produtos(
-      '20000000-0000-0000-0000-000000000021',
-      'NFD-OWNER',
-      'FORGED-NUMBER',
-      '[{"codigo_produto":"FORGED","quantidade_galinha":999}]'::jsonb
-    )
-  $$,
-  'legacy wrapper remains safe during the frontend transition'
+select hasnt_function(
+  'public',
+  'iniciar_fstd_produtos',
+  array['uuid', 'text', 'text', 'jsonb'],
+  'legacy wrapper is absent after the frontend transition'
 );
 select results_eq(
   $$
