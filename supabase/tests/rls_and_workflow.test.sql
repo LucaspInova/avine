@@ -137,7 +137,9 @@ insert into public.nfd_itens (
   descricao_produto,
   quantidade_galinha,
   quantidade_codorna,
-  data_referencia
+  data_referencia,
+  uf,
+  cidade
 )
 values
   (
@@ -151,7 +153,9 @@ values
     'Produto Um',
     10,
     2,
-    current_date
+    current_date,
+    'CE',
+    'Fortaleza'
   ),
   (
     90002,
@@ -164,7 +168,9 @@ values
     'Produto Dois',
     3,
     0,
-    current_date
+    current_date,
+    'CE',
+    'Fortaleza'
   ),
   (
     90003,
@@ -177,7 +183,9 @@ values
     'Produto Um',
     1,
     0,
-    current_date
+    current_date,
+    'CE',
+    'Fortaleza'
   );
 
 insert into public.motivos_devolucao (id, nome, ordem, ativo)

@@ -1,8 +1,8 @@
 begin;
 select plan(30);
 
-select has_function('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer']);
-select function_returns('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer'], 'jsonb');
+select has_function('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer','uuid','uuid','uuid','uuid']);
+select function_returns('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer','uuid','uuid','uuid','uuid'], 'jsonb');
 select has_index('public', 'nfd_itens', 'nfd_itens_gerencial_data_idx', 'data efetiva indexada');
 select has_index('public', 'nfd_itens', 'nfd_itens_gerencial_uf_cidade_idx', 'UF/cidade indexadas');
 select has_index('public', 'fstd_processos', 'fstd_processos_nfd_created_stable_idx', 'processo ativo indexado');
@@ -12,7 +12,7 @@ select has_index('public', 'nfd_itens', 'nfd_itens_nota_fiscal_trgm_idx', 'NFD t
 select has_index('public', 'nfd_itens', 'nfd_itens_codigo_cliente_trgm_idx', 'cliente textual parcial indexado');
 select has_index('public', 'nfd_itens', 'nfd_itens_nome_abreviado_trgm_idx', 'nome abreviado textual parcial indexado');
 select has_index('public', 'nfd_itens', 'nfd_itens_estabelecimento_trgm_idx', 'estabelecimento textual parcial indexado');
-select function_privs_are('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer'], 'authenticated', array['EXECUTE'], 'somente usuário autenticado executa');
+select function_privs_are('public', 'listar_nfd_notas_gerencial', array['date','date','text','text','text','text','text','text','integer','integer','uuid','uuid','uuid','uuid'], 'authenticated', array['EXECUTE'], 'somente usuário autenticado executa');
 select has_function('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'RPC da dashboard consolidada existe');
 select function_returns('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'jsonb', 'RPC da dashboard consolidada retorna JSON');
 select function_privs_are('public', 'carregar_fontes_dashboard_gerencial', array['text[]', 'jsonb'], 'authenticated', array['EXECUTE'], 'somente autenticado carrega fontes da dashboard');
@@ -37,25 +37,25 @@ select matches(
 );
 
 select matches(
-  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
+  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer,uuid,uuid,uuid,uuid)'::regprocedure),
   E'app_private\\.search_nfd_chaves_numeric\\(\\$6\\)',
   'RPC resolve chaves numericas antes de consultar a view protegida por RLS'
 );
 
 select matches(
-  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
+  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer,uuid,uuid,uuid,uuid)'::regprocedure),
   E'app_private\\.search_nfd_chaves_by_name\\(\\$6\\)',
   'RPC resolve chaves por nome antes de consultar os itens protegidos por RLS'
 );
 
 select matches(
-  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
+  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer,uuid,uuid,uuid,uuid)'::regprocedure),
   E'from public\\.nfd_itens ni',
   'RPC agrega diretamente os itens protegidos, sem montar detalhes JSON da view completa'
 );
 
 select ok(
-  position('from public.nfd_notas n' in pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure)) = 0,
+  position('from public.nfd_notas n' in pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer,uuid,uuid,uuid,uuid)'::regprocedure)) = 0,
   'RPC nao consulta nfd_notas, cuja agregacao de detalhes inviabiliza filtros amplos'
 );
 
@@ -66,7 +66,7 @@ select matches(
 );
 
 select matches(
-  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer)'::regprocedure),
+  pg_get_functiondef('public.listar_nfd_notas_gerencial(date,date,text,text,text,text,text,text,integer,integer,uuid,uuid,uuid,uuid)'::regprocedure),
   E'when legado\\.legado_id is not null or processo\\.status = ''concluida'' then ''Finalizada''[[:space:]]+when desconhecida\\.encontrada then ''Desconhecida''',
   'finalizacao legada ou moderna prevalece sobre marcacao desconhecida'
 );
