@@ -19,33 +19,90 @@ export type Database = {
   };
   public: {
     Tables: {
-      fstd_documentos: {
+      fstd_documento_versoes: {
         Row: {
           created_at: string;
+          documento_id: string;
+          gerado_por: string | null;
           id: string;
-          numero_controle: number;
           pdf_metadata: Json;
-          pdf_path: string | null;
-          processo_id: string;
-          updated_at: string;
+          pdf_path: string;
+          versao: number;
         };
         Insert: {
           created_at?: string;
+          documento_id: string;
+          gerado_por?: string | null;
           id?: string;
-          numero_controle?: number;
           pdf_metadata?: Json;
-          pdf_path?: string | null;
-          processo_id: string;
-          updated_at?: string;
+          pdf_path: string;
+          versao: number;
         };
         Update: {
           created_at?: string;
+          documento_id?: string;
+          gerado_por?: string | null;
+          id?: string;
+          pdf_metadata?: Json;
+          pdf_path?: string;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fstd_documento_versoes_documento_id_fkey";
+            columns: ["documento_id"];
+            isOneToOne: false;
+            referencedRelation: "fstd_documentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fstd_documento_versoes_gerado_por_fkey";
+            columns: ["gerado_por"];
+            isOneToOne: false;
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      fstd_documentos: {
+        Row: {
+          conteudo_versao: number;
+          created_at: string;
+          id: string;
+          numero_controle: number;
+          pdf_erro: string | null;
+          pdf_metadata: Json;
+          pdf_path: string | null;
+          pdf_status: string;
+          processo_id: string;
+          updated_at: string;
+          versao_publicada: number;
+        };
+        Insert: {
+          conteudo_versao?: number;
+          created_at?: string;
           id?: string;
           numero_controle?: number;
+          pdf_erro?: string | null;
           pdf_metadata?: Json;
           pdf_path?: string | null;
+          pdf_status?: string;
+          processo_id: string;
+          updated_at?: string;
+          versao_publicada?: number;
+        };
+        Update: {
+          conteudo_versao?: number;
+          created_at?: string;
+          id?: string;
+          numero_controle?: number;
+          pdf_erro?: string | null;
+          pdf_metadata?: Json;
+          pdf_path?: string | null;
+          pdf_status?: string;
           processo_id?: string;
           updated_at?: string;
+          versao_publicada?: number;
         };
         Relationships: [
           {
@@ -217,10 +274,12 @@ export type Database = {
       fstd_processos: {
         Row: {
           api_nfd_chave_acesso: string | null;
+          atualizado_por: string | null;
           conferencia_detalhes: Json;
           conferencia_em: string | null;
           conferencia_status: string;
           created_at: string;
+          criado_por: string | null;
           finalizada_em: string | null;
           id: string;
           is_avulsa: boolean;
@@ -235,10 +294,12 @@ export type Database = {
         };
         Insert: {
           api_nfd_chave_acesso?: string | null;
+          atualizado_por?: string | null;
           conferencia_detalhes?: Json;
           conferencia_em?: string | null;
           conferencia_status?: string;
           created_at?: string;
+          criado_por?: string | null;
           finalizada_em?: string | null;
           id?: string;
           is_avulsa?: boolean;
@@ -253,10 +314,12 @@ export type Database = {
         };
         Update: {
           api_nfd_chave_acesso?: string | null;
+          atualizado_por?: string | null;
           conferencia_detalhes?: Json;
           conferencia_em?: string | null;
           conferencia_status?: string;
           created_at?: string;
+          criado_por?: string | null;
           finalizada_em?: string | null;
           id?: string;
           is_avulsa?: boolean;
@@ -270,6 +333,20 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "fstd_processos_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "fstd_processos_criado_por_fkey";
+            columns: ["criado_por"];
+            isOneToOne: false;
+            referencedRelation: "usuarios";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "fstd_processos_loja_id_fkey";
             columns: ["loja_id"];
@@ -784,6 +861,20 @@ export type Database = {
       };
     };
     Views: {
+      fstd_autoria: {
+        Row: {
+          atualizado_por: string | null;
+          atualizado_por_nome: string | null;
+          autoria_historica_inferida: boolean | null;
+          criado_por: string | null;
+          criado_por_nome: string | null;
+          processo_id: string | null;
+          promotor_rota_id: string | null;
+          promotor_rota_nome: string | null;
+          responsavel_nome: string | null;
+        };
+        Relationships: [];
+      };
       fstd_legado_canonico: {
         Row: {
           codigo_loja: string | null;
@@ -1118,10 +1209,12 @@ export type Database = {
         Args: { p_processo_id: string };
         Returns: {
           api_nfd_chave_acesso: string | null;
+          atualizado_por: string | null;
           conferencia_detalhes: Json;
           conferencia_em: string | null;
           conferencia_status: string;
           created_at: string;
+          criado_por: string | null;
           finalizada_em: string | null;
           id: string;
           is_avulsa: boolean;
@@ -1141,16 +1234,24 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_fstd_document_payload: {
+        Args: { p_processo_id: string };
+        Returns: Json;
+      };
       get_or_create_fstd_document: {
         Args: { p_processo_id: string };
         Returns: {
+          conteudo_versao: number;
           created_at: string;
           id: string;
           numero_controle: number;
+          pdf_erro: string | null;
           pdf_metadata: Json;
           pdf_path: string | null;
+          pdf_status: string;
           processo_id: string;
           updated_at: string;
+          versao_publicada: number;
         };
         SetofOptions: {
           from: "*";
@@ -1240,13 +1341,17 @@ export type Database = {
           p_pdf_path: string;
         };
         Returns: {
+          conteudo_versao: number;
           created_at: string;
           id: string;
           numero_controle: number;
+          pdf_erro: string | null;
           pdf_metadata: Json;
           pdf_path: string | null;
+          pdf_status: string;
           processo_id: string;
           updated_at: string;
+          versao_publicada: number;
         };
         SetofOptions: {
           from: "*";
