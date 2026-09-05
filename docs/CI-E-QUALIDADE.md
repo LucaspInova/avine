@@ -44,13 +44,17 @@ dias para facilitar o diagnóstico.
 
 ## Baseline e histórico
 
-O estado estrutural confirmado em 05/09/2026 foi consolidado em quatro
+O estado estrutural confirmado em 05/09/2026 foi consolidado em cinco
 migrações ativas:
 
-1. schema privado (`app_private`);
+1. contratos privados mínimos que resolvem a dependência circular do dump;
 2. schema público;
-3. buckets e políticas do Storage pertencentes à aplicação;
-4. ajuste auditável de totais legados que ainda estava somente local.
+3. implementações completas do schema privado (`app_private`);
+4. buckets e políticas do Storage pertencentes à aplicação;
+5. ajuste auditável de totais legados que ainda estava somente local.
+
+Os contratos do primeiro passo negam acesso por padrão e são substituídos no
+terceiro passo. Eles nunca permanecem como implementação final.
 
 As 77 migrações anteriores continuam preservadas em
 `supabase/migrations_legacy_pre_baseline/` para auditoria. Elas não são mais
