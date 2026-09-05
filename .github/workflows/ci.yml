@@ -59,7 +59,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx supabase@${{ env.SUPABASE_CLI_VERSION }} start
+      - name: Start database-only Supabase stack
+        run: >-
+          npx supabase@${{ env.SUPABASE_CLI_VERSION }} start
+          --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
       - run: npx supabase@${{ env.SUPABASE_CLI_VERSION }} db reset
       - run: npx supabase@${{ env.SUPABASE_CLI_VERSION }} test db
       - run: npx supabase@${{ env.SUPABASE_CLI_VERSION }} db lint --level error
