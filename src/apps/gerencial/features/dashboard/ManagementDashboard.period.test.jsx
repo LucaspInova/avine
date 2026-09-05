@@ -9,6 +9,27 @@ describe('período padrão do dashboard', () => {
       endDate: '2026-08-17',
     })
   })
+
+  it('usa o mês anterior completo no primeiro dia do mês', () => {
+    expect(getDefaultPeriodDates(new Date(2026, 8, 1, 12))).toEqual({
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    })
+  })
+
+  it('retoma o mês atual a partir do segundo dia', () => {
+    expect(getDefaultPeriodDates(new Date(2026, 8, 2, 12))).toEqual({
+      startDate: '2026-09-01',
+      endDate: '2026-09-01',
+    })
+  })
+
+  it('atravessa corretamente a virada de ano', () => {
+    expect(getDefaultPeriodDates(new Date(2026, 0, 1, 12))).toEqual({
+      startDate: '2025-12-01',
+      endDate: '2025-12-31',
+    })
+  })
 })
 
 describe('indicador de período', () => {
