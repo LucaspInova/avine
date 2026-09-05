@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(51);
+select plan(52);
 
 insert into auth.users (id, email)
 values
@@ -738,14 +738,16 @@ insert into public.fstd_processos (
   nfd_numero,
   loja_id,
   promotor_id,
-  status
+  status,
+  is_avulsa
 )
 values (
   'NFD-TRIGGER',
   'TRIGGER-1',
   '20000000-0000-0000-0000-000000000021',
   '20000000-0000-0000-0000-000000000011',
-  'em_andamento'
+  'em_andamento',
+  true
 );
 
 update public.fstd_processos
@@ -826,7 +828,8 @@ select is(
   (
     select count(*)::integer
     from public.fstd_processos as p
-    where not exists (
+    where p.is_avulsa is false
+      and not exists (
       select 1
       from public.nfd_itens as ni
       where ni.chave_acesso = p.nfd_chave_acesso
@@ -839,7 +842,9 @@ select is(
   (
     select count(*)::integer
     from public.fstd_produtos as fp
+    join public.fstd_processos as p on p.id = fp.processo_id
     where fp.status = 'concluido'
+      and p.nfd_chave_acesso = 'NFD-OWNER'
       and (
         select coalesce(sum(fpm.quantidade_faturada), 0)
         from public.fstd_produto_motivos as fpm
@@ -854,6 +859,7 @@ select is(
     select count(*)::integer
     from storage.objects as object
     where object.bucket_id = 'fstd-fotos'
+      and object.name like '20000000-0000-0000-0000-000000000001/%'
       and not exists (
         select 1
         from public.fstd_produtos as fp
