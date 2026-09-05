@@ -150,9 +150,10 @@ select is(
   'vinculo de alias tambem gera auditoria'
 );
 
-select lives_ok(
-  $$select public.salvar_produto_catalogo(null, 'GB C/15', array['10PA01.014GD02'], 15, 'Grande', null, true)$$,
-  'GB C/15 pode ser criado como produto canonico proprio'
+select results_eq(
+  $$select nome, ovos_und, categoria from public.produtos where codigos_vinculados = '10PA01.014GD02'$$,
+  $$values ('GB C/15'::text, 15::bigint, 'Grande'::text)$$,
+  'migracao cria GB C/15 como produto canonico proprio'
 );
 select is(
   (select produto_id is not null from public.produtos_expandidos where codigo_produto = '10PA01.014GD02'),
