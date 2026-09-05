@@ -32,6 +32,14 @@ import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
 import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
 import { AppSelect, FilterPopover, FilterSection, LoadingState, PageToolbar, Pagination } from '../../shared/ui'
+import {
+  getGerencialScreenFromPath,
+  getGerencialScreenPath,
+  getGerencialSearch,
+  isCanonicalGerencialPath,
+  setGerencialSearch,
+} from './navigation'
+import { gerencialNavItems, getGerencialScreenMetadata } from './screenMetadata'
 import './GerencialApp.css'
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
@@ -47,33 +55,8 @@ const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
 const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 
-const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'chart' },
-  { id: 'notas', label: 'Notas', icon: 'notes' },
-  { id: 'fotos-anexadas', label: 'Fotos', icon: 'camera' },
-  { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
-  { id: 'lojas', label: 'Lojas', icon: 'pin' },
-]
-
 const supportWhatsappMessage = 'Olá! Preciso de suporte na plataforma Avine.'
 const supportWhatsappUrl = `https://wa.me/5585986532599?text=${encodeURIComponent(supportWhatsappMessage)}`
-
-const gerencialScreenIds = ['dashboard', 'usuarios', 'lojas', 'notas', 'fotos-anexadas']
-const gerencialScreenStorageKey = 'avine-gerencial-last-screen'
-
-function getInitialGerencialScreen() {
-  if (typeof window === 'undefined') return 'dashboard'
-
-  if (window.location.pathname.endsWith('/fotos-anexadas')) return 'fotos-anexadas'
-
-  try {
-    const savedScreen = window.localStorage.getItem(gerencialScreenStorageKey)
-    if (savedScreen === 'configuracoes') return 'usuarios'
-    return gerencialScreenIds.includes(savedScreen) ? savedScreen : 'dashboard'
-  } catch {
-    return 'dashboard'
-  }
-}
 
 const initialUserForm = {
   email: '',
@@ -531,7 +514,7 @@ export function Sidebar({ isMobile = false, expanded, canCollapse, selectedItem,
       </div>
 
       <nav className="sidebar-nav" aria-label="Menu principal">
-        {navItems.map((item) => (
+          {gerencialNavItems.map((item) => (
           <button
             key={item.id}
             className={[
@@ -2529,8 +2512,8 @@ function GerencialApp({ capabilities }) {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 760)
   const [sidebarExpanded, setSidebarExpanded] = useState(() => typeof window === 'undefined' || window.innerWidth > 980)
   const mobileMenuTriggerRef = useRef(null)
-  const [selectedItem, setSelectedItem] = useState(getInitialGerencialScreen)
-  const [search, setSearch] = useState('')
+  const selectedItem = getGerencialScreenFromPath(location.pathname) ?? 'dashboard'
+  const search = getGerencialSearch(location.search)
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -2586,12 +2569,16 @@ function GerencialApp({ capabilities }) {
   useEffect(() => {
     if (!isAdministrativeProfile(currentUser)) return
 
-    try {
-      window.localStorage.setItem(gerencialScreenStorageKey, selectedItem)
-    } catch {
-      // A navegaÃ§Ã£o continua funcionando mesmo sem persistÃªncia local.
+    const routeScreen = getGerencialScreenFromPath(location.pathname)
+    const nextScreen = routeScreen ?? 'dashboard'
+
+    if (routeScreen === null || !isCanonicalGerencialPath(location.pathname, nextScreen)) {
+      navigate(
+        getGerencialScreenPath(location.pathname, currentUser.perfil, nextScreen),
+        { replace: true },
+      )
     }
-  }, [currentUser, selectedItem])
+  }, [currentUser, location.pathname, navigate])
 
   async function loadUsuarios() {
     setLoading(true)
@@ -2721,58 +2708,12 @@ function GerencialApp({ capabilities }) {
   const isDashboard = selectedItem === 'dashboard'
   const isNotas = selectedItem === 'notas'
   const isAttachedPhotos = selectedItem === 'fotos-anexadas'
-  const isMotivos = selectedItem === 'motivos'
-  const isRecolhimento = selectedItem === 'recolhimento'
   const isRelatorios = selectedItem === 'relatorios'
-  const pageTitle = isPerfil
-    ? 'Perfil'
-    : isLojas
-    ? 'Lojas'
-    : isDashboard
-          ? 'Dashboard Geral'
-    : isNotas
-            ? 'Notas Fiscais de Devolução'
-            : isAttachedPhotos
-              ? 'Fotos Anexadas'
-            : isMotivos
-              ? 'Motivos'
-              : isRecolhimento
-                ? 'Recolhimento'
-          : isRelatorios
-            ? 'Relatório'
-            : 'Usuários'
-  const pageSubtitle = isPerfil
-     ? `Dados da conta ${getManagedRoleLabel(currentUser)}.`
-    : isLojas
-    ? 'Roteirização dos promotores.'
-    : isDashboard
-          ? 'Visão geral da operação de devoluções e retornos.'
-    : isNotas
-          ? 'Preenchimento de FSTD logística ou lojas sem promotor.'
-          : isAttachedPhotos
-            ? 'Fotos enviadas pelos promotores referentes às suas devoluções'
-            : isMotivos
-              ? 'Cadastro de motivos de devolução.'
-              : isRecolhimento
-                ? 'Fila logística de recolhimentos.'
-          : isRelatorios
-            ? 'Relatório Solicitante BI.'
-            : 'Gerencie todos os usuários do sistema.'
-  const heroIcon = isPerfil
-    ? 'users'
-    : isLojas
-    ? 'pin'
-    : isDashboard
-      ? 'chart'
-    : isAttachedPhotos
-      ? 'camera'
-    : isNotas || isMotivos
-          ? 'notes'
-          : isRecolhimento
-            ? 'logs'
-        : isRelatorios
-          ? 'chart'
-          : 'user-plus'
+  const {
+    title: pageTitle,
+    subtitle: pageSubtitle,
+    icon: heroIcon,
+  } = getGerencialScreenMetadata(selectedItem, getManagedRoleLabel(currentUser))
 
   async function handleCreateUsuario(event) {
     event.preventDefault()
@@ -3123,7 +3064,6 @@ function GerencialApp({ capabilities }) {
   async function handleLogout() {
     await signOut()
     setProfilePhoto('')
-    setSelectedItem('lojas')
     setUsuarios([])
     setLojas([])
     setPromotores([])
@@ -3277,16 +3217,16 @@ function GerencialApp({ capabilities }) {
   }
 
   function handleSelectItem(item) {
-    if (location.pathname.endsWith('/fotos-anexadas')) {
-      navigate(location.pathname.replace(/\/fotos-anexadas\/?$/, ''), { replace: true })
-    }
-    setSelectedItem(item)
-    setSearch('')
+    navigate(getGerencialScreenPath(location.pathname, currentUser?.perfil, item))
     setFilterOpen(false)
     setCadastroOpen(false)
     setGerencialError('')
     setGerencialEditId('')
     if (isMobile) closeMobileSidebar()
+  }
+
+  function handleSearchChange(value) {
+    navigate(setGerencialSearch(location.pathname, location.search, value), { replace: true })
   }
 
   function closeCadastro() {
@@ -3357,7 +3297,7 @@ function GerencialApp({ capabilities }) {
             editId={gerencialEditId}
             editForm={gerencialEditForm}
             search={search}
-            onSearch={setSearch}
+            onSearch={handleSearchChange}
             onOpenCadastro={() => setCadastroOpen(true)}
             onOpenUsuario={openInfoModal}
             onEditChange={(patch) => setGerencialEditForm((current) => ({ ...current, ...patch }))}
@@ -3376,7 +3316,7 @@ function GerencialApp({ capabilities }) {
         ) : isNotas ? (
           <NotasScreen
             search={search}
-            onSearch={setSearch}
+            onSearch={handleSearchChange}
             lojas={lojas}
             usuarios={usuarios}
             currentUser={currentUser}
@@ -3395,7 +3335,7 @@ function GerencialApp({ capabilities }) {
             isFilterOpen={isFilterOpen}
             selectedUfs={storeSelectedUfs}
             selectedCidades={storeSelectedCidades}
-            onSearch={setSearch}
+            onSearch={handleSearchChange}
             onToggleFilter={(open) => setFilterOpen(open)}
             onToggleUf={toggleStoreUf}
             onToggleCidade={toggleStoreCidade}
