@@ -67,8 +67,9 @@ function topLevelMembers(block) {
     while (/\s/.test(block[index])) index += 1
 
     if (block[index] !== '{') {
+      const valueStart = index
       while (index < block.length - 1 && block[index] !== '\n') index += 1
-      members.set(name, null)
+      members.set(name, block.slice(valueStart, index).trim())
       continue
     }
 
@@ -128,9 +129,13 @@ function manifest(filePath) {
   )) {
     if (!viewBlock) continue
     const viewMembers = topLevelMembers(viewBlock)
-    result.views[viewName] = sortedKeys(
-      topLevelMembers(requiredMember(viewMembers, 'Row', `Views.${viewName}`)),
+    const rowBlock = requiredMember(viewMembers, 'Row', `Views.${viewName}`)
+    const tableAlias = rowBlock.match(
+      /^Database\[['"]public['"]\]\[['"]Tables['"]\]\[['"]([^'"]+)['"]\]\[['"]Row['"]\]$/,
     )
+    result.views[viewName] = tableAlias
+      ? (result.tables[tableAlias[1]]?.row ?? [`@table:${tableAlias[1]}`])
+      : sortedKeys(topLevelMembers(rowBlock))
   }
 
   for (const [functionName, functionBlock] of [...functions].sort(([left], [right]) =>
