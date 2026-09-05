@@ -123,11 +123,16 @@ begin
     raise exception 'Somente usuarios Gerencial ou Admin ativos podem editar uma FSTD finalizada.';
   end if;
 
-  select fl.*, l.id
-    into v_legado, v_loja_id
+  select fl.*
+    into v_legado
   from public.fstd_legado_canonico fl
-  join public.lojas l on l.codigo::text = fl.codigo_loja
   where fl.legado_id = p_legado_id
+  limit 1;
+
+  select l.id
+    into v_loja_id
+  from public.lojas l
+  where l.codigo::text = v_legado.codigo_loja
   limit 1;
 
   if v_legado.legado_id is null or v_loja_id is null then
