@@ -38,17 +38,12 @@ values
   ('61000000-0000-4000-8000-000000000021', '60000000-0000-4000-8000-000000000021', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30', 'OVOS BRANCOS', 6, 0, 1, 'concluido', '[]'),
   ('61000000-0000-4000-8000-000000000022', '60000000-0000-4000-8000-000000000022', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30', 'OVOS BRANCOS', 7, 0, 1, 'concluido', '[]');
 
-insert into public.fstd_documentos (
-  id, processo_id, pdf_path, conteudo_versao, versao_publicada, pdf_status
-)
-values (
-  '62000000-0000-4000-8000-000000000020',
-  '60000000-0000-4000-8000-000000000020',
-  'teste/fstd-avulsa-v1.pdf',
-  1,
-  1,
-  'disponivel'
-);
+update public.fstd_documentos
+set pdf_path = 'teste/fstd-avulsa-v1.pdf',
+    conteudo_versao = 1,
+    versao_publicada = 1,
+    pdf_status = 'disponivel'
+where processo_id = '60000000-0000-4000-8000-000000000020';
 
 select is(
   app_private.conferir_fstd_avulsa('60000000-0000-4000-8000-000000000020'),
