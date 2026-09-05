@@ -49,6 +49,22 @@ textarea {
   min-height: 100vh;
 }
 
+.environment-banner {
+  position: sticky;
+  z-index: 1000;
+  top: 0;
+  width: 100%;
+  padding: 6px 16px;
+  color: #422006;
+  background: #facc15;
+  border-bottom: 1px solid #ca8a04;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .configuration-error {
   display: grid;
   place-content: center;

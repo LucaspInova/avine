@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from '../../domains/auth/AuthProvider.jsx'
+import EnvironmentBanner from '../../shared/components/EnvironmentBanner.jsx'
 import { supabaseConfigError } from '../../shared/lib/supabaseClient.ts'
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ export default function AppProviders({ children }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <EnvironmentBanner />
       <BrowserRouter>
         <AuthProvider>{children}</AuthProvider>
       </BrowserRouter>
