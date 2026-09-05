@@ -20,6 +20,7 @@ describe('navegacao canonica gerencial', () => {
     expect(getGerencialScreenFromPath('/admin/dashboard')).toBe('dashboard')
     expect(getGerencialScreenFromPath('/gerencial/fotos')).toBe('fotos-anexadas')
     expect(getGerencialScreenFromPath('/admin/fotos-anexadas')).toBe('fotos-anexadas')
+    expect(getGerencialScreenFromPath('/gerencial/produtos')).toBe('produtos')
     expect(getGerencialScreenFromPath('/admin')).toBe('dashboard')
     expect(getGerencialScreenFromPath('/admin/inexistente')).toBeNull()
   })

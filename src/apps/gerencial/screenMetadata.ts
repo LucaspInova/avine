@@ -10,6 +10,7 @@ export const gerencialNavItems: ReadonlyArray<{
   { id: 'fotos-anexadas', label: 'Fotos', icon: 'camera' },
   { id: 'usuarios', label: 'Usuários', icon: 'user-plus' },
   { id: 'lojas', label: 'Lojas', icon: 'pin' },
+  { id: 'produtos', label: 'Produtos', icon: 'logs' },
 ]
 
 const screenMetadata: Record<GerencialScreenId, {
@@ -42,6 +43,11 @@ const screenMetadata: Record<GerencialScreenId, {
     subtitle: 'Roteirização dos promotores.',
     icon: 'pin',
   },
+  produtos: {
+    title: 'Produtos',
+    subtitle: 'Catálogo, códigos vinculados e itens aguardando classificação.',
+    icon: 'logs',
+  },
   perfil: {
     title: 'Perfil',
     subtitle: 'Dados da conta.',
@@ -69,4 +75,3 @@ export function getGerencialScreenMetadata(screen: GerencialScreenId, profileLab
   if (screen !== 'perfil' || !profileLabel) return metadata
   return { ...metadata, subtitle: `Dados da conta ${profileLabel}.` }
 }
-

@@ -40,6 +40,13 @@ export interface LojaDatabase {
   cidade: string;
 }
 
+export interface LojaSyncResult {
+  inseridas: number;
+  inalteradas: number;
+  divergentes: number;
+  invalidas: number;
+}
+
 export function jsonResponse(
   body: Record<string, unknown>,
   status = 200,
@@ -282,7 +289,8 @@ export async function insertOnlyNewItems(
 export async function syncLojas(
   supabase: SupabaseClient,
   items: DevolucaoDatabase[],
-): Promise<number> {
+  source: SyncSource,
+): Promise<LojaSyncResult> {
   const lojasMap = new Map<string, LojaDatabase>();
 
   for (const item of items) {
@@ -291,25 +299,38 @@ export async function syncLojas(
     const uf = item.uf?.trim().toUpperCase() ?? "";
     const cidade = item.cidade?.trim() ?? "";
 
-    if (codigo && nome && uf && cidade) {
-      lojasMap.set(codigo, { codigo, nome, uf, cidade });
+    if (codigo) {
+      const candidata = { codigo, nome, uf, cidade };
+      const atual = lojasMap.get(codigo);
+      const pontuacao = (loja: LojaDatabase) =>
+        Number(Boolean(loja.nome)) + Number(Boolean(loja.uf)) + Number(Boolean(loja.cidade));
+      if (!atual || pontuacao(candidata) >= pontuacao(atual)) {
+        lojasMap.set(codigo, candidata);
+      }
     }
   }
 
   const lojas = Array.from(lojasMap.values());
   if (lojas.length === 0) {
-    return 0;
+    return { inseridas: 0, inalteradas: 0, divergentes: 0, invalidas: 0 };
   }
 
-  const { error } = await supabase
-    .from("lojas")
-    .upsert(lojas, { onConflict: "codigo", ignoreDuplicates: false });
+  const { data, error } = await supabase.rpc("sincronizar_lojas_importadas", {
+    p_lojas: lojas,
+    p_fonte: source,
+  });
 
   if (error) {
     throw new Error(`Não foi possível sincronizar as lojas: ${error.message}`);
   }
 
-  return lojas.length;
+  const result = data && typeof data === "object" ? data : {};
+  return {
+    inseridas: Number(result.inseridas ?? 0),
+    inalteradas: Number(result.inalteradas ?? 0),
+    divergentes: Number(result.divergentes ?? 0),
+    invalidas: Number(result.invalidas ?? 0),
+  };
 }
 
 export async function conferirFstdAvulsas(

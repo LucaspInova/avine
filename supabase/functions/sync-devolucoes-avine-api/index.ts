@@ -287,7 +287,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       supabase,
       uniqueItems,
     );
-    await syncLojas(supabase, uniqueItems);
+    const lojasSync = await syncLojas(supabase, uniqueItems, "api");
     const conferenciaData = await conferirFstdAvulsas(supabase);
 
     const invalidDetails = summarizeInvalidItems(
@@ -297,7 +297,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const finishMessage =
       `Sincronização API concluída: ${insertedCount} novos itens inseridos, ` +
       `${uniqueItems.length - insertedCount} já existentes e ` +
-      `${invalidItems.length} inválidos ignorados.`;
+      `${invalidItems.length} inválidos ignorados. ` +
+      `Lojas: ${lojasSync.inseridas} novas, ${lojasSync.divergentes} divergentes.`;
 
     const { error: finishLogError } = await supabase
       .from(LOG_TABLE_NAME)
@@ -335,6 +336,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       registros_inseridos: insertedCount,
       registros_ja_existentes: uniqueItems.length - insertedCount,
       lotes_processados: batchCount,
+      lojas: lojasSync,
       conferencia_fstd_avulsas: conferenciaData,
       erros_amostra: summarizeInvalidItems(
         invalidItems,
