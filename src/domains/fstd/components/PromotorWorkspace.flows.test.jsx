@@ -1,11 +1,42 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { FstdAvulsaFlow, FstdLegacyTotalsEditor, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { FstdAvulsaFlow, FstdLegacyTotalsEditor, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, NfdConferenceErrorPopup, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
 import { keepNumericNfdCode } from '../model/validation'
 
 const noop = vi.fn()
 
 describe('NFD avulsa', () => {
+  it('explica as diferenças e encaminha o autor para revisar a mesma FSTD', () => {
+    const onReview = vi.fn()
+    render(
+      <NfdConferenceErrorPopup
+        nfd={{
+          numero: '123',
+          conferencia_detalhes: {
+            produtos: [{
+              chave_produto: 'produto-1',
+              nome_produto: 'OVOS BRANCOS C/30',
+              tipo: 'quantidade_divergente',
+              fstd_galinha: 5,
+              fstd_codorna: 0,
+              nota_galinha: 6,
+              nota_codorna: 0,
+            }],
+          },
+        }}
+        busy={false}
+        error=""
+        onClose={noop}
+        onReview={onReview}
+      />,
+    )
+
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Revisão pendente')
+    expect(screen.getByRole('table', { name: 'Comparação dos produtos' })).toHaveTextContent('FSTD: 5 · Nota: 6')
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar FSTD' }))
+    expect(onReview).toHaveBeenCalledOnce()
+  })
+
   it('aceita somente dÃ­gitos no cÃ³digo da NFD', () => {
     expect(keepNumericNfdCode('NFD-12A/3')).toBe('123')
 

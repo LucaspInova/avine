@@ -13,7 +13,7 @@ export function getDaysSinceIssue(date: unknown, now = new Date()): number {
 
 export function getNfdVisualStatus(nfd: any, unknownComments: Record<string, unknown> = {}, now = new Date()): NfdVisualStatus {
   if (nfd?.is_avulsa) {
-    if (nfd.conferencia_status === 'divergente') return 'avulsa-erro'
+    if (['revisao_pendente', 'divergente'].includes(nfd.conferencia_status)) return 'avulsa-erro'
     if (nfd.fstd_process_status === 'concluida') return nfd.conferencia_status === 'conferida' ? 'sent' : 'avulsa-finalizada'
     return 'avulsa'
   }

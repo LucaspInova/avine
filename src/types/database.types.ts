@@ -1305,6 +1305,35 @@ export type Database = {
       };
       record_usuario_access: { Args: never; Returns: string };
       recuperar_fstd_documentos: { Args: never; Returns: number };
+      reabrir_fstd_avulsa_revisao: {
+        Args: { p_processo_id: string };
+        Returns: {
+          api_nfd_chave_acesso: string | null;
+          atualizado_por: string | null;
+          conferencia_detalhes: Json;
+          conferencia_em: string | null;
+          conferencia_status: string;
+          created_at: string;
+          criado_por: string | null;
+          finalizada_em: string | null;
+          id: string;
+          is_avulsa: boolean;
+          loja_id: string;
+          nfd_chave_acesso: string;
+          nfd_data_emissao: string | null;
+          nfd_numero: string;
+          nfd_valor: number | null;
+          promotor_id: string;
+          status: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "fstd_processos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       set_fstd_document_pdf: {
         Args: {
           p_document_id: string;

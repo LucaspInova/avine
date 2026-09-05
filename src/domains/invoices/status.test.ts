@@ -5,6 +5,7 @@ describe('status visual e aba da NFD', () => {
   const now = new Date(2026, 7, 6, 12)
   it.each([
     [{ is_avulsa: true, conferencia_status: 'divergente' }, 'avulsa-erro', 'avulsa'],
+    [{ is_avulsa: true, conferencia_status: 'revisao_pendente' }, 'avulsa-erro', 'avulsa'],
     [{ is_avulsa: true, fstd_process_status: 'concluida', conferencia_status: 'conferida' }, 'sent', 'finalizada'],
     [{ data_envio: '2026-08-06' }, 'sent', 'finalizada'],
     [{ data_emissao: '2026-08-05' }, 'overdue', 'atrasada'],

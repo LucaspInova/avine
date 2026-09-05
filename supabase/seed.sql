@@ -105,7 +105,7 @@ insert into public.fstd_processos (
 )
 values
   ('60000000-0000-4000-8000-000000000001', 'HOM-900001-990001', '990001', '30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000004', 'em_andamento', false, '2026-09-01', 165.00, 'pendente', '{}'),
-  ('60000000-0000-4000-8000-000000000002', 'AVULSA:900002:990010', '990010', '30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000004', 'em_andamento', true, '2026-09-04', 72.00, 'divergente', '{"cenario":"homologacao"}')
+  ('60000000-0000-4000-8000-000000000002', 'AVULSA:900002:990010', '990010', '30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000004', 'em_andamento', true, '2026-09-04', 72.00, 'revisao_pendente', '{"cenario":"homologacao"}')
 on conflict (id) do update set nfd_chave_acesso=excluded.nfd_chave_acesso,
   nfd_numero=excluded.nfd_numero, loja_id=excluded.loja_id,
   promotor_id=excluded.promotor_id, status=excluded.status,

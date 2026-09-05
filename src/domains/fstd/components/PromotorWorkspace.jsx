@@ -1112,17 +1112,48 @@ function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubm
   )
 }
 
-function NfdConferenceErrorPopup({ nfd, onClose }) {
+export function NfdConferenceErrorPopup({ nfd, busy, error, onClose, onReview }) {
   if (!nfd) return null
+  const differences = Array.isArray(nfd.conferencia_detalhes?.produtos)
+    ? nfd.conferencia_detalhes.produtos
+    : []
+
+  const differenceLabel = (difference) => {
+    if (difference.tipo === 'ausente_na_fstd') return 'Não informado na FSTD'
+    if (difference.tipo === 'ausente_na_nota') return 'Não encontrado na nota'
+    return 'Quantidade diferente'
+  }
 
   return (
     <div className="nfd-conference-layer">
       <button className="nfd-conference-backdrop" type="button" aria-label="Fechar alerta" onClick={onClose} />
       <section className="nfd-conference-dialog" role="alertdialog" aria-modal="true" aria-labelledby="nfd-conference-title">
         <InvoiceIcon status="avulsa-erro" />
-        <h2 id="nfd-conference-title">Erro na NFD</h2>
-        <p>A NFD “{getNfdNumber(nfd)}” deu erro, entre em contato com o suporte.</p>
-        <button type="button" onClick={onClose}>Entendi</button>
+        <h2 id="nfd-conference-title">Revisão pendente</h2>
+        <p>
+          A loja e o número da NFD “{getNfdNumber(nfd)}” conferem, mas os produtos
+          informados precisam ser conciliados com a nota recebida.
+        </p>
+        {differences.length > 0 && (
+          <div className="nfd-conference-differences" role="table" aria-label="Comparação dos produtos">
+            {differences.map((difference) => (
+              <article key={difference.chave_produto ?? difference.codigo_produto} role="row">
+                <strong>{difference.nome_produto ?? difference.codigo_produto}</strong>
+                <span>{differenceLabel(difference)}</span>
+                <small>
+                  FSTD: {Number(difference.fstd_galinha ?? 0) + Number(difference.fstd_codorna ?? 0)} · Nota: {Number(difference.nota_galinha ?? 0) + Number(difference.nota_codorna ?? 0)}
+                </small>
+              </article>
+            ))}
+          </div>
+        )}
+        {error && <strong className="promotor-error">{error}</strong>}
+        <footer>
+          <button type="button" onClick={onClose}>Agora não</button>
+          <button disabled={busy} type="button" onClick={onReview}>
+            {busy ? 'Abrindo revisão...' : 'Revisar FSTD'}
+          </button>
+        </footer>
       </section>
     </div>
   )
@@ -3348,13 +3379,54 @@ export function PromotorWorkspace({
     },
   })
 
+  const reopenAvulsaReviewMutation = useMutation({
+    mutationFn: async (nfd) => {
+      const processoId = nfd.fstd_process_id ?? nfd.fstd_process?.id
+      if (!processoId) throw new Error('Não foi possível identificar a FSTD para revisão.')
+
+      const { data, error } = await supabase.rpc('reabrir_fstd_avulsa_revisao', {
+        p_processo_id: processoId,
+      })
+      if (error) throw error
+      const processo = Array.isArray(data) ? data[0] : data
+      const targetStore = stores.find((store) => String(store.id) === String(nfd.loja_id))
+      if (!targetStore) throw new Error('A loja desta FSTD não está mais vinculada à sua rota.')
+      return {
+        targetStore,
+        target: {
+          ...nfd,
+          fstd_process_status: processo.status,
+          conferencia_status: processo.conferencia_status,
+          fstd_process: {
+            ...(nfd.fstd_process ?? {}),
+            ...processo,
+          },
+        },
+      }
+    },
+    onSuccess: async ({ target, targetStore }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fstd-process', { profileId: profile.id }] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices', { profileId: profile.id }] }),
+      ])
+      setConferenceAlertDismissed(true)
+      setSelectedStore(targetStore)
+      setSelectedNfd(null)
+      setAvulsaAddProductsTarget(null)
+      setFstdTarget(target)
+    },
+  })
+
   const conferenceAlertNfd = conferenceAlertDismissed
     ? null
-    : nfds.find((nfd) => nfd.is_avulsa && nfd.conferencia_status === 'divergente')
+    : nfds.find((nfd) => nfd.is_avulsa && ['revisao_pendente', 'divergente'].includes(nfd.conferencia_status))
   const conferenceAlert = (
     <NfdConferenceErrorPopup
       nfd={conferenceAlertNfd}
+      busy={reopenAvulsaReviewMutation.isPending}
+      error={reopenAvulsaReviewMutation.error?.message}
       onClose={() => setConferenceAlertDismissed(true)}
+      onReview={() => reopenAvulsaReviewMutation.mutate(conferenceAlertNfd)}
     />
   )
 
