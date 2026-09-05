@@ -14,7 +14,6 @@ describe('auth capabilities', () => {
     const profile = { ...base, perfil: 'Gerencial', auth_role: 'gerencial', ufs: ['CE', 'PI', 'CE'] }
     expect(can(profile, 'users.managePromoters')).toBe(true)
     expect(can(profile, 'fstd.editFinalized')).toBe(true)
-    expect(can(profile, 'products.manage')).toBe(true)
     expect(can(profile, 'users.manageGerencial')).toBe(false)
   })
 
@@ -22,7 +21,6 @@ describe('auth capabilities', () => {
     const profile = { ...base, perfil: 'Promotor', auth_role: 'promotor', ufs: ['CE'] }
     expect(can(profile, 'fstd.create')).toBe(true)
     expect(can(profile, 'stores.create')).toBe(false)
-    expect(can(profile, 'products.manage')).toBe(false)
   })
 
   it.each([

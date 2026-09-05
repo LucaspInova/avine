@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
@@ -26,7 +26,6 @@ import { GerencialFstdModal } from './features/fstd/GerencialFstdModal.jsx'
 import { GerencialFinalizedNfdModal } from './features/fstd/GerencialFinalizedNfdModal.jsx'
 import { ManagementDashboard } from './features/dashboard/ManagementDashboard.jsx'
 import { AttachedPhotosScreen } from './features/attached-photos/AttachedPhotosScreen.jsx'
-import { ProductCatalogScreen } from './features/products/ProductCatalogScreen.jsx'
 import { GerencialApplicationShell } from './features/shell/GerencialApplicationShell.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
@@ -42,6 +41,8 @@ import {
 } from './navigation'
 import { gerencialNavItems, getGerencialScreenMetadata } from './screenMetadata'
 import './GerencialApp.css'
+
+const ProductCatalogScreen = lazy(() => import('./features/products/ProductCatalogScreen.jsx'))
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
@@ -170,7 +171,7 @@ function getDefaultNoteDates(now = new Date()) {
 
 
 function normalizaNome(nome) {
-  return nome.trim().replace(/\s+/g, ' ').toUpperCase()
+  return normalizaTexto(nome).toUpperCase()
 }
 
 function normalizaTexto(texto) {
@@ -2731,7 +2732,6 @@ function GerencialApp({ capabilities }) {
   const isUsuarios = selectedItem === 'usuarios'
   const isDashboard = selectedItem === 'dashboard'
   const isNotas = selectedItem === 'notas'
-  const isProdutos = selectedItem === 'produtos'
   const isAttachedPhotos = selectedItem === 'fotos-anexadas'
   const isRelatorios = selectedItem === 'relatorios'
   const {
@@ -3341,7 +3341,7 @@ function GerencialApp({ capabilities }) {
           <AttachedPhotosScreen canEditFinalized={can(currentUser, 'fstd.editFinalized')} />
         ) : isRelatorios ? (
           <ReportScreen />
-        ) : isProdutos ? (
+        ) : selectedItem === 'produtos' ? (
           <ProductCatalogScreen search={search} onSearch={handleSearchChange} />
         ) : isNotas ? (
           <NotasScreen

@@ -201,3 +201,5 @@ export function ProductCatalogScreen({ search = '', onSearch }) {
     </section>
   )
 }
+
+export default ProductCatalogScreen

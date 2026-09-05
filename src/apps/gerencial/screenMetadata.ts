@@ -15,7 +15,7 @@ export const gerencialNavItems: ReadonlyArray<{
 
 const screenMetadata: Record<GerencialScreenId, {
   title: string
-  subtitle: string
+  subtitle?: string
   icon: string
 }> = {
   dashboard: {
@@ -45,7 +45,6 @@ const screenMetadata: Record<GerencialScreenId, {
   },
   produtos: {
     title: 'Produtos',
-    subtitle: 'Catálogo, códigos vinculados e itens aguardando classificação.',
     icon: 'logs',
   },
   perfil: {
