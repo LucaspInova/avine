@@ -128,8 +128,8 @@ async function readManagementDashboard(filters: ManagementDashboardFilters, sign
   const request = supabase.rpc('carregar_dashboard_gerencial', {
     p_data_inicial: filters.startDate,
     p_data_final: filters.endDate,
-    p_uf: filters.uf || null,
-    p_cidade: filters.city || null,
+    p_uf: filters.uf || undefined,
+    p_cidade: filters.city || undefined,
   })
   const { data, error } = await (signal ? request.abortSignal(signal) : request)
   if (error) throw error

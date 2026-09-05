@@ -70,8 +70,8 @@ describe('fontes da dashboard', () => {
     expect(dashboardApi.rpc).toHaveBeenCalledWith('carregar_dashboard_gerencial', {
       p_data_inicial: '2026-08-01',
       p_data_final: '2026-08-31',
-      p_uf: null,
-      p_cidade: null,
+      p_uf: undefined,
+      p_cidade: undefined,
     })
     expect(result.current.notes).toHaveLength(1)
   })
