@@ -1542,6 +1542,7 @@ export function UsuariosScreen({
                       ? new Intl.DateTimeFormat('pt-BR', {
                           dateStyle: 'short',
                           timeStyle: 'short',
+                          timeZone: 'America/Fortaleza',
                         }).format(new Date(usuario.last_access_at))
                       : 'Nunca'}
                   </span>

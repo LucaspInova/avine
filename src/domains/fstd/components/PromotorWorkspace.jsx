@@ -3400,10 +3400,10 @@ export function PromotorWorkspace({
           if (authError) throw authError
           if (!authData.user) throw new Error('Sessão expirada. Entre novamente para enviar as fotos.')
 
-          for (const [index, file] of fotos.entries()) {
+          for (const file of fotos) {
             const safeProductCode = product.codigo_produto.replace(/[^a-zA-Z0-9_.-]/g, '-')
             const safeFileName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-').toLowerCase()
-            const uniquePart = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${index}`
+            const uniquePart = globalThis.crypto.randomUUID()
             const path = `${authData.user.id}/${processoId}/${safeProductCode}/${uniquePart}-${safeFileName}`
             const { data: uploadData, error: uploadError } = await supabase.storage
               .from('fstd-fotos')

@@ -3,15 +3,8 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { routeForProfile, useAuth } from './AuthProvider.jsx'
 import { getProfileLabel } from '../../shared/lib/profileLabels.js'
 import AvineLogin from '../../shared/components/auth/AvineLogin.jsx'
+import { getSignInErrorMessage } from './roleAccessUtils.js'
 import './RoleAccess.css'
-
-export function getSignInErrorMessage(signInError) {
-  if (signInError?.code === 'invalid_credentials' || signInError?.status === 400) {
-    return 'E-mail ou senha inválidos.'
-  }
-
-  return 'Não foi possível conectar ao serviço de autenticação. Tente novamente.'
-}
 
 function RoleEntry() {
   const navigate = useNavigate()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getSignInErrorMessage } from './RoleAccess'
+import { getSignInErrorMessage } from './roleAccessUtils.js'
 
 describe('getSignInErrorMessage', () => {
   it('mantém a mensagem genérica para credenciais inválidas', () => {
