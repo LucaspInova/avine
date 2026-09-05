@@ -261,9 +261,9 @@ set local request.jwt.claim.sub = '10000000-0000-0000-0000-000000000001';
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","app_metadata":{"role":"gerencial"}}';
 
 select results_eq(
-  'select count(*) from public.usuarios',
+  $$select count(*) from public.usuarios where email like '%@test.invalid'$$,
   array[4::bigint],
-  'active Gerencial can read all profiles'
+  'active Gerencial can read all test profiles'
 );
 select ok(
   app_private.is_current_user_gerencial_ativo(),
@@ -405,6 +405,8 @@ select throws_ok(
       'NFD-MISSING'
     )
   $$,
+  'P0001',
+  'NFD nao encontrada para a loja informada.',
   'missing NFD is rejected'
 );
 select throws_ok(
@@ -414,6 +416,8 @@ select throws_ok(
       'NFD-OTHER'
     )
   $$,
+  'P0001',
+  'Loja nao encontrada ou sem acesso para o usuario autenticado.',
   'cross-store IDOR is rejected'
 );
 
@@ -530,6 +534,8 @@ select throws_ok(
       )
     )
   $$,
+  'P0001',
+  'Conclua todos os produtos antes de finalizar a NFD.',
   'incomplete workflow cannot be finalized'
 );
 select throws_ok(
@@ -556,6 +562,8 @@ select throws_ok(
       )
     )
   $$,
+  'P0001',
+  'As fotos devem existir e pertencer ao usuario e processo autenticados.',
   'foreign photo path is rejected'
 );
 
@@ -582,9 +590,17 @@ select throws_ok(
         )
       ),
       null,
-      '[]'::jsonb
+      jsonb_build_array(
+        '30000000-0000-0000-0000-000000000001/' ||
+          (
+            select id::text from public.fstd_processos
+            where nfd_chave_acesso = 'NFD-OWNER'
+          ) || '/other.webp'
+      )
     )
   $$,
+  'P0001',
+  'Produto de FSTD nao encontrado, ja concluido ou processo finalizado.',
   'another Promotor cannot mutate the owner product'
 );
 
@@ -615,7 +631,13 @@ select lives_ok(
         )
       ),
       null,
-      '[]'::jsonb
+      jsonb_build_array(
+        '20000000-0000-0000-0000-000000000001/' ||
+          (
+            select id::text from public.fstd_processos
+            where nfd_chave_acesso = 'NFD-OWNER'
+          ) || '/owner.webp'
+      )
     )
   $$,
   'owner concludes the final product'
@@ -763,6 +785,8 @@ select throws_ok(
       'NFD-OWNER'
     )
   $$,
+  'P0001',
+  'Promotor com acesso ativo nao encontrado para o usuario autenticado.',
   'disabled profile cannot execute workflow RPCs'
 );
 
@@ -781,13 +805,12 @@ select throws_ok(
       'NFD-OWNER'
     )
   $$,
+  'P0001',
+  'Promotor com acesso ativo nao encontrado para o usuario autenticado.',
   'Auth user without a profile cannot execute workflow RPCs'
 );
 
 reset role;
-
-delete from storage.objects
-where name like '30000000-0000-0000-0000-000000000001/%';
 
 select is(
   (
