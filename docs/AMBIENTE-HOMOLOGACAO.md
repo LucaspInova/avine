@@ -77,14 +77,27 @@ O frontend de homologação só será disponibilizado quando:
 - crons e integrações reais estiverem desativados;
 - as variáveis do Preview apontarem exclusivamente para a branch descartável.
 
-## Validação técnica e pendências herdadas
+## Validação técnica atual
 
-- Passou: paridade estrutural do banco, carga do seed, login das seis contas, escopo RLS por perfil, teste do banner, TypeScript, build nos modos produção e homologação e `git diff --check`.
-- O conjunto atual tem 194 testes: 189 passaram e cinco testes antigos de filtros gerenciais falharam. Nenhuma falha envolve o banner, o seed ou a seleção do banco de homologação.
-- O lint já tinha dois erros no código atual: exportação compartilhada em `RoleAccess.jsx` e uso de `Date.now()` durante o fluxo de foto em `PromotorWorkspace.jsx`.
-- O orçamento global de 450 KB por arquivo foi respeitado, mas o chunk Gerencial já excede sua baseline histórica menor.
-- O Advisor do Supabase reproduz alertas do esquema de produção: 17 avisos de segurança e 12 de desempenho, além de itens informativos. Eles ficam registrados para tratamento nos lotes de segurança e desempenho; não foram alterados durante a montagem da homologação.
-- O painel da branch ainda informa falha no replay histórico de migrações. Isso corresponde à primeira tentativa já abandonada; o projeto Preview está saudável e sua estrutura corrente foi aplicada e comparada diretamente. Novas alterações devem nascer como migrações versionadas sobre o baseline.
+- O commit `3fba004` passou integralmente no GitHub Actions: lint, tipos, 229
+  testes de frontend, build, bundle, Playwright, recriação do banco, 260 testes
+  pgTAP, lint SQL e comparação dos tipos gerados.
+- As 23 migrações da homologação e as quatro Edge Functions esperadas estão
+  presentes na branch remota.
+- O Supabase remoto contém somente as seis contas e os cenários sintéticos
+  versionados.
+- O orçamento global de 450 KB é respeitado; a entrada Gerencial mede 136.146
+  bytes brutos e 37.364 bytes em gzip.
+- O Advisor não apresenta erro. RPCs autenticadas `SECURITY DEFINER` continuam
+  sinalizadas genericamente, mas nenhuma é executável por `anon` e todas as
+  expostas a `authenticated` possuem verificação explícita de autorização.
+- Avisos de índices sem uso não justificam remoção numa base sintética pequena;
+  a decisão depende de medição posterior com volume representativo.
+- A tela pública e a faixa de homologação foram verificadas no navegador. O
+  percurso autenticado por perfil está documentado em
+  `docs/ROTEIRO-VALIDACAO-HOMOLOGACAO-FSTD.md` e permanece como último gate.
+- O problema local do Docker continua isolado do projeto; o CI Linux é a
+  validação reprodutível e autoritativa do banco descartável.
 
 ## Custo
 
