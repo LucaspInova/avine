@@ -722,15 +722,65 @@ export type Database = {
         }
         Relationships: []
       }
+      nfd_desconhecimento_comentarios: {
+        Row: {
+          autor_nome: string
+          autor_perfil: string
+          comentario: string
+          created_at: string
+          desconhecimento_id: string
+          id: string
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          autor_nome: string
+          autor_perfil: string
+          comentario: string
+          created_at?: string
+          desconhecimento_id: string
+          id?: string
+          tipo?: string
+          usuario_id: string
+        }
+        Update: {
+          autor_nome?: string
+          autor_perfil?: string
+          comentario?: string
+          created_at?: string
+          desconhecimento_id?: string
+          id?: string
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfd_desconhecimento_comentarios_desconhecimento_id_fkey"
+            columns: ["desconhecimento_id"]
+            isOneToOne: false
+            referencedRelation: "nfd_desconhecimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfd_desconhecimento_comentarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nfd_desconhecimentos: {
         Row: {
           comentario: string
           created_at: string
+          encerramento_motivo: string | null
           id: string
           loja_codigo: string | null
           loja_id: string
           nfd_chave_acesso: string | null
           nfd_numero: string
+          nfd_numero_normalizado: string
           nfd_referencia: string
           reconhecida_em: string | null
           reconhecida_por: string | null
@@ -739,11 +789,13 @@ export type Database = {
         Insert: {
           comentario: string
           created_at?: string
+          encerramento_motivo?: string | null
           id?: string
           loja_codigo?: string | null
           loja_id: string
           nfd_chave_acesso?: string | null
           nfd_numero: string
+          nfd_numero_normalizado: string
           nfd_referencia: string
           reconhecida_em?: string | null
           reconhecida_por?: string | null
@@ -752,11 +804,13 @@ export type Database = {
         Update: {
           comentario?: string
           created_at?: string
+          encerramento_motivo?: string | null
           id?: string
           loja_codigo?: string | null
           loja_id?: string
           nfd_chave_acesso?: string | null
           nfd_numero?: string
+          nfd_numero_normalizado?: string
           nfd_referencia?: string
           reconhecida_em?: string | null
           reconhecida_por?: string | null
@@ -1152,6 +1206,49 @@ export type Database = {
         }
         Relationships: []
       }
+      nfd_desconhecimento_historico: {
+        Row: {
+          ativo: boolean | null
+          autor_nome: string | null
+          autor_perfil: string | null
+          comentario: string | null
+          comentario_id: string | null
+          created_at: string | null
+          desconhecimento_id: string | null
+          encerramento_motivo: string | null
+          loja_codigo: string | null
+          loja_id: string | null
+          nfd_chave_acesso: string | null
+          nfd_numero: string | null
+          nfd_numero_normalizado: string | null
+          nfd_referencia: string | null
+          tipo: string | null
+          usuario_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfd_desconhecimento_comentarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfd_desconhecimentos_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfd_desconhecimentos_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "lojas_com_promotores"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
       nfd_notas: {
         Row: {
           chave_acesso: string | null
@@ -1345,11 +1442,13 @@ export type Database = {
         Returns: {
           comentario: string
           created_at: string
+          encerramento_motivo: string | null
           id: string
           loja_codigo: string | null
           loja_id: string
           nfd_chave_acesso: string | null
           nfd_numero: string
+          nfd_numero_normalizado: string
           nfd_referencia: string
           reconhecida_em: string | null
           reconhecida_por: string | null
@@ -1554,6 +1653,18 @@ export type Database = {
         }
         Returns: number
       }
+      registrar_desconhecimento_nfd: {
+        Args: {
+          p_comentario: string
+          p_loja_codigo: string
+          p_loja_id: string
+          p_nfd_chave_acesso: string
+          p_nfd_numero: string
+          p_nfd_referencia: string
+          p_tipo?: string
+        }
+        Returns: string
+      }
       record_usuario_access: { Args: never; Returns: string }
       recuperar_fstd_documentos: { Args: never; Returns: number }
       salvar_fstd_agregada: {
@@ -1620,6 +1731,22 @@ export type Database = {
           to: "produtos"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      salvar_rota_loja: {
+        Args: { p_loja_id: string; p_promotor_ids: string[] }
+        Returns: {
+          created_at: string | null
+          id: string
+          loja_id: string | null
+          posicao: number
+          promotor_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "loja_promotores"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       set_fstd_document_pdf: {

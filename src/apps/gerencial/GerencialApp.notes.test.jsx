@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const invoiceBoundary = vi.hoisted(() => ({ useInvoices: vi.fn(), useInvoiceMutations: vi.fn() }))
-vi.mock('../../domains/invoices', () => ({ useInvoices: invoiceBoundary.useInvoices, useInvoiceMutations: invoiceBoundary.useInvoiceMutations }))
+const invoiceBoundary = vi.hoisted(() => ({ useInvoices: vi.fn(), useInvoiceMutations: vi.fn(), useInvoiceUnknownHistory: vi.fn() }))
+vi.mock('../../domains/invoices', () => ({ useInvoices: invoiceBoundary.useInvoices, useInvoiceMutations: invoiceBoundary.useInvoiceMutations, useInvoiceUnknownHistory: invoiceBoundary.useInvoiceUnknownHistory }))
 vi.mock('../../domains/auth/AuthProvider.jsx', async (importOriginal) => ({ ...await importOriginal(), useAuth: () => ({ profile: { id: 'a1', perfil: 'Admin' } }) }))
 import { NotasScreen } from './GerencialApp.jsx'
 
@@ -12,6 +12,7 @@ const page = { rows, total: 120, counts: { Finalizada: 20, Pendente: 90, Desconh
 function setup(data = page) {
   invoiceBoundary.useInvoices.mockReturnValue({ data, isLoading: false, isFetching: false, error: null, refetch: vi.fn() })
   invoiceBoundary.useInvoiceMutations.mockReturnValue({ findStore: mutation(), start: mutation(), markUnknown: mutation(), recognize: mutation() })
+  invoiceBoundary.useInvoiceUnknownHistory.mockReturnValue({ data: [], isLoading: false, error: null })
 }
 function select(name, option) {
   const dialog = screen.queryByRole('dialog', { name: 'Filtros' }) ?? openFilters()
@@ -209,5 +210,38 @@ describe('fluxo paginado das Notas gerenciais', () => {
     render(<NotasScreen search="" onSearch={vi.fn()} lojas={[]} currentUser={{ id: 'a1' }} />)
     expect(screen.getByText('Falha ao consultar')).toBeVisible()
     expect(screen.queryByRole('status', { name: /Carregando/ })).not.toBeInTheDocument()
+  })
+
+  it('exibe o histórico e adiciona uma retificação sem apagar o caso', async () => {
+    vi.useRealTimers()
+    const unknownNote = { ...rows[0], status: 'Desconhecida' }
+    setup({ ...page, rows: [unknownNote], total: 1 })
+    const markUnknown = mutation()
+    invoiceBoundary.useInvoiceMutations.mockReturnValue({ findStore: mutation(), start: mutation(), markUnknown, recognize: mutation() })
+    invoiceBoundary.useInvoiceUnknownHistory.mockReturnValue({
+      data: [{
+        comentario_id: 'c1', desconhecimento_id: 'd1', loja_id: 'l1',
+        autor_nome: 'Promotor Um', autor_perfil: 'Promotor', tipo: 'abertura',
+        comentario: 'A nota não pertence à loja.', created_at: '2026-08-06T12:00:00Z', ativo: true,
+      }],
+      isLoading: false,
+      error: null,
+    })
+
+    render(<NotasScreen search="" onSearch={vi.fn()}
+      lojas={[{ id: 'l1', codigo: '10', nome: 'Loja 0', uf: 'CE', cidade: 'Fortaleza' }]}
+      currentUser={{ id: 'a1' }}
+    />)
+    fireEvent.click(screen.getByText('Loja 0'))
+
+    expect(await screen.findByRole('region', { name: 'Histórico do desconhecimento' })).toHaveTextContent('A nota não pertence à loja.')
+    fireEvent.click(screen.getByRole('button', { name: 'Comentário' }))
+    fireEvent.change(screen.getByPlaceholderText('Digite a nova informação ou retificação'), { target: { value: 'Quantidade corrigida pelo coordenador.' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Adicionar' })))
+
+    expect(markUnknown.mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      comment: 'Quantidade corrigida pelo coordenador.',
+      commentType: 'retificacao',
+    }))
   })
 })

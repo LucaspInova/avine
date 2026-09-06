@@ -1,4 +1,4 @@
-import { lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useInvoiceMutations, useInvoices } from '../../domains/invoices'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../domains/auth/AuthProvider.jsx'
@@ -18,7 +18,7 @@ import {
   uploadProfilePhoto,
   validateProfilePhoto,
 } from '../../shared/lib/profilePhoto'
-import { isMesmoUf, listStores, sortStoresByCode } from '../../domains/stores'
+import { isMesmoUf, listStores, saveStoreRoute, sortStoresByCode } from '../../domains/stores'
 import { getProfileLabel } from '../../shared/lib/profileLabels'
 import { getPasswordValidationMessage, PASSWORD_MIN_LENGTH } from '../../shared/lib/passwordPolicy'
 import { InvoiceIcon } from '../../shared/components/InvoiceIcon.jsx'
@@ -29,7 +29,6 @@ import { AttachedPhotosScreen } from './features/attached-photos/AttachedPhotosS
 import { GerencialApplicationShell } from './features/shell/GerencialApplicationShell.jsx'
 import avineLogo from '../../shared/assets/foto_logoavine.png'
 import profileUserIcon from '../../shared/assets/ui-icons/do-utilizador.png'
-import pdfIcon from '../../shared/assets/ui-icons/arquivo-pdf.png'
 import LogoutConfirmDialog from '../../shared/components/LogoutConfirmDialog.jsx'
 import { AppSelect, FilterPopover, FilterSection, LoadingState, PageToolbar, Pagination } from '../../shared/ui'
 import {
@@ -43,6 +42,7 @@ import { gerencialNavItems, getGerencialScreenMetadata } from './screenMetadata'
 import './GerencialApp.css'
 
 const ProductCatalogScreen = lazy(() => import('./features/products/ProductCatalogScreen.jsx'))
+const NotaFiscalModal = lazy(() => import('./features/notes/NotaFiscalModal.jsx'))
 
 const estados = ['CE', 'MA', 'BA', 'PA', 'PB', 'PI', 'PE', 'AP', 'SE', 'RN', 'AL']
 const estadosLojas = [...estados, 'TO']
@@ -53,7 +53,6 @@ const perfisCadastroUi = [
   { value: 'Gerencial', label: 'Gerencial', authRole: 'gerencial' },
   { value: 'Promotor', label: 'Promotor', authRole: 'promotor' },
 ]
-const emptyPromotorSlots = [1, 2, 3]
 const USERS_PAGE_SIZE = 10
 const DEFAULT_PROMOTER_PASSWORD = 'Promotor12345'
 
@@ -1100,10 +1099,32 @@ export function LojasScreen({
   }, [lojas, search, selectedCidades, selectedUfs])
 
   const [currentPage, setCurrentPage] = useState(1)
+  const [draftRouteStores, setDraftRouteStores] = useState(() => new Set())
   const storesPerPage = 24
   const totalPages = Math.max(1, Math.ceil(filteredLojas.length / storesPerPage))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedLojas = filteredLojas.slice((safePage - 1) * storesPerPage, safePage * storesPerPage)
+
+  async function handleRouteSelection(lojaId, currentIds, index, promotorId, isDraft = false) {
+    const nextIds = isDraft
+      ? promotorId ? [...currentIds, promotorId] : currentIds
+      : promotorId
+        ? currentIds.map((id, currentIndex) => currentIndex === index ? promotorId : id)
+        : currentIds.filter((_, currentIndex) => currentIndex !== index)
+
+    try {
+      await onChangePromotor(lojaId, nextIds)
+      if (isDraft || !promotorId) {
+        setDraftRouteStores((current) => {
+          const next = new Set(current)
+          next.delete(lojaId)
+          return next
+        })
+      }
+    } catch {
+      // A mensagem detalhada fica no alerta geral da tela.
+    }
+  }
 
 
   const activeFilterCount = selectedUfs.length + selectedCidades.length
@@ -1175,8 +1196,10 @@ export function LojasScreen({
       {!loading && (
         <div className="store-cards-grid" aria-label="Lojas">
           {paginatedLojas.map((loja) => {
-            const lojaVinculos = vinculos[loja.id] ?? {}
+            const lojaVinculos = vinculos[loja.id] ?? []
             const promotoresDaUf = promotores.filter((promotor) => isMesmoUf(loja, promotor))
+            const selectedPromoterIds = lojaVinculos.map((vinculo) => vinculo.promotor_id).filter(Boolean)
+            const hasDraft = draftRouteStores.has(loja.id)
 
             return (
               <article className="route-store-card" key={loja.id}>
@@ -1184,19 +1207,42 @@ export function LojasScreen({
                 <strong>{loja.codigo} - {loja.nome}</strong>
 
                 <div className="promotor-slots">
-                  {emptyPromotorSlots.map((posicao) => {
-                    const key = `${loja.id}-${posicao}`
+                  {lojaVinculos.map((vinculo, index) => {
+                    const key = `${loja.id}-${vinculo.id}`
+                    const availablePromoters = promotoresDaUf.filter(
+                      (promotor) => promotor.id === vinculo.promotor_id || !selectedPromoterIds.includes(promotor.id),
+                    )
 
                     return (
                       <PromotorSelect
-                        key={posicao}
-                        value={lojaVinculos[posicao] ?? ''}
-                        promotores={promotoresDaUf}
-                        disabled={savingKey === key}
-                        onChange={(promotorId) => onChangePromotor(loja.id, posicao, promotorId)}
+                        key={key}
+                        value={vinculo.promotor_id ?? ''}
+                        promotores={availablePromoters}
+                        disabled={savingKey === loja.id}
+                        onChange={(promotorId) => void handleRouteSelection(loja.id, selectedPromoterIds, index, promotorId)}
                       />
                     )
                   })}
+                  {hasDraft && (
+                    <PromotorSelect
+                      value=""
+                      promotores={promotoresDaUf.filter((promotor) => !selectedPromoterIds.includes(promotor.id))}
+                      disabled={savingKey === loja.id}
+                      onChange={(promotorId) => void handleRouteSelection(loja.id, selectedPromoterIds, selectedPromoterIds.length, promotorId, true)}
+                    />
+                  )}
+                  {lojaVinculos.length === 0 && !hasDraft && (
+                    <small className="route-empty">Nenhum promotor vinculado.</small>
+                  )}
+                  <button
+                    className="route-add-promoter"
+                    type="button"
+                    disabled={savingKey === loja.id || hasDraft || selectedPromoterIds.length >= promotoresDaUf.length}
+                    onClick={() => setDraftRouteStores((current) => new Set(current).add(loja.id))}
+                  >
+                    <Icon name="plus" />
+                    Adicionar Promotor
+                  </button>
                 </div>
               </article>
             )
@@ -1799,223 +1845,6 @@ function NotaStatusIcon({ status }) {
 
 const NOTE_STATUS_OPTIONS = ['Finalizada', 'Pendente', 'Desconhecida']
 
-function NotaFiscalModal({ note, onClose, onPending, onUnknown, onRecognize }) {
-  const [invoiceCopied, setInvoiceCopied] = useState(false)
-  const [pendingBusy, setPendingBusy] = useState(false)
-  const [pendingError, setPendingError] = useState('')
-  const [unknownBusy, setUnknownBusy] = useState(false)
-  const [unknownError, setUnknownError] = useState('')
-  const [unknownConfirmOpen, setUnknownConfirmOpen] = useState(false)
-  const [unknownComment, setUnknownComment] = useState('')
-  const [recognizeBusy, setRecognizeBusy] = useState(false)
-  const [recognizeError, setRecognizeError] = useState('')
-
-  useEffect(() => {
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
-  if (!note) return null
-
-  const isFinalized = note.status === 'Finalizada'
-  const isUnknown = note.status === 'Desconhecida'
-  const title = `${note.codigo_cliente ?? '-'} - ${note.nota_fiscal ?? '-'}`
-  const statusDescription = isFinalized ? 'FSTD Finalizada' : note.status === 'Desconhecida' ? 'NFD Desconhecida' : 'FSTD Pendente'
-
-  async function handleOpenInvoice() {
-    window.open('https://meudanfe.com.br/#', '_blank', 'noopener,noreferrer')
-
-    const accessKey = String(note.chave_acesso ?? '').trim()
-    if (!accessKey) return
-
-    try {
-      await navigator.clipboard.writeText(accessKey)
-      setInvoiceCopied(true)
-    } catch {
-      setInvoiceCopied(false)
-    }
-  }
-
-  async function handleOpenPending() {
-    if (isFinalized || note.status !== 'Pendente' || !onPending || pendingBusy) return
-
-    setPendingBusy(true)
-    setPendingError('')
-    try {
-      await onPending(note)
-    } catch (requestError) {
-      setPendingError(
-        requestError?.message
-        || requestError?.details
-        || requestError?.hint
-        || 'Não foi possível abrir o preenchimento da NFD.',
-      )
-    } finally {
-      setPendingBusy(false)
-    }
-  }
-
-  function handleOpenUnknownConfirm() {
-    if (isFinalized || isUnknown || !onUnknown || unknownBusy) return
-    setUnknownComment('')
-    setUnknownError('')
-    setUnknownConfirmOpen(true)
-  }
-
-  async function handleMarkUnknown() {
-    if (isFinalized || isUnknown || !onUnknown || unknownBusy) return
-
-    const comment = unknownComment.trim()
-    if (comment.length < 5) return
-
-    setUnknownBusy(true)
-    setUnknownError('')
-    try {
-      await onUnknown(note, comment)
-      setUnknownConfirmOpen(false)
-    } catch (requestError) {
-      setUnknownError(
-        requestError?.message
-        || requestError?.details
-        || requestError?.hint
-        || 'Não foi possível atualizar a NFD como desconhecida.',
-      )
-    } finally {
-      setUnknownBusy(false)
-    }
-  }
-
-  async function handleRecognize() {
-    if (!isUnknown || !onRecognize || recognizeBusy) return
-
-    setRecognizeBusy(true)
-    setRecognizeError('')
-    try {
-      await onRecognize(note)
-    } catch (requestError) {
-      setRecognizeError(
-        requestError?.message
-        || requestError?.details
-        || requestError?.hint
-        || 'Não foi possível reconhecer novamente esta NFD.',
-      )
-    } finally {
-      setRecognizeBusy(false)
-    }
-  }
-
-  return (
-    <div className="nota-modal-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="nota-modal" role="dialog" aria-modal="true" aria-labelledby="nota-modal-title">
-        <header className="nota-modal-titlebar">
-          <strong id="nota-modal-title">{title}</strong>
-          <button type="button" onClick={onClose} aria-label="Fechar nota fiscal">
-            <Icon name="x" />
-          </button>
-        </header>
-
-        <div className="nota-modal-summary">
-          <button className="nota-modal-summary-button is-invoice" type="button" onClick={handleOpenInvoice}>
-            <NotaStatusIcon status="Finalizada" />
-            <span>
-              <strong>NFD</strong>
-              <small>Emitida em {formatNoteDate(note.data_emissao)}</small>
-            </span>
-            <img className="nota-modal-pdf-icon" src={pdfIcon} alt="" aria-hidden="true" />
-          </button>
-
-          <button className="nota-modal-summary-button is-status" type="button" disabled={isFinalized || note.status !== 'Pendente' || pendingBusy} onClick={handleOpenPending}>
-            <NotaStatusIcon status={note.status} />
-            <span>
-              <strong>{note.status}</strong>
-              <small>{pendingBusy ? 'Abrindo preenchimento...' : statusDescription}</small>
-            </span>
-            <span className="nota-modal-add" aria-hidden="true">+</span>
-          </button>
-        </div>
-
-        <div className="nota-modal-body">
-          <div className="nota-modal-content">
-            <div className="nota-modal-backlink">‹ <strong>{title}</strong></div>
-            <h2>Faturado</h2>
-            <dl>
-              <div>
-                <dt>Galinha</dt>
-                <dd>{formatNoteQuantity(note.quantidade_galinha)} ovos</dd>
-              </div>
-              <div>
-                <dt>Codorna</dt>
-                <dd>{formatNoteQuantity(note.quantidade_codorna)} ovos</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="nota-modal-alerts">
-            <div className="nota-modal-alert is-pdf">
-              <img src={pdfIcon} alt="" aria-hidden="true" />
-              <span>
-                <strong>Arquivo PDF indisponível!</strong>
-                <small>{statusDescription}</small>
-              </span>
-            </div>
-            <div className="nota-modal-alert is-unknown">
-              <Icon name="alert" />
-              <span>{isUnknown ? 'NFD marcada como desconhecida' : 'Desconheço NF?'}</span>
-              {isUnknown ? (
-                <button className="is-recognize" type="button" disabled={recognizeBusy} onClick={handleRecognize}>
-                  {recognizeBusy ? 'Atualizando...' : 'Reconheço NFD'}
-                </button>
-              ) : (
-                <button type="button" disabled={isFinalized || unknownBusy} onClick={handleOpenUnknownConfirm}>
-                  Desconheço
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {invoiceCopied && <p className="nota-modal-copy-feedback" role="status">Chave de acesso copiada.</p>}
-        {pendingError && <p className="nota-modal-pending-error" role="alert">{pendingError}</p>}
-        {unknownError && <p className="nota-modal-pending-error" role="alert">{unknownError}</p>}
-        {recognizeError && <p className="nota-modal-pending-error" role="alert">{recognizeError}</p>}
-      </section>
-
-      {unknownConfirmOpen && (
-        <div className="nota-unknown-confirm-layer" role="presentation">
-          <section className="nota-unknown-confirm" role="dialog" aria-modal="true" aria-labelledby="nota-unknown-confirm-title">
-            <header>
-              <strong id="nota-unknown-confirm-title">Desconhecer NFD</strong>
-              <button type="button" onClick={() => setUnknownConfirmOpen(false)} aria-label="Fechar confirmação">×</button>
-            </header>
-            <p>Informe por que o usuário não reconhece esta nota fiscal.</p>
-            <label>
-              <span>Motivo <small>Obrigatório</small></span>
-              <textarea
-                value={unknownComment}
-                onChange={(event) => setUnknownComment(event.target.value)}
-                placeholder="Explique o motivo"
-                rows="4"
-                autoFocus
-              />
-            </label>
-            {unknownError && <strong className="nota-unknown-confirm-error" role="alert">{unknownError}</strong>}
-            <footer>
-              <button type="button" onClick={() => setUnknownConfirmOpen(false)}>Cancelar</button>
-              <button type="button" disabled={unknownComment.trim().length < 5 || unknownBusy} onClick={handleMarkUnknown}>
-                {unknownBusy ? 'Atualizando...' : 'Confirmar'}
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function NotasScreen({ search, onSearch, lojas, usuarios = [], currentUser, restrictedUfs = [], canEditFinalized = false }) {
   const defaults = useMemo(() => getDefaultNoteDates(), [])
   const today = defaults.end
@@ -2169,11 +1998,11 @@ export function NotasScreen({ search, onSearch, lojas, usuarios = [], currentUse
     setSelectedFstd({ note: selectedNfd, store })
   }
 
-  async function handleUnknownNote(note, comment) {
+  async function handleUnknownNote(note, comment, commentType = 'comentario') {
     const store = getStoreForNote(note)
     if (!store) throw new Error('Não foi possível localizar a loja desta NFD.')
 
-    await invoiceMutations.markUnknown.mutateAsync({ store, note, comment })
+    await invoiceMutations.markUnknown.mutateAsync({ store, note, comment, commentType })
     setSelectedNote((current) => current ? { ...current, status: 'Desconhecida' } : current)
   }
 
@@ -2480,13 +2309,22 @@ export function NotasScreen({ search, onSearch, lojas, usuarios = [], currentUse
           <p className="table-message">Nenhuma NFD encontrada.</p>
         )}
       </div>
-      <NotaFiscalModal
-        note={selectedNote}
-        onClose={() => setSelectedNote(null)}
-        onPending={handlePendingNote}
-        onUnknown={handleUnknownNote}
-        onRecognize={handleRecognizeNote}
-      />
+      {selectedNote && (
+        <Suspense fallback={<LoadingState message="Carregando nota fiscal..." />}>
+          <NotaFiscalModal
+            note={selectedNote}
+            store={getStoreForNote(selectedNote)}
+            onClose={() => setSelectedNote(null)}
+            onPending={handlePendingNote}
+            onUnknown={handleUnknownNote}
+            onRecognize={handleRecognizeNote}
+            Icon={Icon}
+            NotaStatusIcon={NotaStatusIcon}
+            formatNoteDate={formatNoteDate}
+            formatNoteQuantity={formatNoteQuantity}
+          />
+        </Suspense>
+      )}
       <GerencialFstdModal
         note={selectedFstd?.note}
         store={selectedFstd?.store}
@@ -2721,10 +2559,10 @@ function GerencialApp({ capabilities }) {
 
   const vinculosPorLoja = useMemo(() => {
     return lojaPromotores.reduce((acc, vinculo) => {
-      if (!acc[vinculo.loja_id]) acc[vinculo.loja_id] = {}
-      acc[vinculo.loja_id][vinculo.posicao] = vinculo.promotor_id ?? ''
+      if (!acc[vinculo.loja_id]) acc[vinculo.loja_id] = []
+      acc[vinculo.loja_id].push(vinculo)
       return acc
-    }, {})
+    }, Object.create(null))
   }, [lojaPromotores])
 
   const isPerfil = selectedItem === 'perfil'
@@ -2890,64 +2728,32 @@ function GerencialApp({ capabilities }) {
     await loadLojas()
   }
 
-  async function handlePromotorChange(lojaId, posicao, promotorId) {
-    const key = `${lojaId}-${posicao}`
-    setStoreSavingKey(key)
+  async function handlePromotorChange(lojaId, promotorIds) {
+    setStoreSavingKey(lojaId)
     setLojasError('')
 
-    if (!promotorId) {
-      const { error: deleteError } = await supabase
-        .from('loja_promotores')
-        .delete()
-        .eq('loja_id', lojaId)
-        .eq('posicao', posicao)
-
-      if (deleteError) {
-        setLojasError(deleteError.message)
-      } else {
-        setLojaPromotores((current) =>
-          current.filter((vinculo) => !(vinculo.loja_id === lojaId && vinculo.posicao === posicao)),
-        )
-      }
-
-      setStoreSavingKey('')
-      return
-    }
-
     const loja = lojas.find((item) => item.id === lojaId)
-    const promotor = promotores.find((item) => item.id === promotorId)
+    const routePromoters = promotorIds.map((promotorId) => promotores.find((item) => item.id === promotorId))
 
-    if (!loja || !promotor || !isMesmoUf(loja, promotor)) {
+    if (!loja || routePromoters.some((promotor) => !promotor || !isMesmoUf(loja, promotor))) {
       setLojasError('Selecione um promotor com a mesma UF da loja.')
       setStoreSavingKey('')
-      return
+      throw new Error('Selecione um promotor com a mesma UF da loja.')
     }
 
-    const { data, error: upsertError } = await supabase
-      .from('loja_promotores')
-      .upsert(
-        {
-          loja_id: lojaId,
-          posicao,
-          promotor_id: promotorId,
-        },
-        { onConflict: 'loja_id,posicao' },
-      )
-      .select('id, loja_id, promotor_id, posicao')
-      .single()
-
-    if (upsertError) {
-      setLojasError(upsertError.message)
-    } else {
+    try {
+      const data = await saveStoreRoute(lojaId, promotorIds)
       setLojaPromotores((current) => {
-        const withoutCurrent = current.filter(
-          (vinculo) => !(vinculo.loja_id === lojaId && vinculo.posicao === posicao),
-        )
-        return [...withoutCurrent, data].sort((a, b) => a.posicao - b.posicao)
+        const otherStores = current.filter((vinculo) => vinculo.loja_id !== lojaId)
+        return [...otherStores, ...data].sort((a, b) => a.posicao - b.posicao)
       })
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'Não foi possível salvar a rota.'
+      setLojasError(message)
+      throw requestError
+    } finally {
+      setStoreSavingKey('')
     }
-
-    setStoreSavingKey('')
   }
 
   function openInfoModal(usuario) {

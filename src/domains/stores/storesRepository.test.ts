@@ -20,4 +20,20 @@ describe('stores repository com Supabase mockado', () => {
     expect(filters).toContainEqual(['uf', ['CE']])
     expect(result[0].codigo).toBe('2')
   })
+
+  it('salva a lista completa e ordenada da rota por RPC', async () => {
+    const route = [
+      { id: 'v1', loja_id: 'l1', promotor_id: 'p1', posicao: 1 },
+      { id: 'v2', loja_id: 'l1', promotor_id: 'p2', posicao: 2 },
+      { id: 'v3', loja_id: 'l1', promotor_id: 'p3', posicao: 3 },
+      { id: 'v4', loja_id: 'l1', promotor_id: 'p4', posicao: 4 },
+    ]
+    const rpc = vi.fn().mockResolvedValue({ data: route, error: null })
+
+    await expect(createStoresRepository({ rpc }).saveStoreRoute('l1', ['p1', 'p2', 'p3', 'p4'])).resolves.toEqual(route)
+    expect(rpc).toHaveBeenCalledWith('salvar_rota_loja', {
+      p_loja_id: 'l1',
+      p_promotor_ids: ['p1', 'p2', 'p3', 'p4'],
+    })
+  })
 })

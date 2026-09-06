@@ -1,7 +1,7 @@
 import { supabase } from '../../shared/lib/supabaseClient'
 import { paginateSupabase } from '../../shared/api/pagination'
 import { toAppError } from '../../shared/errors'
-import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand, StartInvoiceProcessResult } from './types'
+import type { InvoiceListFilters, InvoiceOverviewPage, MarkInvoiceUnknownCommand, RecognizeInvoiceCommand, StartInvoiceProcessResult, UnknownInvoiceHistoryItem } from './types'
 
 const hydratedInvoiceSelect = 'chave_acesso, estabelecimento, nota_fiscal, data_emissao, data_referencia, codigo_cliente, nome_abreviado, uf, cidade, quantidade_galinha, valor_galinha, quantidade_codorna, valor_codorna, valor_total, quantidade_itens, quantidade_produtos_distintos, detalhes'
 
@@ -66,9 +66,31 @@ export async function findInvoiceStore(code: string | number, restrictedUfs: str
   return data
 }
 
-export async function markInvoiceUnknown(store: MarkInvoiceUnknownCommand['store'], note: MarkInvoiceUnknownCommand['note'], comment: string) {
-  const { error } = await (supabase as any).rpc('desconhecer_nfd_gerencial', { p_loja_id: store.id, p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`, p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null, p_nfd_numero: String(note.nota_fiscal ?? ''), p_loja_codigo: store.codigo ? String(store.codigo) : null, p_comentario: comment })
+export async function markInvoiceUnknown(store: MarkInvoiceUnknownCommand['store'], note: MarkInvoiceUnknownCommand['note'], comment: string, commentType: MarkInvoiceUnknownCommand['commentType'] = 'comentario') {
+  const { error } = await (supabase as any).rpc('registrar_desconhecimento_nfd', { p_loja_id: store.id, p_nfd_referencia: `${note.codigo_cliente ?? ''}:${note.nota_fiscal ?? ''}`, p_nfd_chave_acesso: note.chave_acesso ? String(note.chave_acesso) : null, p_nfd_numero: String(note.nota_fiscal ?? ''), p_loja_codigo: store.codigo ? String(store.codigo) : null, p_comentario: comment, p_tipo: commentType })
   if (error) throw toAppError(error)
+}
+
+export function normalizeUnknownInvoiceNumber(value: string | number | null | undefined) {
+  const normalized = String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (/^\d+$/.test(normalized)) return normalized.replace(/^0+(?=\d)/, '')
+  return normalized
+}
+
+export async function listInvoiceUnknownHistory(storeId: string, invoiceNumber: string | number): Promise<UnknownInvoiceHistoryItem[]> {
+  const normalizedNumber = normalizeUnknownInvoiceNumber(invoiceNumber)
+  if (!storeId || !normalizedNumber) return []
+
+  const { data, error } = await (supabase as any)
+    .from('nfd_desconhecimento_historico')
+    .select('desconhecimento_id, loja_id, nfd_referencia, nfd_chave_acesso, nfd_numero, nfd_numero_normalizado, loja_codigo, ativo, encerramento_motivo, comentario_id, usuario_id, autor_nome, autor_perfil, tipo, comentario, created_at')
+    .eq('loja_id', storeId)
+    .eq('nfd_numero_normalizado', normalizedNumber)
+    .order('created_at', { ascending: true })
+    .order('comentario_id', { ascending: true })
+
+  if (error) throw toAppError(error)
+  return (data ?? []) as UnknownInvoiceHistoryItem[]
 }
 
 export async function recognizeInvoice(note: RecognizeInvoiceCommand) {

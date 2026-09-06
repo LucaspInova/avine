@@ -1804,6 +1804,56 @@
   padding: 12px 14px;
 }
 
+.unknown-nfd-history {
+  display: grid;
+  max-height: 210px;
+  overflow-y: auto;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding-right: 3px;
+}
+
+.unknown-nfd-history article {
+  border: 1px solid #e5e8e5;
+  border-radius: 9px;
+  background: #fafbfa;
+  padding: 10px 11px;
+}
+
+.unknown-nfd-history article header {
+  display: flex;
+  min-height: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.unknown-nfd-history article header strong {
+  color: #373b37;
+  font-size: 0.78rem;
+}
+
+.unknown-nfd-history time,
+.unknown-nfd-history article > small {
+  color: #858a85;
+  font-size: 0.68rem;
+}
+
+.unknown-nfd-history article > small {
+  display: block;
+  margin-top: 2px;
+  color: #4c7949;
+  font-weight: 800;
+}
+
+.unknown-nfd-history article p {
+  margin: 6px 0 0;
+  color: #555a55;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
 .unknown-nfd-comment {
   display: grid;
   gap: 8px;

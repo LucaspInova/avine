@@ -64,7 +64,7 @@ describe('fluxos proprietários de lojas/roteirização', () => {
     expect(screen.getByText('Nenhuma loja encontrada.')).toBeVisible()
   })
 
-  it('pagina as lojas e preserva o contrato de vinculação do promotor', () => {
+  it('pagina as lojas e adiciona o primeiro promotor pela lista dinâmica', () => {
     const stores = Array.from({ length: 25 }, (_, index) => ({ id: `l${index}`, codigo: `${index}`, nome: `Loja ${index}`, cidade: 'Fortaleza', uf: 'CE' }))
     const onChangePromotor = vi.fn()
     render(<LojasScreen {...storeProps} lojas={stores} promotores={[{ id: 'p1', nome: 'Paula', perfil: 'Promotor', estado: 'CE' }]} onChangePromotor={onChangePromotor} />)
@@ -72,9 +72,30 @@ describe('fluxos proprietários de lojas/roteirização', () => {
     expect(screen.queryByText('24 - Loja 24')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
     expect(screen.getByText('24 - Loja 24')).toBeVisible()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Promotor da loja' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar Promotor' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Promotor da loja' }))
     fireEvent.click(screen.getByRole('option', { name: 'Paula' }))
-    expect(onChangePromotor).toHaveBeenCalledWith('l24', 1, 'p1')
+    expect(onChangePromotor).toHaveBeenCalledWith('l24', ['p1'])
+  })
+
+  it('exibe quatro vínculos, evita opções duplicadas e remove sem deixar lacuna', () => {
+    const promoters = Array.from({ length: 5 }, (_, index) => ({ id: `p${index + 1}`, nome: `Promotor ${index + 1}`, perfil: 'Promotor', estado: 'CE' }))
+    const links = Array.from({ length: 4 }, (_, index) => ({ id: `v${index + 1}`, loja_id: 'l1', promotor_id: `p${index + 1}`, posicao: index + 1 }))
+    const onChangePromotor = vi.fn().mockResolvedValue([])
+
+    render(<LojasScreen {...storeProps}
+      lojas={[{ id: 'l1', codigo: '1', nome: 'Loja dinâmica', cidade: 'Fortaleza', uf: 'CE' }]}
+      promotores={promoters}
+      vinculos={{ l1: links }}
+      onChangePromotor={onChangePromotor}
+    />)
+
+    expect(screen.getAllByRole('button', { name: 'Promotor da loja' })).toHaveLength(4)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Promotor da loja' })[0])
+    expect(screen.queryByRole('option', { name: 'Promotor 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Promotor 5' })).toBeVisible()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remover promotor' })[1])
+    expect(onChangePromotor).toHaveBeenCalledWith('l1', ['p1', 'p3', 'p4'])
   })
 
   it('usa seções verticais com drill-down, contadores, aplicação e limpeza', () => {

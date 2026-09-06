@@ -56,9 +56,12 @@ export async function getLegacyFstd(codigoLoja: string | number, numeroNfd: stri
 export const listProductCatalog = () => result<any[]>(supabase!.from('produtos_expandidos').select('produto_id, codigo_produto, nome, ovos_und, categoria, imagem_url').eq('status', true).order('nome', { ascending: true })).then((data) => data ?? [])
 export const listReturnReasons = () => result<any[]>(supabase!.from('motivos_devolucao').select('id, nome, ordem, ativo').order('ordem', { ascending: true }).order('nome', { ascending: true })).then((data) => data ?? [])
 
-export async function listUnknownInvoices(profile: any) {
-  let query = supabase!.from('nfd_desconhecimentos').select('nfd_referencia, comentario, created_at').is('reconhecida_em', null).order('created_at', { ascending: false })
-  if (!['Admin', 'Gerencial'].includes(profile.perfil)) query = query.eq('usuario_id', profile.id)
+export async function listUnknownInvoices(_profile: any) {
+  const query = (supabase as any)
+    .from('nfd_desconhecimento_historico')
+    .select('desconhecimento_id, loja_id, nfd_referencia, nfd_chave_acesso, nfd_numero, nfd_numero_normalizado, loja_codigo, ativo, encerramento_motivo, comentario_id, usuario_id, autor_nome, autor_perfil, tipo, comentario, created_at')
+    .eq('ativo', true)
+    .order('created_at', { ascending: false })
   return (await result<any[]>(query)) ?? []
 }
 

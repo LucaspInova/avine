@@ -1700,6 +1700,44 @@ fieldset legend {
   padding: 0 16px;
 }
 
+.route-empty {
+  color: #858b87;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.route-add-promoter {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed #a7b9a5;
+  border-radius: 7px;
+  color: #377936;
+  background: #f8fbf8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-add-promoter .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.route-add-promoter:hover:not(:disabled),
+.route-add-promoter:focus-visible {
+  border-color: #377936;
+  background: #eef6ee;
+}
+
+.route-add-promoter:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .warning-button,
 .reactivate-button {
   height: 34px;
@@ -3351,6 +3389,71 @@ select:focus-visible {
   font: inherit;
   font-size: 11px;
   font-weight: 700;
+}
+
+.nota-modal-unknown-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.nota-modal-unknown-actions .is-recognize {
+  margin-left: 0;
+}
+
+.nota-unknown-history {
+  display: grid;
+  max-height: 230px;
+  overflow-y: auto;
+  gap: 7px;
+  border: 1px solid #e5e8e5;
+  border-radius: 9px;
+  background: #fafbfa;
+  padding: 10px;
+}
+
+.nota-unknown-history > strong {
+  color: #3f443f;
+  font-size: 0.78rem;
+}
+
+.nota-unknown-history article {
+  border-top: 1px solid #e7e9e7;
+  padding-top: 7px;
+}
+
+.nota-unknown-history article div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #484d48;
+  font-size: 0.7rem;
+}
+
+.nota-unknown-history time,
+.nota-unknown-history article small,
+.nota-unknown-history-loading {
+  color: #858a85;
+  font-size: 0.65rem;
+}
+
+.nota-unknown-history article small {
+  color: #377936;
+  font-weight: 700;
+}
+
+.nota-unknown-history article p {
+  margin: 4px 0 0;
+  color: #5a5f5a;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.nota-unknown-history-error {
+  color: #b42318;
+  font-size: 0.68rem;
 }
 
 .nota-modal-alert.is-unknown button:disabled {

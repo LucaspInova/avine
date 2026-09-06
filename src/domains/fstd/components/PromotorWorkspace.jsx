@@ -1,4 +1,4 @@
-import { getFstdTargetProducts, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode } from '../../invoices'
+import { getFstdTargetProducts, getNfdKey, getNfdProducts, getNfdReturnRates, getNfdTabStatus, getNfdVisualStatus, getProductGroupKey, mergeNfdProducts, normalizeProductCode, normalizeUnknownInvoiceNumber } from '../../invoices'
 import { buildSaveFstdProductCommand } from '../model/commands'
 import { keepNumericNfdCode } from '../model/validation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -28,7 +28,7 @@ const initialFstdForm = {
   gal: '',
   cod: '',
   notaVenda: '',
-  lotes: '',
+  observacao: '',
   fotos: [],
 }
 
@@ -1071,7 +1071,7 @@ export function FstdAvulsaFlow({
   )
 }
 
-function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubmit }) {
+export function UnknownNfdSheet({ open, comment, busy, error, history = [], isExistingCase = false, onChange, onClose, onSubmit }) {
   if (!open) return null
 
   const trimmedComment = comment.trim()
@@ -1083,18 +1083,35 @@ function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubm
       <section className="unknown-nfd-sheet" role="dialog" aria-modal="true" aria-labelledby="unknown-nfd-title">
         <div className="unknown-nfd-handle" aria-hidden="true" />
         <header>
-          <h2 id="unknown-nfd-title">Desconhecer NFD</h2>
+          <h2 id="unknown-nfd-title">{isExistingCase ? 'Histórico do desconhecimento' : 'Desconhecer NFD'}</h2>
           <button type="button" aria-label="Fechar formulário" onClick={onClose}>×</button>
         </header>
 
-        <p className="unknown-nfd-warning">Não reconheço a procedência desta NFD.</p>
+        <p className="unknown-nfd-warning">
+          {isExistingCase ? 'Esta NFD continua marcada como desconhecida.' : 'Não reconheço a procedência desta NFD.'}
+        </p>
+
+        {history.length > 0 && (
+          <div className="unknown-nfd-history" aria-label="Histórico de comentários">
+            {history.map((item) => (
+              <article key={item.comentario_id}>
+                <header>
+                  <strong>{item.autor_nome}</strong>
+                  <time dateTime={item.created_at}>{formatDate(item.created_at)}</time>
+                </header>
+                <small>{item.tipo === 'abertura' ? 'Abertura' : item.tipo === 'retificacao' ? 'Retificação' : item.tipo === 'reconhecimento' ? 'Reconhecimento' : 'Comentário'}</small>
+                <p>{item.comentario}</p>
+              </article>
+            ))}
+          </div>
+        )}
 
         <label className="unknown-nfd-comment">
-          <span>Comentário <small className="required-label">Obrigatório</small></span>
+          <span>{isExistingCase ? 'Novo comentário' : 'Comentário'} <small className="required-label">Obrigatório</small></span>
           <textarea
             value={comment}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="Explique por que você não reconhece esta NFD"
+            placeholder={isExistingCase ? 'Adicione uma correção ou informação ao histórico' : 'Explique por que você não reconhece esta NFD'}
             rows="4"
           />
         </label>
@@ -1104,7 +1121,7 @@ function UnknownNfdSheet({ open, comment, busy, error, onChange, onClose, onSubm
         <footer>
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="button" disabled={!canSubmit} onClick={onSubmit}>
-            {busy ? 'Enviando' : 'Enviar'}
+            {busy ? 'Enviando' : isExistingCase ? 'Adicionar' : 'Enviar'}
           </button>
         </footer>
       </section>
@@ -1159,7 +1176,7 @@ export function NfdConferenceErrorPopup({ nfd, busy, error, onClose, onReview })
   )
 }
 
-function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMarkUnknown, unknownBusy, unknownError }) {
+function NfdDetailScreen({ store, nfd, unknownHistory = [], onBack, onOpenInvoice, onOpenFstd, onMarkUnknown, unknownBusy, unknownError }) {
   const [invoiceCopied, setInvoiceCopied] = useState(false)
   const [isUnknownOpen, setUnknownOpen] = useState(false)
   const [unknownComment, setUnknownComment] = useState('')
@@ -1232,10 +1249,10 @@ function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMark
               Nota Fiscal
             </button>
           )}
-          {!nfd.is_avulsa && !isFinalized && !isUnknown && (
+          {!nfd.is_avulsa && !isFinalized && (
             <button className="unknown-nfd-button" type="button" onClick={() => setUnknownOpen(true)}>
               <NfdActionIcon name="unknown" />
-              Desconheço NFD
+              {isUnknown ? 'Comentários' : 'Desconheço NFD'}
             </button>
           )}
           <button type="button" onClick={() => onOpenFstd(nfd)}>
@@ -1271,6 +1288,8 @@ function NfdDetailScreen({ store, nfd, onBack, onOpenInvoice, onOpenFstd, onMark
         comment={unknownComment}
         busy={unknownBusy}
         error={unknownError}
+        history={unknownHistory}
+        isExistingCase={isUnknown}
         onChange={setUnknownComment}
         onClose={() => setUnknownOpen(false)}
         onSubmit={async () => {
@@ -1451,7 +1470,7 @@ export function LegacyFstdScreen({ store, nfd, motivos, summary = null, busy, er
           <FieldCard title="Observações">
             <label className="mobile-field">
               <span>Informações adicionais</span>
-              <textarea value={form.observacao} onChange={(event) => updateForm({ observacao: event.target.value })} rows="4" placeholder="Use para nota de venda, lotes ou qualquer comentário relevante sobre esta FSTD." />
+              <textarea value={form.observacao} onChange={(event) => updateForm({ observacao: event.target.value })} rows="4" placeholder="Opcional: lote, data do ovo, nota de venda, entrega, motorista ou outro comentário relevante." />
             </label>
           </FieldCard>
 
@@ -1649,7 +1668,9 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
       fotosExistentes: Array.isArray(initialDraft?.fotosExistentes)
         ? initialDraft.fotosExistentes
         : isEditing ? getFstdStoredPhotoPaths(product) : [],
-      lotes: initialDraft?.lotes ?? (isEditing ? getEditableObservation(product.persisted?.observacao) : ''),
+      observacao: initialDraft?.observacao
+        ?? initialDraft?.lotes
+        ?? (isEditing ? getEditableObservation(product.persisted?.observacao) : ''),
     }
   })
   const photoPreviews = form.fotosPreviews
@@ -1754,7 +1775,7 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
     event.preventDefault()
     if (!canSubmit) return
 
-    const observacao = form.lotes.trim()
+    const observacao = form.observacao.trim()
 
     await onSubmit({
       product,
@@ -1937,7 +1958,12 @@ function FstdProductForm({ product, motivos, busy, error, onBack, onClose, embed
           </FieldCard>
 
           <FieldCard title="Observações">
-            <textarea value={form.lotes} onChange={(event) => updateForm({ lotes: event.target.value })} rows="4" />
+            <textarea
+              value={form.observacao}
+              onChange={(event) => updateForm({ observacao: event.target.value })}
+              placeholder="Opcional: lote, data do ovo, nota de venda, entrega, motorista ou outro comentário relevante."
+              rows="4"
+            />
           </FieldCard>
 
           {error && <strong className="promotor-error">{error}</strong>}
@@ -2155,7 +2181,7 @@ function FstdQuickProductForm({ product, motivos, busy, error, initialDraft = nu
             fotosExistentes: [],
             faturadoGalinha: getProductBilledQuantity(product, 'galinha'),
             faturadoCodorna: getProductBilledQuantity(product, 'codorna'),
-            lotes: '',
+            observacao: '',
           })}
           title="Adicionar outro motivo"
           type="button"
@@ -2750,7 +2776,7 @@ export function FstdTableEditor({ products, motivos, busy, processFinalized, all
             id="fstd-general-observation"
             disabled={!canEdit}
             maxLength="500"
-            placeholder="Digite suas observações aqui..."
+            placeholder="Opcional: lote, data do ovo, nota de venda, entrega, motorista ou outro comentário relevante."
             value={observation}
             onChange={(event) => {
               observationTouchedRef.current = true
@@ -3279,6 +3305,14 @@ export function PromotorWorkspace({
     || String(nfd.chave_acesso) === String(navigationKey)
   ))
   const selectedNfd = selectedNfdKey ? findNfdByNavigationKey(selectedNfdKey) ?? null : null
+  const selectedUnknownHistory = useMemo(() => {
+    if (!selectedNfd?.loja_id) return []
+    const normalizedNumber = normalizeUnknownInvoiceNumber(getNfdNumber(selectedNfd))
+    return (desconhecimentosQuery.data ?? [])
+      .filter((item) => item.loja_id === selectedNfd.loja_id && item.nfd_numero_normalizado === normalizedNumber)
+      .slice()
+      .sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)))
+  }, [desconhecimentosQuery.data, selectedNfd])
   const fstdTarget = fstdTargetSnapshot
     ?? (fstdTargetKey ? findNfdByNavigationKey(fstdTargetKey) : undefined)
   const avulsaAddProductsTarget = avulsaAddProductsSnapshot
@@ -3827,19 +3861,15 @@ export function PromotorWorkspace({
     mutationFn: async ({ nfd, comment }) => {
       if (!nfd.loja_id) throw new Error('Não foi possível identificar a loja desta NFD.')
 
-      const { data, error } = await supabase
-        .from('nfd_desconhecimentos')
-        .insert({
-          loja_id: nfd.loja_id,
-          usuario_id: profile.id,
-          nfd_referencia: getNfdKey(nfd),
-          nfd_chave_acesso: nfd.chave_acesso ? String(nfd.chave_acesso) : null,
-          nfd_numero: String(getNfdNumber(nfd)),
-          loja_codigo: nfd.loja_codigo ? String(nfd.loja_codigo) : null,
-          comentario: comment,
-        })
-        .select('id')
-        .single()
+      const { data, error } = await supabase.rpc('registrar_desconhecimento_nfd', {
+        p_loja_id: nfd.loja_id,
+        p_nfd_referencia: getNfdKey(nfd),
+        p_nfd_chave_acesso: nfd.chave_acesso ? String(nfd.chave_acesso) : null,
+        p_nfd_numero: String(getNfdNumber(nfd)),
+        p_loja_codigo: nfd.loja_codigo ? String(nfd.loja_codigo) : null,
+        p_comentario: comment,
+        p_tipo: 'comentario',
+      })
 
       if (error) throw error
       return data
@@ -4095,6 +4125,7 @@ export function PromotorWorkspace({
         <NfdDetailScreen
           store={selectedStore}
           nfd={selectedNfd}
+          unknownHistory={selectedUnknownHistory}
           unknownBusy={desconhecerMutation.isPending}
           unknownError={desconhecerMutation.error?.message}
           onBack={() => setSelectedNfd(null)}
@@ -4110,6 +4141,7 @@ export function PromotorWorkspace({
             openInvoice()
           }}
           onMarkUnknown={async (nfd, comment) => {
+            const wasUnknown = nfd.visual_status === 'unknown' || nfd.status_nfd === 'outros'
             await desconhecerMutation.mutateAsync({ nfd, comment })
             const key = getNfdKey(nfd)
             setUnknownNfdComments((current) => {
@@ -4117,8 +4149,10 @@ export function PromotorWorkspace({
               saveUnknownNfdComments(profile.id, next)
               return next
             })
-            setSelectedNfd(null)
-            setStatusFilter('outros')
+            if (!wasUnknown) {
+              setSelectedNfd(null)
+              setStatusFilter('outros')
+            }
           }}
           onOpenFstd={setFstdTarget}
         />

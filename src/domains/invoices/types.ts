@@ -4,6 +4,24 @@ import type { StoreReferenceViewModel } from '../stores/types'
 export type InvoiceRecord = ViewRow<'nfd_notas'>
 export type InvoiceItemRecord = TableRow<'nfd_itens'>
 export type UnknownInvoiceRecord = TableRow<'nfd_desconhecimentos'>
+export type UnknownInvoiceHistoryItem = {
+  desconhecimento_id: string
+  loja_id: string
+  nfd_referencia: string
+  nfd_chave_acesso: string | null
+  nfd_numero: string
+  nfd_numero_normalizado: string
+  loja_codigo: string | null
+  ativo: boolean
+  encerramento_motivo: 'reconhecido' | 'consolidado' | null
+  comentario_id: string
+  usuario_id: string
+  autor_nome: string
+  autor_perfil: 'Admin' | 'Gerencial' | 'Promotor'
+  tipo: 'abertura' | 'comentario' | 'retificacao' | 'reconhecimento'
+  comentario: string
+  created_at: string
+}
 
 export type InvoiceOverviewViewModel = Pick<InvoiceRecord,
   'chave_acesso' | 'estabelecimento' | 'nota_fiscal' | 'data_emissao' | 'data_referencia' |
@@ -39,5 +57,6 @@ export type MarkInvoiceUnknownCommand = {
   store: StoreReferenceViewModel
   note: Pick<InvoiceRecord, 'codigo_cliente' | 'nota_fiscal' | 'chave_acesso'>
   comment: string
+  commentType?: 'comentario' | 'retificacao'
 }
 export type RecognizeInvoiceCommand = Pick<MarkInvoiceUnknownCommand, 'note'>['note']

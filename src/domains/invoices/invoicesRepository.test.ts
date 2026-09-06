@@ -4,7 +4,7 @@ const boundary = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }))
 const rpc = boundary.rpc
 const from = boundary.from
 vi.mock('../../shared/lib/supabaseClient', () => ({ supabase: { rpc: boundary.rpc, from: boundary.from } }))
-import { listInvoicesOverview, startInvoiceProcess } from './invoicesRepository'
+import { listInvoiceUnknownHistory, listInvoicesOverview, markInvoiceUnknown, normalizeUnknownInvoiceNumber, startInvoiceProcess } from './invoicesRepository'
 
 describe('repositório paginado de NFDs', () => {
   beforeEach(() => {
@@ -58,5 +58,38 @@ describe('repositório paginado de NFDs', () => {
     expect(rpc).toHaveBeenCalledWith('iniciar_fstd_produtos_v2', { p_loja_id: 'loja-1', p_nfd_chave_acesso: 'chave-869' })
     expect(from).toHaveBeenCalledWith('nfd_notas')
     expect(eq).toHaveBeenCalledWith('chave_acesso', 'chave-869')
+  })
+
+  it('normaliza o número e consulta o histórico ordenado da loja', async () => {
+    const history = [{ comentario_id: 'c1', comentario: 'Inicial' }]
+    const secondOrder = vi.fn().mockResolvedValue({ data: history, error: null })
+    const firstOrder = vi.fn().mockReturnValue({ order: secondOrder })
+    const secondEq = vi.fn().mockReturnValue({ order: firstOrder })
+    const firstEq = vi.fn().mockReturnValue({ eq: secondEq })
+    const select = vi.fn().mockReturnValue({ eq: firstEq })
+    from.mockReturnValue({ select })
+
+    expect(normalizeUnknownInvoiceNumber('001.234')).toBe('1234')
+    await expect(listInvoiceUnknownHistory('loja-1', '001.234')).resolves.toEqual(history)
+    expect(from).toHaveBeenCalledWith('nfd_desconhecimento_historico')
+    expect(firstEq).toHaveBeenCalledWith('loja_id', 'loja-1')
+    expect(secondEq).toHaveBeenCalledWith('nfd_numero_normalizado', '1234')
+  })
+
+  it('registra abertura ou retificação pela RPC atômica', async () => {
+    rpc.mockResolvedValue({ data: 'caso-1', error: null })
+    await expect(markInvoiceUnknown(
+      { id: 'loja-1', codigo: '10', nome: 'Loja', uf: 'CE', cidade: 'Fortaleza' },
+      { codigo_cliente: 10, nota_fiscal: 1234, chave_acesso: 'chave-1' },
+      'Correção do coordenador',
+      'retificacao',
+    )).resolves.toBeUndefined()
+
+    expect(rpc).toHaveBeenCalledWith('registrar_desconhecimento_nfd', expect.objectContaining({
+      p_loja_id: 'loja-1',
+      p_nfd_numero: '1234',
+      p_comentario: 'Correção do coordenador',
+      p_tipo: 'retificacao',
+    }))
   })
 })

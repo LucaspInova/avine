@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { FstdAvulsaFlow, FstdLegacyTotalsEditor, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, NfdConferenceErrorPopup, StoreDetailScreen, StoresScreen } from './PromotorWorkspace.jsx'
+import { FstdAvulsaFlow, FstdLegacyTotalsEditor, FstdTableEditor, InvoiceIcon, LegacyFstdScreen, NfdConferenceErrorPopup, StoreDetailScreen, StoresScreen, UnknownNfdSheet } from './PromotorWorkspace.jsx'
 import { keepNumericNfdCode } from '../model/validation'
 
 const noop = vi.fn()
@@ -87,6 +87,51 @@ describe('NFD avulsa', () => {
 
     expect(billedInput.value).toBe('')
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
+describe('histórico de desconhecimento', () => {
+  it('mostra os comentários anteriores e permite adicionar uma retificação', () => {
+    const onChange = vi.fn()
+    const onSubmit = vi.fn()
+    render(<UnknownNfdSheet
+      open
+      comment="Nova informação"
+      busy={false}
+      error=""
+      history={[{
+        comentario_id: 'c1',
+        autor_nome: 'Promotor Um',
+        tipo: 'abertura',
+        comentario: 'Não reconheço esta nota.',
+        created_at: '2026-09-05T12:00:00Z',
+      }]}
+      isExistingCase
+      onChange={onChange}
+      onClose={noop}
+      onSubmit={onSubmit}
+    />)
+
+    expect(screen.getByRole('dialog', { name: 'Histórico do desconhecimento' })).toHaveTextContent('Não reconheço esta nota.')
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeEnabled()
+    fireEvent.change(screen.getByPlaceholderText('Adicione uma correção ou informação ao histórico'), { target: { value: 'Informação corrigida' } })
+    expect(onChange).toHaveBeenCalledWith('Informação corrigida')
+    fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  it('mantém observações opcionais orientadas no modo agregado', () => {
+    render(<FstdTableEditor
+      products={[]}
+      motivos={[]}
+      busy={false}
+      processFinalized={false}
+      allowFinalizedEdit={false}
+      onAddProducts={noop}
+      onSubmit={noop}
+    />)
+
+    expect(screen.getByPlaceholderText(/Opcional: lote, data do ovo, nota de venda/)).toBeVisible()
   })
 })
 

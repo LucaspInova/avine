@@ -30,19 +30,28 @@ async function listStorePromoters(storeIds?: string[]): Promise<StorePromoterAss
   return data ?? []
 }
 
-async function assignStorePromoter(lojaId: string, posicao: 1 | 2 | 3, promotorId: string) {
+async function assignStorePromoter(lojaId: string, posicao: number, promotorId: string) {
   const { data, error } = await client.from('loja_promotores').upsert({ loja_id: lojaId, posicao, promotor_id: promotorId }, { onConflict: 'loja_id,posicao' }).select('id, loja_id, promotor_id, posicao').single()
   if (error) throw toAppError(error)
   return data
 }
 
-async function removeStorePromoter(lojaId: string, posicao: 1 | 2 | 3) {
+async function removeStorePromoter(lojaId: string, posicao: number) {
   const { error } = await client.from('loja_promotores').delete().eq('loja_id', lojaId).eq('posicao', posicao)
   if (error) throw toAppError(error)
 }
 
-return { listStores, createStore, listStorePromoters, assignStorePromoter, removeStorePromoter }
+async function saveStoreRoute(lojaId: string, promoterIds: string[]): Promise<StorePromoterAssignmentViewModel[]> {
+  const { data, error } = await client.rpc('salvar_rota_loja', {
+    p_loja_id: lojaId,
+    p_promotor_ids: promoterIds,
+  })
+  if (error) throw toAppError(error)
+  return (data ?? []) as StorePromoterAssignmentViewModel[]
+}
+
+return { listStores, createStore, listStorePromoters, assignStorePromoter, removeStorePromoter, saveStoreRoute }
 }
 
 const repository = createStoresRepository(supabase)
-export const { listStores, createStore, listStorePromoters, assignStorePromoter, removeStorePromoter } = repository
+export const { listStores, createStore, listStorePromoters, assignStorePromoter, removeStorePromoter, saveStoreRoute } = repository
