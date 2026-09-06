@@ -76,7 +76,8 @@ insert into public.produtos (id, status, nome, codigos_vinculados, ovos_und, cat
 values
   ('40000000-0000-4000-8000-000000000001', true, 'OVOS BRANCOS C/30 TESTE', 'TESTE-OVO-30;TESTE-OVO-30-ALIAS', 30, 'Galinha', 'branco', '#F4E7C5'),
   ('40000000-0000-4000-8000-000000000002', true, 'OVOS CODORNA C/30 TESTE', 'TESTE-COD-30', 30, 'Codorna', 'codorna', '#D6B589'),
-  ('40000000-0000-4000-8000-000000000003', false, 'PRODUTO INATIVO TESTE', 'TESTE-INATIVO', 12, 'Galinha', 'inativo', '#999999')
+  ('40000000-0000-4000-8000-000000000003', false, 'PRODUTO INATIVO TESTE', 'TESTE-INATIVO', 12, 'Galinha', 'inativo', '#999999'),
+  ('40000000-0000-4000-8000-000000000004', true, 'EB C/30', 'TESTE-EB-C30;10PA01.017EX23', 30, 'Grande', 'branco', '#F4E7C5')
 on conflict (id) do update set status=excluded.status, nome=excluded.nome,
   codigos_vinculados=excluded.codigos_vinculados, ovos_und=excluded.ovos_und,
   categoria=excluded.categoria, class_ia=excluded.class_ia, color_ia=excluded.color_ia;
