@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "verify:homologacao": "node scripts/verify-homologacao.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build && npm run check:bundle",
     "preview": "vite preview"
   },

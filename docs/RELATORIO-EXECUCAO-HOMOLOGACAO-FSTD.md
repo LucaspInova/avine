@@ -12,6 +12,9 @@
   Edge Functions ativas.
 - Dados: seis usuários sintéticos, três lojas, três vínculos de rota, cinco
   produtos, duas FSTDs e os cenários de catálogo e desconhecimento.
+- API remota: login e escopo RLS confirmados para Admin, Gerenciais CE/BA,
+  Promotores CE1/CE2 e Promotor inativo pelo verificador reproduzível
+  `npm run verify:homologacao`.
 - QA navegada: tela pública e identificação de homologação verificadas; jornadas
   autenticadas aguardam a confirmação operacional para inserir as credenciais
   sintéticas no navegador.
@@ -45,8 +48,8 @@ dentro da tolerância da baseline e abaixo do teto global de 450 KB.
 | 7 | A rota usa lista ordenada sem limite artificial e sem duplicidade por loja. | RPC `salvar_rota_loja`, 29 testes SQL e testes com quatro promotores. | Automatizado; navegador pendente |
 | 8 | A função antiga de criação gerencial foi removida; Admin mantém gestão plena e Gerencial não promove perfis privilegiados. | Edge Function `manage-users`, remoção da função legada e testes de acesso. | Automatizado; navegador pendente |
 | 9 | A senha inicial compartilhada foi preservada por decisão funcional, sem coluna de senha no schema público; redefinição continua disponível. | Consulta estrutural retornou zero colunas de senha e testes da recuperação. | Mantido conforme decisão |
-| 10 | Promotor lê por rota, Gerencial por UF e Admin globalmente, inclusive por RPC e acesso direto. | Migração de escopo, 41 testes SQL e matriz de perfis sintéticos. | Automatizado; navegador pendente |
-| 11 | Usuário inativo perde acesso às camadas protegidas e a gestão revoga sessões; reativação preserva o cadastro. | Edge Function e testes de Auth/RLS. | Automatizado; navegador pendente |
+| 10 | Promotor lê por rota, Gerencial por UF e Admin globalmente, inclusive por RPC e acesso direto. | Migração de escopo, 41 testes SQL e smoke real da API com seis perfis. | API confirmada; navegador pendente |
+| 11 | Usuário inativo perde acesso às camadas protegidas e a gestão revoga sessões; reativação preserva o cadastro. | Edge Function, testes de Auth/RLS e conta inativa sem qualquer linha via API. | API confirmada; navegador pendente |
 | 12 | URLs canônicas foram criadas para as telas e etapas; refresh, voltar e links diretos preservam o contexto. Código foi separado por aplicação, domínio e componentes lazy. | Testes de navegação e build dividido. | Automatizado; navegador pendente |
 | 13 | Autor original e último editor são separados; filtros distinguem responsável, criador, editor e promotor da rota. | Migrações de autoria/filtros e testes da tela de Notas. | Automatizado; navegador pendente |
 | 14 | PDF usa autor/último editor da FSTD, não quem abriu; não contém fotos e possui documento e versões materializadas no Storage. | Migração de documentos, testes do gerador e contratos SQL. | Automatizado; navegador pendente |

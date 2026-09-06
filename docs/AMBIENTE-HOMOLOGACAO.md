@@ -46,6 +46,16 @@ Todas usam a senha de teste `FstdTeste2026!` e existem somente na branch descart
 
 A conta inativa autentica no provedor, mas é bloqueada pelo perfil público, que é o comportamento atual a ser endurecido no plano.
 
+Para repetir a validação de login e RLS sem registrar a senha no repositório,
+defina `FSTD_TEST_PASSWORD` somente no processo atual e execute:
+
+```text
+npm run verify:homologacao
+```
+
+O script aborta se a URL não corresponder ao projeto
+`binxgymusventbechztf` e não realiza mutações.
+
 ## Proteções obrigatórias
 
 - Não usar chaves, usuários, arquivos ou dados de produção.
