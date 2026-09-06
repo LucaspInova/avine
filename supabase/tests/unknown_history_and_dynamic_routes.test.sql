@@ -140,7 +140,7 @@ select is(
     where loja_id = '30000000-0000-4000-8000-000000000001'
       and nfd_numero_normalizado = '1234'
       and tipo = 'retificacao'
-    order by created_at desc, comentario_id desc limit 1),
+      and comentario = 'Coordenador corrigiu a informacao'),
   'GERENCIAL CE HOMOLOGACAO',
   'Historico preserva o autor da retificacao'
 );

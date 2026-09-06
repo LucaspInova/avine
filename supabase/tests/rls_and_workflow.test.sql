@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(63);
+select plan(64);
 
 insert into auth.users (id, email)
 values
@@ -281,6 +281,28 @@ select ok(
 set local request.jwt.claim.sub = '20000000-0000-0000-0000-000000000001';
 set local request.jwt.claims = '{"sub":"20000000-0000-0000-0000-000000000001","app_metadata":{"role":"promotor"}}';
 
+select throws_ok(
+  $$
+    select public.concluir_fstd_produto(
+      (
+        select id from public.fstd_produtos
+        where codigo_produto = 'P1'
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'motivo_id', '20000000-0000-0000-0000-000000000041',
+          'quantidade_faturada', 12,
+          'quantidade_retorno', 4
+        )
+      ),
+      'teste sem foto',
+      '[]'::jsonb
+    )
+  $$,
+  'P0001',
+  'Ao menos uma foto e obrigatoria para concluir o FSTD.',
+  'produto novo nao pode ser concluido sem foto'
+);
 select results_eq(
   'select public.record_usuario_access() is not null',
   array[true],
