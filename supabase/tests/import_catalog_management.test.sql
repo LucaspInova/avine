@@ -161,11 +161,22 @@ select is(
   'codigo GB C/15 fica resolvido no catalogo'
 );
 select lives_ok(
-  $$select public.salvar_produto_catalogo(null, 'EB C/30', array['10PA01.017EX02'], 30, 'Alto Giro Bco', null, true)$$,
+  $$select public.salvar_produto_catalogo(
+    (select id from public.produtos where nome = 'EB C/30' order by id limit 1),
+    'EB C/30',
+    array['10PA01.017EX02'],
+    30,
+    'Alto Giro Bco',
+    null,
+    true
+  )$$,
   'produto canonico EB C/30 e preparado no cenario limpo'
 );
 select lives_ok(
-  $$select public.vincular_codigo_produto((select id from public.produtos where nome = 'EB C/30'), '10PA01.017EX23')$$,
+  $$select public.vincular_codigo_produto(
+    (select id from public.produtos where nome = 'EB C/30' order by id limit 1),
+    '10PA01.017EX23'
+  )$$,
   'Cuisine e Co e vinculado como alias do EB C/30'
 );
 select is(

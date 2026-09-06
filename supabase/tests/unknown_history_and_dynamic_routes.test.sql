@@ -6,8 +6,16 @@ set local search_path = public, extensions;
 select plan(29);
 
 select has_function('app_private', 'normalize_invoice_number', array['text']);
-select has_table('public', 'nfd_desconhecimento_comentarios');
-select has_view('public', 'nfd_desconhecimento_historico');
+select has_table(
+  'public',
+  'nfd_desconhecimento_comentarios',
+  'comentarios de desconhecimento possuem historico proprio'
+);
+select has_view(
+  'public',
+  'nfd_desconhecimento_historico',
+  'historico consolidado de desconhecimentos esta disponivel'
+);
 select has_index(
   'public',
   'nfd_desconhecimentos',
