@@ -6,7 +6,7 @@ select function_returns('public', 'listar_nfd_notas_gerencial', array['date','da
 select has_index('public', 'nfd_itens', 'nfd_itens_gerencial_data_idx', 'data efetiva indexada');
 select has_index('public', 'nfd_itens', 'nfd_itens_gerencial_uf_cidade_idx', 'UF/cidade indexadas');
 select has_index('public', 'fstd_processos', 'fstd_processos_nfd_created_stable_idx', 'processo ativo indexado');
-select has_index('public', 'nfd_desconhecimentos', 'nfd_desconhecimentos_referencia_ativa_idx', 'desconhecimento ativo indexado');
+select has_index('public', 'nfd_desconhecimentos', 'nfd_desconhecimentos_ativos_referencia_idx', 'desconhecimento ativo indexado');
 select has_index('public', 'fstd_legado', 'fstd_legado_loja_nfd_idx', 'legado indexado sem cast da coluna legada');
 select has_index('public', 'nfd_itens', 'nfd_itens_nota_fiscal_trgm_idx', 'NFD textual parcial indexada');
 select has_index('public', 'nfd_itens', 'nfd_itens_codigo_cliente_trgm_idx', 'cliente textual parcial indexado');
