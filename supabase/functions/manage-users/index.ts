@@ -259,7 +259,7 @@ Deno.serve(async (request) => {
       .not("auth_user_id", "is", null);
 
     if (isScopedGerencial) {
-      listQuery = listQuery.in("estado", callerUfs);
+      listQuery = listQuery.eq("perfil", "Promotor").in("estado", callerUfs);
     }
 
     const { data, error } = await listQuery.order("nome", { ascending: true });

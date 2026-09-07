@@ -98,21 +98,25 @@ values
   ('HOMOLOGACAO', 990001, 'HOM-900001-990001', '2026-09-01', 120.00, 10, 120.00, 0, 0, 900001, 'LOJA TESTE FORTALEZA', 'CE', 'FORTALEZA', 'TESTE-OVO-30', 'OVOS BRANCOS C/30 TESTE', '2026-09-01'),
   ('HOMOLOGACAO', 990001, 'HOM-900001-990001', '2026-09-01', 45.00, 0, 0, 5, 45.00, 900001, 'LOJA TESTE FORTALEZA', 'CE', 'FORTALEZA', 'TESTE-COD-30', 'OVOS CODORNA C/30 TESTE', '2026-09-01'),
   ('HOMOLOGACAO', 990002, 'HOM-900002-990002', '2026-09-02', 72.00, 6, 72.00, 0, 0, 900002, 'LOJA TESTE CAUCAIA', 'CE', 'CAUCAIA', 'TESTE-OVO-30-ALIAS', 'OVOS BRANCOS C/30 ALIAS TESTE', '2026-09-02'),
-  ('HOMOLOGACAO', 990003, 'HOM-900003-990003', '2026-09-03', 84.00, 7, 84.00, 0, 0, 900003, 'LOJA TESTE SALVADOR', 'BA', 'SALVADOR', 'TESTE-NAO-CLASSIFICADO', 'PRODUTO NOVO PENDENTE TESTE', '2026-09-03');
+  ('HOMOLOGACAO', 990003, 'HOM-900003-990003', '2026-09-03', 84.00, 7, 84.00, 0, 0, 900003, 'LOJA TESTE SALVADOR', 'BA', 'SALVADOR', 'TESTE-NAO-CLASSIFICADO', 'PRODUTO NOVO PENDENTE TESTE', '2026-09-03'),
+  ('HOMOLOGACAO', 990010, 'HOM-900002-990010', '2026-09-04', 72.00, 6, 72.00, 0, 0, 900002, 'LOJA TESTE CAUCAIA', 'CE', 'CAUCAIA', 'TESTE-OVO-30', 'OVOS BRANCOS C/30 TESTE', '2026-09-04'),
+  ('HOMOLOGACAO', 990099, 'HOM-900001-990099', '2026-09-05', 36.00, 3, 36.00, 0, 0, 900001, 'LOJA TESTE FORTALEZA', 'CE', 'FORTALEZA', 'TESTE-OVO-30', 'OVOS BRANCOS C/30 TESTE', '2026-09-05');
 
 insert into public.fstd_processos (
   id, nfd_chave_acesso, nfd_numero, loja_id, promotor_id, status,
-  is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes
+  is_avulsa, nfd_data_emissao, nfd_valor, conferencia_status, conferencia_detalhes,
+  api_nfd_chave_acesso
 )
 values
-  ('60000000-0000-4000-8000-000000000001', 'HOM-900001-990001', '990001', '30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000004', 'em_andamento', false, '2026-09-01', 165.00, 'pendente', '{}'),
-  ('60000000-0000-4000-8000-000000000002', 'AVULSA:900002:990010', '990010', '30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000004', 'em_andamento', true, '2026-09-04', 72.00, 'revisao_pendente', '{"cenario":"homologacao"}')
+  ('60000000-0000-4000-8000-000000000001', 'HOM-900001-990001', '990001', '30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000004', 'em_andamento', false, '2026-09-01', 165.00, 'pendente', '{}', null),
+  ('60000000-0000-4000-8000-000000000002', 'AVULSA:900002:990010', '990010', '30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000004', 'em_andamento', true, '2026-09-04', 72.00, 'revisao_pendente', '{"cenario":"homologacao","produtos":[{"chave_produto":"40000000-0000-4000-8000-000000000001","codigo_produto":"TESTE-OVO-30","nome_produto":"OVOS BRANCOS C/30 TESTE","tipo":"quantidade_divergente","fstd_galinha":5,"fstd_codorna":0,"nota_galinha":6,"nota_codorna":0}]}', 'HOM-900002-990010')
 on conflict (id) do update set nfd_chave_acesso=excluded.nfd_chave_acesso,
   nfd_numero=excluded.nfd_numero, loja_id=excluded.loja_id,
   promotor_id=excluded.promotor_id, status=excluded.status,
   is_avulsa=excluded.is_avulsa, nfd_data_emissao=excluded.nfd_data_emissao,
   nfd_valor=excluded.nfd_valor, conferencia_status=excluded.conferencia_status,
-  conferencia_detalhes=excluded.conferencia_detalhes;
+  conferencia_detalhes=excluded.conferencia_detalhes,
+  api_nfd_chave_acesso=excluded.api_nfd_chave_acesso;
 
 insert into public.fstd_produtos (
   id, processo_id, produto_id, codigo_produto, nome, descricao,
@@ -120,9 +124,9 @@ insert into public.fstd_produtos (
   quantidade_retorno, motivo_id, observacao, status, fotos
 )
 values
-  ('61000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30', 'OVOS BRANCOS C/30 TESTE', 'CENARIO NORMAL', 10, 0, 1, '50000000-0000-4000-8000-000000000001', 'OBSERVACAO SINTETICA', 'concluido', '["homologacao/foto-teste.webp"]'),
+  ('61000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30', 'OVOS BRANCOS C/30 TESTE', 'CENARIO NORMAL', 10, 0, 1, '50000000-0000-4000-8000-000000000001', 'OBSERVACAO SINTETICA', 'concluido', '["20000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000001/foto-teste.webp"]'),
   ('61000000-0000-4000-8000-000000000002', '60000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000002', 'TESTE-COD-30', 'OVOS CODORNA C/30 TESTE', 'CENARIO NORMAL', 0, 5, 0, null, null, 'pendente', '[]'),
-  ('61000000-0000-4000-8000-000000000003', '60000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30-ALIAS', 'OVOS BRANCOS C/30 ALIAS TESTE', 'CENARIO AVULSA DIVERGENTE', 5, 0, 1, '50000000-0000-4000-8000-000000000002', 'AGUARDANDO CONCILIACAO', 'concluido', '["homologacao/foto-avulsa.webp"]')
+  ('61000000-0000-4000-8000-000000000003', '60000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000001', 'TESTE-OVO-30-ALIAS', 'OVOS BRANCOS C/30 ALIAS TESTE', 'CENARIO AVULSA DIVERGENTE', 5, 0, 1, '50000000-0000-4000-8000-000000000002', 'AGUARDANDO CONCILIACAO', 'concluido', '["20000000-0000-4000-8000-000000000004/60000000-0000-4000-8000-000000000002/foto-avulsa.webp"]')
 on conflict (id) do update set processo_id=excluded.processo_id,
   produto_id=excluded.produto_id, codigo_produto=excluded.codigo_produto,
   nome=excluded.nome, descricao=excluded.descricao,
@@ -139,7 +143,19 @@ values (
   '70000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000004',
-  'HOM-900001-990099', 'HOM-900001-990099', '990099', '900001',
+  '900001:990099', 'HOM-900001-990099', '990099', '900001',
+  'DESCONHECIMENTO SINTETICO PARA VALIDACAO'
+)
+on conflict (id) do update set comentario=excluded.comentario;
+
+insert into public.nfd_desconhecimento_comentarios (
+  id, desconhecimento_id, usuario_id, autor_nome, autor_perfil, tipo, comentario
+)
+values (
+  '71000000-0000-4000-8000-000000000001',
+  '70000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000004',
+  'PROMOTOR CE UM', 'Promotor', 'abertura',
   'DESCONHECIMENTO SINTETICO PARA VALIDACAO'
 )
 on conflict (id) do update set comentario=excluded.comentario;

@@ -30,32 +30,35 @@ const cases = [
   {
     profile: 'Admin',
     email: 'admin@homologacao.avine.test',
-    expected: { lojas: 3, nfd_itens: 4, fstd_processos: 2 },
+    expected: { lojas: 3, nfd_itens: 6, fstd_processos: 2, desconhecimentos: 1 },
+    managedUsers: { count: 6, profiles: ['Admin', 'Gerencial', 'Promotor'] },
   },
   {
     profile: 'Gerencial CE',
     email: 'gerencial.ce@homologacao.avine.test',
-    expected: { lojas: 2, nfd_itens: 3, fstd_processos: 2 },
+    expected: { lojas: 2, nfd_itens: 5, fstd_processos: 2, desconhecimentos: 1 },
+    managedUsers: { count: 3, profiles: ['Promotor'], states: ['CE'] },
   },
   {
     profile: 'Gerencial BA',
     email: 'gerencial.ba@homologacao.avine.test',
-    expected: { lojas: 1, nfd_itens: 1, fstd_processos: 0 },
+    expected: { lojas: 1, nfd_itens: 1, fstd_processos: 0, desconhecimentos: 0 },
+    managedUsers: { count: 0, profiles: [], states: [] },
   },
   {
     profile: 'Promotor CE 1',
     email: 'promotor.ce1@homologacao.avine.test',
-    expected: { lojas: 2, nfd_itens: 3, fstd_processos: 2 },
+    expected: { lojas: 2, nfd_itens: 5, fstd_processos: 2, desconhecimentos: 1 },
   },
   {
     profile: 'Promotor CE 2',
     email: 'promotor.ce2@homologacao.avine.test',
-    expected: { lojas: 1, nfd_itens: 2, fstd_processos: 0 },
+    expected: { lojas: 1, nfd_itens: 3, fstd_processos: 0, desconhecimentos: 0 },
   },
   {
     profile: 'Promotor inativo',
     email: 'promotor.inativo@homologacao.avine.test',
-    expected: { lojas: 0, nfd_itens: 0, fstd_processos: 0 },
+    expected: { lojas: 0, nfd_itens: 0, fstd_processos: 0, desconhecimentos: 0 },
   },
 ]
 
@@ -89,10 +92,28 @@ for (const scenario of cases) {
   assert.ok(data.user, `${scenario.profile}: usuário não retornado pelo Auth.`)
 
   const observed = {}
-  for (const table of Object.keys(scenario.expected)) {
+  for (const table of ['lojas', 'nfd_itens', 'fstd_processos']) {
     observed[table] = await countRows(supabase, table)
   }
+  const unknownHistory = await supabase
+    .from('nfd_desconhecimento_historico')
+    .select('desconhecimento_id', { count: 'exact', head: true })
+  if (unknownHistory.error) throw new Error(`${scenario.profile}: histórico de desconhecimento falhou: ${unknownHistory.error.message}`)
+  observed.desconhecimentos = unknownHistory.count ?? 0
   assert.deepEqual(observed, scenario.expected, `${scenario.profile}: escopo RLS divergente.`)
+
+  const managedUsers = await supabase.functions.invoke('manage-users', { body: { action: 'list' } })
+  if (scenario.managedUsers) {
+    if (managedUsers.error) throw new Error(`${scenario.profile}: listagem administrativa falhou: ${managedUsers.error.message}`)
+    const users = managedUsers.data?.usuarios ?? []
+    assert.equal(users.length, scenario.managedUsers.count, `${scenario.profile}: quantidade de usuários administráveis divergente.`)
+    assert.deepEqual([...new Set(users.map((user) => user.perfil))].sort(), scenario.managedUsers.profiles, `${scenario.profile}: perfis administrativos indevidos.`)
+    if (scenario.managedUsers.states) {
+      assert.deepEqual([...new Set(users.map((user) => user.estado))].sort(), scenario.managedUsers.states, `${scenario.profile}: UFs administrativas indevidas.`)
+    }
+  } else {
+    assert.ok(managedUsers.error, `${scenario.profile}: não pode acessar a administração de usuários.`)
+  }
   results.push({ profile: scenario.profile, ...observed })
 
   await supabase.auth.signOut({ scope: 'local' })
