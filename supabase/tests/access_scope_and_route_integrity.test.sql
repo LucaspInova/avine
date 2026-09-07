@@ -131,14 +131,14 @@ set local request.jwt.claims = '{"sub":"20000000-0000-4000-8000-000000000001","a
 
 select ok(app_private.is_current_user_active(), 'Admin coerente e ativo passa pelo gate geral');
 select is((select count(*) from public.lojas), 3::bigint, 'Admin ve todas as lojas');
-select is((select count(*) from public.nfd_itens), 4::bigint, 'Admin ve todos os itens fiscais');
+select is((select count(*) from public.nfd_itens), 6::bigint, 'Admin ve todos os itens fiscais');
 select is((select count(*) from public.fstd_legado where origem = 'TESTE RLS'), 2::bigint, 'Admin ve todo o legado');
 
 set local request.jwt.claim.sub = '20000000-0000-4000-8000-000000000002';
 set local request.jwt.claims = '{"sub":"20000000-0000-4000-8000-000000000002","app_metadata":{"role":"gerencial"}}';
 
 select is((select count(*) from public.lojas), 2::bigint, 'Gerencial CE ve somente lojas do CE');
-select is((select count(*) from public.nfd_itens), 3::bigint, 'Gerencial CE ve somente itens do CE');
+select is((select count(*) from public.nfd_itens), 5::bigint, 'Gerencial CE ve somente itens do CE');
 select is((select count(*) from public.nfd_desconhecimentos where loja_codigo = '900003'), 0::bigint, 'Gerencial CE nao ve desconhecimento da BA');
 select is((select count(*) from public.fstd_processos where loja_id = '30000000-0000-4000-8000-000000000003'), 0::bigint, 'Gerencial CE nao ve processo da BA');
 select is((select count(*) from public.fstd_legado where origem = 'TESTE RLS'), 1::bigint, 'Gerencial CE ve somente legado da sua UF');
@@ -156,7 +156,7 @@ set local request.jwt.claims = '{"sub":"20000000-0000-4000-8000-000000000004","a
 
 select ok(app_private.is_current_user_promotor_ativo(), 'Promotor coerente e ativo passa pelo gate do perfil');
 select is((select count(*) from public.lojas), 2::bigint, 'Promotor ve somente lojas da propria rota');
-select is((select count(*) from public.nfd_itens), 3::bigint, 'Promotor ve somente itens fiscais das suas lojas');
+select is((select count(*) from public.nfd_itens), 5::bigint, 'Promotor ve somente itens fiscais das suas lojas');
 select is((select count(*) from public.fstd_processos), 2::bigint, 'Promotor ve somente processos de sua autoria');
 select is((select count(*) from public.fstd_legado where origem = 'TESTE RLS'), 1::bigint, 'Promotor ve legado somente das lojas da rota');
 

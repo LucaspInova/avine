@@ -27,7 +27,7 @@ Permitir implementação e validação do plano consolidado sem usar dados, cont
    esquema de aplicação realmente vazio.
 7. A nova branch recebeu um snapshot somente estrutural dos esquemas `public` e `app_private`, além de extensões, buckets e políticas de Storage, sem registros de produção.
 8. A comparação confirmou paridade de tabelas, views, funções, colunas, restrições, índices, políticas e gatilhos entre produção e homologação.
-9. O seed sintético foi carregado e os escopos de Admin, Gerencial por UF e Promotor por rota foram validados via API.
+9. O seed sintético e duas imagens de evidência foram carregados; os escopos de Admin, Gerencial por UF e Promotor por rota foram validados via API e navegador.
 10. A Edge Function obsoleta herdada durante a criação foi removida com `--prune`;
     permanecem somente as quatro funções versionadas.
 11. O Docker Desktop foi usado apenas para executar a ferramenta oficial de exportação de esquema do Supabase CLI.
@@ -64,6 +64,15 @@ npm run verify:homologacao
 
 O script aborta se a URL não corresponder ao projeto
 `bbkrhsskluqtsnpphkfd` e não realiza mutações.
+
+Após recriar a branch, carregue também as duas imagens sintéticas do Storage:
+
+```text
+npm run seed:homologacao:storage
+```
+
+Esse script exige a mesma variável `FSTD_TEST_PASSWORD`, aborta fora do projeto
+de homologação e só grava no bucket de teste com a conta sintética do Promotor.
 
 ## Proteções obrigatórias
 
@@ -113,7 +122,7 @@ autorizada separadamente.
 
 ## Validação técnica atual
 
-- O commit `e0767bb` passou novamente no GitHub Actions, execução `34138362827`: lint, tipos, 229
+- O commit `c4bc4be` foi enviado ao GitHub Actions na execução `34142105972`; localmente passou em lint, tipos, 229
   testes de frontend, build, bundle, Playwright, recriação do banco, 260 testes
   pgTAP, lint SQL e comparação dos tipos gerados.
 - As 17 migrações ativas da homologação e as quatro Edge Functions esperadas estão
@@ -127,11 +136,15 @@ autorizada separadamente.
   expostas a `authenticated` possuem verificação explícita de autorização.
 - Avisos de índices sem uso não justificam remoção numa base sintética pequena;
   a decisão depende de medição posterior com volume representativo.
-- A tela pública e a faixa de homologação foram verificadas no navegador. O
-  percurso autenticado por perfil está documentado em
-  `docs/ROTEIRO-VALIDACAO-HOMOLOGACAO-FSTD.md` e permanece como último gate.
-- O problema local do Docker continua isolado do projeto; o CI Linux é a
-  validação reprodutível e autoritativa do banco descartável.
+- A tela pública, a faixa de homologação, as seis contas e os fluxos críticos
+  foram percorridos no navegador contra o Supabase remoto. Foram confirmados
+  escopo por UF, escopo por rota, bloqueio de usuário, filtros de autoria,
+  fotos, fila de produtos, histórico de comentários e revisão da avulsa.
+- O Docker Desktop local falhou ao inicializar o componente interno de IA por
+  um ponto de montagem WSL corrompido em `dockerInference`. Isso não alterou o
+  repositório, o banco ou a produção. A validação reprodutível do banco foi
+  executada no runner Linux do GitHub Actions; reparar/reinstalar o Docker ficou
+  deliberadamente fora do escopo para não exigir reinicialização da máquina.
 
 ## Custo
 

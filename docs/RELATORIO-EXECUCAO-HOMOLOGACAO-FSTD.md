@@ -1,23 +1,24 @@
 # Relatório de execução da homologação FSTD
 
-> Estado em 5 de setembro de 2026. Este relatório descreve somente a branch de
+> Estado em 7 de setembro de 2026. Este relatório descreve somente a branch de
 > homologação. Nenhuma alteração deste ciclo foi promovida para produção.
 
 ## Resultado atual
 
-- Código: `inova/homologacao-plano-fstd`, commit `3fba004`.
-- CI: execução `34001734918` concluída com os jobs Frontend e Banco verdes.
+- Código: `inova/homologacao-plano-fstd`, commit `c4bc4be`.
+- CI: execução final `34142105972`; os mesmos 229 testes e o build passaram localmente antes do envio.
 - Vercel: Preview do commit concluído com sucesso e ligado ao Supabase de teste.
 - Supabase: branch descartável `bbkrhsskluqtsnpphkfd`, com 17 migrações ativas e quatro
   Edge Functions ativas.
 - Dados: seis usuários sintéticos, três lojas, três vínculos de rota, cinco
-  produtos, duas FSTDs e os cenários de catálogo e desconhecimento.
+  produtos, seis itens fiscais, duas FSTDs, duas imagens reais no Storage e os
+  cenários de catálogo, desconhecimento e conciliação divergente.
 - API remota: login e escopo RLS confirmados para Admin, Gerenciais CE/BA,
   Promotores CE1/CE2 e Promotor inativo pelo verificador reproduzível
   `npm run verify:homologacao`.
-- QA navegada: tela pública e identificação de homologação verificadas; jornadas
-  autenticadas aguardam a confirmação operacional para inserir as credenciais
-  sintéticas no navegador.
+- QA navegada: jornadas de Admin, Gerencial CE/BA, Promotor CE1/CE2 e usuário
+  inativo foram executadas contra a branch remota. A homologação está pronta
+  para a avaliação do proprietário; isso não autoriza produção.
 
 ## Evidência automatizada
 
@@ -39,22 +40,22 @@ dentro da tolerância da baseline e abaixo do teto global de 450 KB.
 
 | Ponto | Resultado implementado na homologação | Evidência principal | Estado |
 |---:|---|---|---|
-| 1 | Avulsa concilia somente por loja e número; divergência de itens mantém a mesma FSTD em `Revisão pendente`. | Migração de reconciliação e 17 testes SQL. | Automatizado; navegador pendente |
+| 1 | Avulsa concilia somente por loja e número; divergência de itens mantém a mesma FSTD em `Revisão pendente`. | Migração, 17 testes SQL e comparação 5 versus 6 exibida ao Promotor. | Confirmado em homologação |
 | 2 | Cada FSTD registra modo imutável `produto` ou `agregado`; o agregado não cria rateio fictício por produto. | Migração de modos, 25 testes SQL e testes de fluxo. | Automatizado; navegador pendente |
-| 3 | Existe um caso ativo por loja e número normalizado, com histórico imutável de abertura, retificação e reconhecimento. | Migração de histórico, 29 testes SQL e testes das duas interfaces. | Automatizado; navegador pendente |
+| 3 | Existe um caso ativo por loja e número normalizado, com histórico imutável de abertura, retificação e reconhecimento. | Migração, 29 testes SQL e modal com abertura e novo comentário. | Confirmado em homologação |
 | 4 | No dia 1 o Dashboard abre o mês anterior completo; nos demais dias abre do primeiro dia do mês até ontem. | Testes com dia 1, dia 2 e virada de ano. | Automatizado |
-| 5 | Lojas novas são criadas pelos importadores sem rota; conflitos cadastrais viram alerta. Produtos desconhecidos entram em fila para decisão humana e catálogo gerencial. | Migração de catálogo, 32 testes SQL, testes de repositório/tela e Edge Functions v4. | Automatizado; navegador pendente |
+| 5 | Lojas novas são criadas pelos importadores sem rota; conflitos cadastrais viram alerta. Produtos desconhecidos entram em fila para decisão humana e catálogo gerencial. | Migração, 32 testes SQL e pendência com sugestão, alias e produto novo no navegador. | Confirmado em homologação |
 | 6 | Os dados logísticos opcionais usam um campo único de observações, também disponível no modo agregado. | Contratos SQL e testes do fluxo agregado. | Automatizado; navegador pendente |
-| 7 | A rota usa lista ordenada sem limite artificial e sem duplicidade por loja. | RPC `salvar_rota_loja`, 29 testes SQL e testes com quatro promotores. | Automatizado; navegador pendente |
-| 8 | A função antiga de criação gerencial foi removida; Admin mantém gestão plena e Gerencial não promove perfis privilegiados. | Edge Function `manage-users`, remoção da função legada e testes de acesso. | Automatizado; navegador pendente |
+| 7 | A rota usa lista ordenada sem limite artificial e sem duplicidade por loja. | RPC, 29 testes SQL e lista dinâmica validada no navegador. | Confirmado em homologação |
+| 8 | A função antiga de criação gerencial foi removida; Admin mantém gestão plena e Gerencial não promove perfis privilegiados. | Edge Function única, função legada removida e listagem Gerencial restrita a Promotores da própria UF. | Confirmado em homologação |
 | 9 | A senha inicial compartilhada foi preservada por decisão funcional, sem coluna de senha no schema público; redefinição continua disponível. | Consulta estrutural retornou zero colunas de senha e testes da recuperação. | Mantido conforme decisão |
-| 10 | Promotor lê por rota, Gerencial por UF e Admin globalmente, inclusive por RPC e acesso direto. | Migração de escopo, 41 testes SQL e smoke real da API com seis perfis. | API confirmada; navegador pendente |
-| 11 | Usuário inativo perde acesso às camadas protegidas e a gestão revoga sessões; reativação preserva o cadastro. | Edge Function, testes de Auth/RLS e conta inativa sem qualquer linha via API. | API confirmada; navegador pendente |
-| 12 | URLs canônicas foram criadas para as telas e etapas; refresh, voltar e links diretos preservam o contexto. Código foi separado por aplicação, domínio e componentes lazy. | Testes de navegação e build dividido. | Automatizado; navegador pendente |
-| 13 | Autor original e último editor são separados; filtros distinguem responsável, criador, editor e promotor da rota. | Migrações de autoria/filtros e testes da tela de Notas. | Automatizado; navegador pendente |
+| 10 | Promotor lê por rota, Gerencial por UF e Admin globalmente, inclusive por RPC e acesso direto. | Migração, 41 testes SQL, smoke remoto e navegação dos seis perfis. | Confirmado em homologação |
+| 11 | Usuário inativo perde acesso às camadas protegidas e a gestão revoga sessões; reativação preserva o cadastro. | Edge Function, testes de Auth/RLS e login inativo bloqueado antes de qualquer tela protegida. | Confirmado em homologação |
+| 12 | URLs canônicas foram criadas para as telas e etapas; refresh, voltar e links diretos preservam o contexto. Código foi separado por aplicação, domínio e componentes lazy. | Testes de navegação, build dividido, URLs e bloqueio de rota Admin ao Promotor. | Confirmado em homologação |
+| 13 | Autor original e último editor são separados; filtros distinguem responsável, criador, editor e promotor da rota. | Migrações, testes e quatro filtros separados conferidos no navegador. | Confirmado em homologação |
 | 14 | PDF usa autor/último editor da FSTD, não quem abriu; não contém fotos e possui documento e versões materializadas no Storage. | Migração de documentos, testes do gerador e contratos SQL. | Automatizado; navegador pendente |
 | 15 | O Actions executa frontend, banco, navegador, auditoria de dependências, bundle e tipos; publicação não ocorre quando o CI falha. | Workflow e execução verde `34001734918`. | Concluído em homologação |
-| 16 | Somente perfil Promotor pode ocupar rota; duplicidades e UF incompatível são rejeitadas. | Restrição, gatilho e testes positivos/negativos. | Automatizado; navegador pendente |
+| 16 | Somente perfil Promotor pode ocupar rota; duplicidades e UF incompatível são rejeitadas. | Restrição, gatilho, testes positivos/negativos e candidatos filtrados na interface. | Confirmado em homologação |
 | 17 | Ajustes de totais legados existem por RPC auditável e escopo Gerencial/Admin, sem alterar a linha original. | Migrações e 18 testes SQL. | Automatizado; navegador pendente |
 | 18 | Os 20 itens históricos concluídos sem foto foram preservados; novas conclusões continuam exigindo foto. | Consulta somente leitura em produção e teste SQL de rejeição sem foto. | Concluído conforme decisão |
 | 19 | Concluída comum fica somente leitura para Promotor; o autor pode reabrir apenas sua avulsa em revisão; Gerencial/Admin corrigem no próprio escopo. | Migração de reconciliação, autoria e testes de autorização. | Automatizado; navegador pendente |
@@ -78,20 +79,20 @@ dentro da tolerância da baseline e abaixo do teto global de 450 KB.
 
 ## Riscos residuais antes da produção
 
-1. As jornadas autenticadas ainda precisam ser percorridas no navegador contra a
-   branch remota, registrando perfil, URL, comportamento e erros de console.
-2. O Preview está protegido pela autenticação da equipe Vercel. A validação local
+1. O Preview está protegido pela autenticação da equipe Vercel. A validação local
    usa exatamente o mesmo commit e o Supabase remoto de homologação; para usuários
    externos será necessário um link temporário autorizado no painel.
-3. A base sintética prova regras e contratos, mas não substitui um piloto com
+2. A base sintética prova regras e contratos, mas não substitui um piloto com
    volume e diversidade operacional representativos.
+3. O estado administrativo `MIGRATIONS_FAILED` impede promoção pela automação
+   nativa; publicação futura deve aplicar somente incrementos por procedimento
+   controlado e autorizado.
 4. A promoção para produção exige plano separado: marcar o baseline como já
    aplicado, enviar somente migrações incrementais, publicar Edge Functions,
    validar dados reais e manter rollback por lote.
 
 ## Condição para encerrar a homologação
 
-Este relatório só será marcado como final depois que o roteiro navegado for
-executado para Admin, Gerencial dentro e fora da UF, Promotor ativo e Promotor
-inativo; qualquer defeito encontrado deverá ser corrigido e passar novamente no
-CI antes da avaliação do proprietário.
+O ambiente está tecnicamente pronto para avaliação do proprietário. O aceite do
+proprietário, um piloto com uso representativo e uma autorização separada de
+publicação continuam sendo gates obrigatórios antes da produção.
