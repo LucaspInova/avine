@@ -145,4 +145,4 @@ migração versionada.
 - [x] Promotor CE2 e separação de rota; concorrência coberta pelos testes SQL.
 - [x] Promotor inativo.
 - [x] Desktop e fluxos críticos no navegador; mobile, console detalhado e tempos ficam para o piloto do proprietário.
-- [ ] CI verde após os últimos ajustes do QA (a execução `34142105972` detectou contagens antigas no teste de escopo; expectativas corrigidas para o seed ampliado).
+- [x] CI verde após os últimos ajustes do QA (execução `34142386166`).

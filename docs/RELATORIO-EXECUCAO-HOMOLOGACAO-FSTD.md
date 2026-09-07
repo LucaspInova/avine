@@ -5,8 +5,8 @@
 
 ## Resultado atual
 
-- Código: `inova/homologacao-plano-fstd`, commit `c4bc4be`.
-- CI: execução final `34142105972`; os mesmos 229 testes e o build passaram localmente antes do envio.
+- Código: `inova/homologacao-plano-fstd`, commit `027703a`.
+- CI: execução `34142386166` concluída com os jobs Frontend e Banco verdes.
 - Vercel: Preview do commit concluído com sucesso e ligado ao Supabase de teste.
 - Supabase: branch descartável `bbkrhsskluqtsnpphkfd`, com 17 migrações ativas e quatro
   Edge Functions ativas.

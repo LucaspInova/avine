@@ -122,7 +122,7 @@ autorizada separadamente.
 
 ## Validação técnica atual
 
-- O commit `c4bc4be` foi enviado ao GitHub Actions na execução `34142105972`; localmente passou em lint, tipos, 229
+- O commit `027703a` passou no GitHub Actions, execução `34142386166`: lint, tipos, 229
   testes de frontend, build, bundle, Playwright, recriação do banco, 260 testes
   pgTAP, lint SQL e comparação dos tipos gerados.
 - As 17 migrações ativas da homologação e as quatro Edge Functions esperadas estão
