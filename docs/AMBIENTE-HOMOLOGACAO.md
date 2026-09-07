@@ -7,29 +7,38 @@ Permitir implementação e validação do plano consolidado sem usar dados, cont
 ## Estrutura adotada
 
 - Código: branch Git `inova/homologacao-plano-fstd`.
-- Banco: branch Preview descartável `homologacao-clone-estrutural`, criada sem dados de produção.
+- Banco: branch Preview descartável `homologacao-plano-fstd-limpa`, criada sem dados de produção.
 - Frontend: Preview da Vercel, ligado à branch Git somente depois que o banco concluiu a reconstrução e passou nos testes de acesso.
 - Produção: branch principal, domínio público e projeto Supabase principal permanecem intocados.
 
-## Estado verificado em 5 de setembro de 2026
+## Estado verificado em 7 de setembro de 2026
 
 1. O Supabase CLI foi usado contra o projeto de produção somente para leitura e exportação estrutural.
 2. As 76 migrações publicadas possuem correspondência local.
 3. Existe uma migração adicional somente local, ainda não publicada: `20260828105725_add_legacy_fstd_totals_adjustments.sql`.
-4. A primeira reconstrução por migrações parou após cinco arquivos porque o histórico começou depois de objetos já existentes no banco antigo.
-5. Essa branch incompleta foi excluída, interrompendo seu custo.
-6. A nova branch recebeu um snapshot somente estrutural dos esquemas `public` e `app_private`, além de extensões, buckets e políticas de Storage, sem registros de produção.
-7. A comparação confirmou paridade de tabelas, views, funções, colunas, restrições, índices, políticas e gatilhos entre produção e homologação.
-8. O seed sintético foi carregado e os escopos de Admin, Gerencial por UF e Promotor por rota foram validados via API.
-9. O Docker Desktop foi usado apenas para executar a ferramenta oficial de exportação de esquema do Supabase CLI.
-10. A interface recebeu uma faixa amarela permanente quando `VITE_APP_ENV=homologacao`; ela não aparece em produção.
-11. O build da Vercel seleciona o arquivo `.env.homologacao` somente na branch Git de homologação. Em qualquer outra branch, mantém o modo de produção e as variáveis configuradas na Vercel.
+4. O provisionamento nativo de uma Preview Branch reproduz o histórico registrado
+   na produção e para após as cinco primeiras migrações legadas. Esse histórico
+   não representa, sozinho, o esquema real que já existia antes dele.
+5. A branch anterior foi excluída em 7 de setembro, invalidando suas credenciais,
+   e substituída por `homologacao-plano-fstd-limpa` no mesmo modelo de cobrança.
+6. Na nova branch, somente os objetos parciais deixados pela tentativa nativa
+   foram descartados. O histórico desses cinco arquivos foi marcado como
+   revertido apenas na Preview e o baseline versionado foi aplicado sobre um
+   esquema de aplicação realmente vazio.
+7. A nova branch recebeu um snapshot somente estrutural dos esquemas `public` e `app_private`, além de extensões, buckets e políticas de Storage, sem registros de produção.
+8. A comparação confirmou paridade de tabelas, views, funções, colunas, restrições, índices, políticas e gatilhos entre produção e homologação.
+9. O seed sintético foi carregado e os escopos de Admin, Gerencial por UF e Promotor por rota foram validados via API.
+10. A Edge Function obsoleta herdada durante a criação foi removida com `--prune`;
+    permanecem somente as quatro funções versionadas.
+11. O Docker Desktop foi usado apenas para executar a ferramenta oficial de exportação de esquema do Supabase CLI.
+12. A interface recebeu uma faixa amarela permanente quando `VITE_APP_ENV=homologacao`; ela não aparece em produção.
+13. O build da Vercel seleciona o arquivo `.env.homologacao` somente na branch Git de homologação. Em qualquer outra branch, mantém o modo de produção e as variáveis configuradas na Vercel.
 
 ## Endereços operacionais
 
 - Branch Git: `inova/homologacao-plano-fstd`.
 - Frontend Preview: `https://fstddigital-git-inova-homologacao-8785a8-luiz-robertos-projects.vercel.app`.
-- Supabase Preview: `https://binxgymusventbechztf.supabase.co`.
+- Supabase Preview: `https://bbkrhsskluqtsnpphkfd.supabase.co`.
 
 O Preview da Vercel está protegido. Pessoas autenticadas na equipe acessam o endereço estável; para uma validação externa pontual, deve-se gerar um link temporário no painel da Vercel.
 
@@ -54,7 +63,7 @@ npm run verify:homologacao
 ```
 
 O script aborta se a URL não corresponder ao projeto
-`binxgymusventbechztf` e não realiza mutações.
+`bbkrhsskluqtsnpphkfd` e não realiza mutações.
 
 ## Proteções obrigatórias
 
@@ -87,12 +96,27 @@ O frontend de homologação só será disponibilizado quando:
 - crons e integrações reais estiverem desativados;
 - as variáveis do Preview apontarem exclusivamente para a branch descartável.
 
+## Estado administrativo `MIGRATIONS_FAILED`
+
+O marcador permanece na plataforma porque o workflow nativo de criação usa o
+histórico legado registrado na produção, não o baseline ativo do repositório. A
+recriação de 7 de setembro reproduziu a mesma parada após cinco arquivos e
+confirmou a causa.
+
+Isso não representa falha ativa do banco: o projeto Preview está
+`ACTIVE_HEALTHY`, as 17 migrações ativas foram aplicadas, o seed foi carregado e
+os seis perfis passaram no smoke remoto. Entretanto, esta branch não pode ser
+promovida pelo botão de merge, rebaseada ou tratada como prova de publicação
+automática. A futura publicação deverá marcar o baseline como já existente e
+aplicar somente as migrações incrementais em uma operação própria, testada e
+autorizada separadamente.
+
 ## Validação técnica atual
 
-- O commit `3fba004` passou integralmente no GitHub Actions: lint, tipos, 229
+- O commit `e0767bb` passou novamente no GitHub Actions, execução `34138362827`: lint, tipos, 229
   testes de frontend, build, bundle, Playwright, recriação do banco, 260 testes
   pgTAP, lint SQL e comparação dos tipos gerados.
-- As 23 migrações da homologação e as quatro Edge Functions esperadas estão
+- As 17 migrações ativas da homologação e as quatro Edge Functions esperadas estão
   presentes na branch remota.
 - O Supabase remoto contém somente as seis contas e os cenários sintéticos
   versionados.

@@ -8,7 +8,7 @@
 - Código: `inova/homologacao-plano-fstd`, commit `3fba004`.
 - CI: execução `34001734918` concluída com os jobs Frontend e Banco verdes.
 - Vercel: Preview do commit concluído com sucesso e ligado ao Supabase de teste.
-- Supabase: branch descartável `binxgymusventbechztf`, com 23 migrações e quatro
+- Supabase: branch descartável `bbkrhsskluqtsnpphkfd`, com 17 migrações ativas e quatro
   Edge Functions ativas.
 - Dados: seis usuários sintéticos, três lojas, três vínculos de rota, cinco
   produtos, duas FSTDs e os cenários de catálogo e desconhecimento.

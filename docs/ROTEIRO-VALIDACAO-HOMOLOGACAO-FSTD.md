@@ -9,7 +9,7 @@ em produção.
 Endereços:
 
 - Preview Vercel: `https://fstddigital-git-inova-homologacao-8785a8-luiz-robertos-projects.vercel.app`
-- Supabase de teste: `https://binxgymusventbechztf.supabase.co`
+- Supabase de teste: `https://bbkrhsskluqtsnpphkfd.supabase.co`
 - Execução local equivalente, quando o Preview exigir SSO: `http://127.0.0.1:5173/`
 
 Contas e senha estão documentadas em `docs/AMBIENTE-HOMOLOGACAO.md` e existem

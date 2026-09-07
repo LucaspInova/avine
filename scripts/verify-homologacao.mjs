@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
-const EXPECTED_PROJECT = 'binxgymusventbechztf'
+const EXPECTED_PROJECT = 'bbkrhsskluqtsnpphkfd'
 
 function readEnvFile(path) {
   return Object.fromEntries(
